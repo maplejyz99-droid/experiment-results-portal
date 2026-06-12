@@ -74,11 +74,14 @@
               </div>
               <p class="muted" id="chartMeta">Target line: 3.28</p>
             </div>
-            <div class="chart-mode-row" id="chartModeSwitch" aria-label="Chart scale mode"></div>
-            <div class="chart-tools" aria-label="Chart export tools">
-              <span class="chart-tools-label">Export</span>
-              <button type="button" id="downloadSvg">SVG</button>
-              <button type="button" id="downloadCsv">CSV</button>
+            <div class="chart-toolbar" aria-label="Chart tools">
+              <div class="chart-mode-row" id="chartModeSwitch" aria-label="Chart scale mode"></div>
+              <p class="chart-toolbar-meta" id="chartToolbarMeta"></p>
+              <div class="chart-tools" aria-label="Chart export tools">
+                <span class="chart-tools-label">Export</span>
+                <button type="button" id="downloadSvg">Visible SVG</button>
+                <button type="button" id="downloadCsv">Visible CSV</button>
+              </div>
             </div>
             <div class="chart-chips" id="chartSelectionChips"></div>
             <div class="chart-frame">
@@ -125,16 +128,16 @@
         </div>
       </section>
 
-      <section class="panel health-panel" aria-labelledby="data-health-title">
-        <div class="panel-heading">
+      <details class="panel health-panel" aria-labelledby="data-health-title">
+        <summary class="health-summary">
           <div>
             <p class="panel-kicker">Data health</p>
             <h3 id="data-health-title">Static snapshot checks</h3>
           </div>
-          <p class="muted">Counts and coverage from the loaded JSON.</p>
-        </div>
+          <p class="muted" id="dataHealthSummary">Snapshot coverage</p>
+        </summary>
         <div id="dataHealth" class="data-health"></div>
-      </section>
+      </details>
     </main>
 
     <footer>

@@ -33,6 +33,8 @@ let runFilterText = "";
 let runFilterRole = "all";
 let runFilterFamily = "all";
 let runFilterStatus = "all";
+let runFilterTarget = "all";
+let runFilterCurve = "all";
 
 const fmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 5 });
 const intFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -143,6 +145,8 @@ function resetRunFilters() {
   runFilterRole = "all";
   runFilterFamily = "all";
   runFilterStatus = "all";
+  runFilterTarget = "all";
+  runFilterCurve = "all";
 }
 
 function curveAvailable(run, suite) {
@@ -175,7 +179,7 @@ function summaryMetricText(runId, metricName) {
 
 function roleLabel(run) {
   if (run.run_role === "ours") return "ours";
-  if (run.run_role === "official_reference") return "reference";
+  if (run.run_role === "official_reference") return "official ref";
   return run.run_role.replaceAll("_", " ");
 }
 
@@ -209,23 +213,25 @@ function compareRunRows(suite, leftRow, rightRow) {
   return leftRow.run.display_name.localeCompare(rightRow.run.display_name);
 }
 
+function rowFromRun(suite, run) {
+  const primary = primaryMetricName(suite);
+  const summary = Object.fromEntries(
+    summaryMetricsForRun(run.run_id).map((metric) => [metric.metric_name, metric])
+  );
+  return {
+    run,
+    metrics: summary,
+    primaryMetric: summary[primary] || null,
+    finalMetric: summary.final_val_loss || null,
+    bestMetric: summary.best_val_loss || null,
+  };
+}
+
 function eligibleRows(suite) {
   const allowed = new Set(suite.leaderboard_eligibility?.allowed_status || []);
-  const primary = primaryMetricName(suite);
   return suiteRuns(suite.suite_id)
     .filter((run) => allowed.has(run.status))
-    .map((run) => {
-      const summary = Object.fromEntries(
-        summaryMetricsForRun(run.run_id).map((metric) => [metric.metric_name, metric])
-      );
-      return {
-        run,
-        metrics: summary,
-        primaryMetric: summary[primary] || null,
-        finalMetric: summary.final_val_loss || null,
-        bestMetric: summary.best_val_loss || null,
-      };
-    })
+    .map((run) => rowFromRun(suite, run))
     .sort((left, right) => compareRunRows(suite, left, right));
 }
 
@@ -250,6 +256,16 @@ function selectedChartRuns(suite) {
     .map(runById)
     .filter((run) => run && run.suite_id === suite.suite_id)
     .sort((left, right) => compareRunsForSuite(suite, left, right));
+}
+
+function chartVisibleRuns(suite) {
+  const visibleIds = new Set(filteredRows(eligibleRows(suite), suite).map((row) => row.run.run_id));
+  return selectedChartRuns(suite).filter((run) => visibleIds.has(run.run_id));
+}
+
+function hiddenPlottedRuns(suite) {
+  const visibleIds = new Set(chartVisibleRuns(suite).map((run) => run.run_id));
+  return selectedChartRuns(suite).filter((run) => !visibleIds.has(run.run_id));
 }
 
 function selectableChartRuns(suite) {
@@ -311,6 +327,54 @@ function rowSearchText(row) {
     .toLowerCase();
 }
 
+function roleFilterLabel(suite) {
+  return suite.family === "track3" ? "Source" : "Run type";
+}
+
+function roleOptionLabel(value) {
+  const labels = {
+    official_reference: "Official ref",
+    ours: "Ours",
+    baseline: "Baseline",
+    ablation: "Ablation",
+    failed_probe: "Failed probe",
+  };
+  return labels[value] || String(value).replaceAll("_", " ");
+}
+
+function familyOptionLabel(value) {
+  if (value === "optimizer") return "other optimizer";
+  return String(value || "unknown").replaceAll("_", " ");
+}
+
+function curveState(row, suite) {
+  if (selectedChartRunIds.has(row.run.run_id)) return "plotted";
+  return curveAvailable(row.run, suite) ? "available" : "unavailable";
+}
+
+function curveStateLabel(value) {
+  const labels = {
+    plotted: "Plotted",
+    available: "Available",
+    unavailable: "Curve unavailable",
+  };
+  return labels[value] || value;
+}
+
+function targetStatus(row, suite) {
+  const primary = primaryMetricName(suite);
+  if (!suite.target?.metric_name || !primary.includes("steps_to_target")) return null;
+  return row.metrics[primary] ? "reached" : "not_reached";
+}
+
+function targetStatusLabel(value) {
+  const labels = {
+    reached: "Reached",
+    not_reached: "Not reached",
+  };
+  return labels[value] || value;
+}
+
 function filteredRows(rows, suite) {
   const needle = runFilterText.trim().toLowerCase();
   return rows.filter((row) => {
@@ -320,6 +384,8 @@ function filteredRows(rows, suite) {
     if (runFilterStatus !== "all" && run.status !== runFilterStatus) return false;
     const family = run.optimizer?.family || run.optimizer?.name || "unknown";
     if (runFilterFamily !== "all" && family !== runFilterFamily) return false;
+    if (runFilterTarget !== "all" && targetStatus(row, suite) !== runFilterTarget) return false;
+    if (runFilterCurve !== "all" && curveState(row, suite) !== runFilterCurve) return false;
     return true;
   });
 }
@@ -328,13 +394,13 @@ function sortedUnique(values) {
   return Array.from(new Set(values.filter(Boolean))).sort((left, right) => left.localeCompare(right));
 }
 
-function filterSelect(id, label, value, options) {
+function filterSelect(id, label, value, options, labeler = (option) => option.replaceAll("_", " ")) {
   return `
     <label class="run-filter-select">
       <span>${escapeHtml(label)}</span>
       <select id="${id}">
         <option value="all">all</option>
-        ${options.map((option) => `<option value="${escapeHtml(option)}" ${option === value ? "selected" : ""}>${escapeHtml(option.replaceAll("_", " "))}</option>`).join("")}
+        ${options.map((option) => `<option value="${escapeHtml(option)}" ${option === value ? "selected" : ""}>${escapeHtml(labeler(option))}</option>`).join("")}
       </select>
     </label>
   `;
@@ -493,45 +559,92 @@ function plotCell(run, suite) {
   `;
 }
 
-function leaderboardTable(suite, rows, startingRank, tableClass = "") {
+function curveStatusCell(run, suite) {
+  if (selectedChartRunIds.has(run.run_id)) return `<span class="curve-status plotted">plotted</span>`;
+  if (curveAvailable(run, suite)) return `<span class="curve-status ok">available</span>`;
+  return `<span class="curve-status missing">missing</span>`;
+}
+
+function primaryColumnLabel(suite) {
   const primary = primaryMetricName(suite);
+  if (primary.includes("steps_to_target")) return "Steps to target";
+  if (primary === "final_val_loss") return "Primary";
+  return primary.replaceAll("_", " ");
+}
+
+function tableColumnsForRows(suite, rows) {
+  const isTrack3 = suite.suite_id === "track3";
+  const roles = sortedUnique(rows.map((row) => row.run.run_role));
+  const statuses = sortedUnique(rows.map((row) => row.run.status));
+  const columns = ["plot", "rank", "run"];
+  if (roles.length > 1) columns.push("role");
+  columns.push("primary");
+  if (isTrack3) {
+    columns.push("curve");
+  } else {
+    columns.push("best", "final");
+  }
+  if (statuses.length > 1) columns.push("status");
+  return columns;
+}
+
+function tableHeader(column, suite) {
+  const labels = {
+    plot: "Plot",
+    rank: suite.suite_id === "track3" ? "Track #" : "Rank",
+    run: "Run",
+    role: roleFilterLabel(suite),
+    primary: primaryColumnLabel(suite),
+    best: "Best val loss",
+    final: "Final val loss",
+    status: "Status",
+    curve: "Curve",
+  };
+  return labels[column] || column;
+}
+
+function tableCell(column, suite, row, rankLabel) {
+  const run = row.run;
+  const primary = primaryMetricName(suite);
+  const primaryText = row.primaryMetric ? formatMetricValue(primary, row.primaryMetric.value) : "n/a";
+  const bestText = row.bestMetric
+    ? `${formatMetricValue("best_val_loss", row.bestMetric.value)} @ ${row.bestMetric.step}`
+    : "n/a";
+  const cells = {
+    plot: plotCell(run, suite),
+    rank: `<span class="rank-token">${escapeHtml(rankLabel)}</span>`,
+    run: `
+      <span class="run-name">${escapeHtml(run.display_name)}</span><br />
+      <span class="muted table-note">${escapeHtml(run.optimizer.variant || run.optimizer.family || run.optimizer.name)}</span>
+    `,
+    role: `<span class="role ${run.run_role === "ours" ? "ours" : ""}">${escapeHtml(roleLabel(run))}</span>`,
+    primary: `<span class="metric-cell">${escapeHtml(primaryText)}</span>`,
+    best: `<span class="metric-cell">${escapeHtml(bestText)}</span>`,
+    final: `<span class="metric-cell">${escapeHtml(row.finalMetric ? formatMetricValue("final_val_loss", row.finalMetric.value) : "n/a")}</span>`,
+    status: `<span class="metric-cell">${escapeHtml(run.status)}</span>`,
+    curve: curveStatusCell(run, suite),
+  };
+  return cells[column] || "";
+}
+
+function leaderboardTable(suite, rows, startingRank, tableClass = "") {
+  const columns = tableColumnsForRows(suite, rows);
   return `
     <div class="table-wrap ${tableClass}">
       <table>
         <thead>
           <tr>
-            <th>Plot</th>
-            <th>Rank</th>
-            <th>Run</th>
-            <th>Role</th>
-            <th>Primary metric</th>
-            <th>Final val loss</th>
-            <th>Best val loss</th>
-            <th>Status</th>
+            ${columns.map((column) => `<th>${escapeHtml(tableHeader(column, suite))}</th>`).join("")}
           </tr>
         </thead>
         <tbody>
           ${rows
             .map((row, index) => {
               const run = row.run;
-              const primaryText = row.primaryMetric ? formatMetricValue(primary, row.primaryMetric.value) : "n/a";
-              const bestText = row.bestMetric
-                ? `${formatMetricValue("best_val_loss", row.bestMetric.value)} @ ${row.bestMetric.step}`
-                : "n/a";
               const rankLabel = run.leaderboard_meta?.rank_label || row.displayRank || String(startingRank + index);
               return `
                 <tr class="${run.run_id === selectedRunId ? "selected" : ""}" data-run-id="${run.run_id}">
-                  <td>${plotCell(run, suite)}</td>
-                  <td><span class="rank-token">${escapeHtml(rankLabel)}</span></td>
-                  <td>
-                    <span class="run-name">${escapeHtml(run.display_name)}</span><br />
-                    <span class="muted table-note">${escapeHtml(run.optimizer.variant || run.optimizer.family || run.optimizer.name)}</span>
-                  </td>
-                  <td><span class="role ${run.run_role === "ours" ? "ours" : ""}">${escapeHtml(roleLabel(run))}</span></td>
-                  <td class="metric-cell">${escapeHtml(primaryText)}</td>
-                  <td class="metric-cell">${escapeHtml(row.finalMetric ? formatMetricValue("final_val_loss", row.finalMetric.value) : "n/a")}</td>
-                  <td class="metric-cell">${escapeHtml(bestText)}</td>
-                  <td class="metric-cell">${escapeHtml(run.status)}</td>
+                  ${columns.map((column) => `<td>${tableCell(column, suite, row, rankLabel)}</td>`).join("")}
                 </tr>
               `;
             })
@@ -545,26 +658,60 @@ function leaderboardTable(suite, rows, startingRank, tableClass = "") {
 function renderSelectionActions(suite) {
   return `
     <div class="selection-actions">
-      <button type="button" data-chart-action="default">Default set</button>
-      <button type="button" data-chart-action="best">Best ${Math.min(chartSelectionLimit(suite), selectableChartRuns(suite).length)}</button>
+      <button type="button" data-chart-action="default">Restore curated</button>
+      <button type="button" data-chart-action="best">Top ${Math.min(chartSelectionLimit(suite), selectableChartRuns(suite).length)} by suite metric</button>
       <button type="button" data-chart-action="clear">Clear</button>
     </div>
   `;
 }
 
-function renderRunFilters(rows) {
+function activeFilterCount() {
+  return [
+    runFilterText.trim() ? "search" : "",
+    runFilterRole !== "all" ? "role" : "",
+    runFilterFamily !== "all" ? "family" : "",
+    runFilterStatus !== "all" ? "status" : "",
+    runFilterTarget !== "all" ? "target" : "",
+    runFilterCurve !== "all" ? "curve" : "",
+  ].filter(Boolean).length;
+}
+
+function renderRunFilters(rows, suite, visibleCount) {
   const roles = sortedUnique(rows.map((row) => row.run.run_role));
   const families = sortedUnique(rows.map((row) => row.run.optimizer?.family || row.run.optimizer?.name || "unknown"));
   const statuses = sortedUnique(rows.map((row) => row.run.status));
+  const targetStatuses = sortedUnique(rows.map((row) => targetStatus(row, suite)).filter(Boolean));
+  const curveStates = sortedUnique(rows.map((row) => curveState(row, suite)));
+  const visibleCurveOptions = ["plotted", "available", "unavailable"].filter(
+    (state) => curveStates.includes(state) || runFilterCurve === state
+  );
+
+  const controls = [
+    roles.length > 1 || runFilterRole !== "all"
+      ? filterSelect("roleFilter", roleFilterLabel(suite), runFilterRole, roles, roleOptionLabel)
+      : "",
+    families.length > 1 || runFilterFamily !== "all"
+      ? filterSelect("familyFilter", "Optimizer family", runFilterFamily, families, familyOptionLabel)
+      : "",
+    targetStatuses.length > 1 || runFilterTarget !== "all"
+      ? filterSelect("targetFilter", "Target status", runFilterTarget, targetStatuses, targetStatusLabel)
+      : "",
+    visibleCurveOptions.length > 1 || runFilterCurve !== "all"
+      ? filterSelect("curveFilter", "Curve state", runFilterCurve, visibleCurveOptions, curveStateLabel)
+      : "",
+    statuses.length > 1 || runFilterStatus !== "all"
+      ? filterSelect("statusFilter", "Status", runFilterStatus, statuses)
+      : "",
+  ].filter(Boolean);
+
   return `
     <div class="run-filters" aria-label="Run table filters">
       <label class="run-search">
         <span>Search</span>
         <input id="runSearch" type="search" value="${escapeHtml(runFilterText)}" placeholder="optimizer, rank, run id" autocomplete="off" />
       </label>
-      ${filterSelect("roleFilter", "Role", runFilterRole, roles)}
-      ${filterSelect("familyFilter", "Family", runFilterFamily, families)}
-      ${filterSelect("statusFilter", "Status", runFilterStatus, statuses)}
+      ${controls.join("")}
+      <span class="filter-summary">Showing ${visibleCount}/${rows.length}${activeFilterCount() ? ` · ${activeFilterCount()} active` : ""}</span>
       <button type="button" id="clearRunFilters">Reset filters</button>
     </div>
   `;
@@ -598,9 +745,9 @@ function bindLeaderboardInteractions() {
       const suite = activeSuite();
       const action = button.dataset.chartAction;
       if (action === "default") {
-        setChartSelection(suite, defaultChartRunIds(suite), "Default chart set restored.");
+        setChartSelection(suite, defaultChartRunIds(suite), "Curated chart set restored.");
       } else if (action === "best") {
-        setChartSelection(suite, bestChartRunIds(suite), "Best drawable runs selected by the suite leaderboard.");
+        setChartSelection(suite, bestChartRunIds(suite), "Top drawable runs selected by the suite leaderboard metric.");
       } else if (action === "clear") {
         setChartSelection(suite, [], "Chart cleared. Pick rows from the tables below.");
       }
@@ -613,6 +760,7 @@ function bindLeaderboardInteractions() {
     search.addEventListener("input", () => {
       runFilterText = search.value;
       renderLeaderboard();
+      renderChart();
     });
   }
 
@@ -621,6 +769,7 @@ function bindLeaderboardInteractions() {
     role.addEventListener("change", () => {
       runFilterRole = role.value;
       renderLeaderboard();
+      renderChart();
     });
   }
 
@@ -629,6 +778,7 @@ function bindLeaderboardInteractions() {
     family.addEventListener("change", () => {
       runFilterFamily = family.value;
       renderLeaderboard();
+      renderChart();
     });
   }
 
@@ -637,6 +787,25 @@ function bindLeaderboardInteractions() {
     status.addEventListener("change", () => {
       runFilterStatus = status.value;
       renderLeaderboard();
+      renderChart();
+    });
+  }
+
+  const target = byId("targetFilter");
+  if (target) {
+    target.addEventListener("change", () => {
+      runFilterTarget = target.value;
+      renderLeaderboard();
+      renderChart();
+    });
+  }
+
+  const curve = byId("curveFilter");
+  if (curve) {
+    curve.addEventListener("change", () => {
+      runFilterCurve = curve.value;
+      renderLeaderboard();
+      renderChart();
     });
   }
 
@@ -645,6 +814,7 @@ function bindLeaderboardInteractions() {
     clearFilters.addEventListener("click", () => {
       resetRunFilters();
       renderLeaderboard();
+      renderChart();
     });
   }
 }
@@ -675,9 +845,9 @@ function renderLeaderboard() {
       </div>
       ${renderSelectedChartRows(suite)}
       ${renderSelectionActions(suite)}
-      <p class="selection-notice ${chartSelectionNotice ? "" : "empty"}">${escapeHtml(chartSelectionNotice || "Select up to the suite limit for a readable curve comparison.")}</p>
+      <p class="selection-notice ${chartSelectionNotice ? "" : "empty"}">${escapeHtml(chartSelectionNotice || "Use the checkboxes below to add or remove plotted curves.")}</p>
     </div>
-    ${renderRunFilters(rows)}
+    ${renderRunFilters(rows, suite, visibleRows.length)}
   `;
 
   if (hasReferenceAndLocal) {
@@ -823,6 +993,17 @@ function renderTargetMarkerStrip(suite, runs, metricName) {
   });
 }
 
+function hiddenFilterChip(hiddenRuns) {
+  if (!hiddenRuns.length) return "";
+  return `
+    <span class="hidden-filter-chip">
+      ${hiddenRuns.length} plotted ${hiddenRuns.length === 1 ? "run is" : "runs are"} hidden by filters
+      <button type="button" data-filter-action="show-plotted">Show plotted</button>
+      <button type="button" data-filter-action="clear-filters">Clear filters</button>
+    </span>
+  `;
+}
+
 function safeFilename(value) {
   return String(value || "portal-export")
     .toLowerCase()
@@ -851,8 +1032,35 @@ function csvCell(value) {
 
 function chartCsv(suite) {
   const yMetric = curveMetricName(suite);
-  const rows = [["suite_id", "run_id", "display_name", "rank_label", "role", "status", "optimizer", "step", "metric_name", "value"]];
-  selectedChartRuns(suite).forEach((run) => {
+  const target = suite.target || {};
+  const filters = [
+    runFilterText.trim() ? `search=${runFilterText.trim()}` : "",
+    runFilterRole !== "all" ? `role=${runFilterRole}` : "",
+    runFilterFamily !== "all" ? `family=${runFilterFamily}` : "",
+    runFilterStatus !== "all" ? `status=${runFilterStatus}` : "",
+    runFilterTarget !== "all" ? `target=${runFilterTarget}` : "",
+    runFilterCurve !== "all" ? `curve=${runFilterCurve}` : "",
+  ].filter(Boolean).join(";");
+  const rows = [[
+    "suite_id",
+    "run_id",
+    "display_name",
+    "rank_label",
+    "role",
+    "status",
+    "optimizer",
+    "source_type",
+    "source_path",
+    "scale_mode",
+    "target_value",
+    "filters",
+    "step",
+    "metric_name",
+    "value",
+  ]];
+  chartVisibleRuns(suite).forEach((run) => {
+    const source = run.source || {};
+    const sourcePath = source.log_path || source.csv_path || source.config_path || source.wandb_url || source.command || "";
     pointMetrics(run.run_id, yMetric).forEach((point) => {
       rows.push([
         suite.suite_id,
@@ -862,6 +1070,11 @@ function chartCsv(suite) {
         run.run_role,
         run.status,
         run.optimizer?.name || "",
+        source.source_type || "",
+        sourcePath,
+        chartScaleMode,
+        target.metric_name === yMetric ? target.value ?? "" : "",
+        filters,
         point.step,
         yMetric,
         point.value,
@@ -928,15 +1141,17 @@ function renderChart() {
   const margin = { top: 22, right: 24, bottom: 42, left: 58 };
   const chartWidth = width - margin.left - margin.right;
   const chartHeight = height - margin.top - margin.bottom;
-  const runs = selectedChartRuns(suite).filter((run) => curveAvailable(run, suite));
+  const hiddenRuns = hiddenPlottedRuns(suite);
+  const runs = chartVisibleRuns(suite).filter((run) => curveAvailable(run, suite));
   const allPoints = runs.flatMap((run) => pointMetrics(run.run_id, yMetric));
 
   byId("chartMeta").textContent = showTargetLine
-    ? `${yMetric} with target ${target.value} · ${runs.length}/${chartSelectionLimit(suite)} plotted · ${chartScaleModeLabel()}`
-    : `${yMetric} by step · ${runs.length}/${chartSelectionLimit(suite)} plotted · ${chartScaleModeLabel()}`;
+    ? `${yMetric} with target ${target.value}`
+    : `${yMetric} by step`;
 
   byId("chartSelectionChips").innerHTML = runs.length
-    ? runs
+    ? [
+        ...runs
         .map(
           (run, index) => `
             <button type="button" class="${run.run_id === selectedRunId ? "active" : ""}" data-run-id="${run.run_id}">
@@ -944,12 +1159,30 @@ function renderChart() {
               ${escapeHtml(runChipLabel(run, suite))}
             </button>
           `
-        )
-        .join("")
-    : "<span class=\"muted\">No selected runs have drawable curves.</span>";
-  byId("chartSelectionChips").querySelectorAll("button").forEach((button) => {
+        ),
+        hiddenFilterChip(hiddenRuns),
+      ].join("")
+    : hiddenRuns.length
+      ? hiddenFilterChip(hiddenRuns)
+      : "<span class=\"muted\">No selected runs have drawable curves.</span>";
+  byId("chartSelectionChips").querySelectorAll("button[data-run-id]").forEach((button) => {
     button.addEventListener("click", () => {
       selectedRunId = button.dataset.runId;
+      renderAll();
+    });
+  });
+  byId("chartSelectionChips").querySelectorAll("[data-filter-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (button.dataset.filterAction === "show-plotted") {
+        runFilterText = "";
+        runFilterRole = "all";
+        runFilterFamily = "all";
+        runFilterStatus = "all";
+        runFilterTarget = "all";
+        runFilterCurve = "plotted";
+      } else {
+        resetRunFilters();
+      }
       renderAll();
     });
   });
@@ -957,6 +1190,7 @@ function renderChart() {
   renderTargetMarkerStrip(suite, runs, markerMetric);
 
   if (!allPoints.length) {
+    byId("chartToolbarMeta").textContent = `${runs.length}/${chartSelectionLimit(suite)} visible · ${hiddenRuns.length} hidden by filters`;
     const empty = svgEl("text", { x: 24, y: 48, class: "chart-label" });
     empty.textContent = "Select a run with an available curve.";
     svg.appendChild(empty);
@@ -980,6 +1214,15 @@ function renderChart() {
   const maxValue = configuredYMax ?? niceAxisCeiling(rawMax + padding, 6);
   const minCandidate = Math.max(0, rawMin - padding);
   const minValue = configuredYMax ? Math.max(0, Math.min(minCandidate, maxValue - 0.1)) : 0;
+  const clippedRuns = configuredYMax
+    ? runs.filter((run) => pointMetrics(run.run_id, yMetric).some((point) => point.value > maxValue)).length
+    : 0;
+  byId("chartToolbarMeta").textContent = [
+    `${runs.length}/${chartSelectionLimit(suite)} visible`,
+    hiddenRuns.length ? `${hiddenRuns.length} hidden by filters` : "",
+    configuredYMax ? `Zoom y<=${formatMetricValue(yMetric, maxValue)}` : "Full scale",
+    clippedRuns ? `${clippedRuns} ${clippedRuns === 1 ? "run" : "runs"} clipped` : "",
+  ].filter(Boolean).join(" · ");
 
   const x = (step) => margin.left + (step / maxStep) * chartWidth;
   const y = (value) => margin.top + ((maxValue - value) / (maxValue - minValue)) * chartHeight;
@@ -1088,11 +1331,12 @@ function renderChart() {
     });
     const focus = svgEl("circle", { r: 5, class: "chart-focus" });
     const tooltip = svgEl("g", { class: "chart-tooltip" });
-    const tooltipRect = svgEl("rect", { rx: 7, ry: 7, width: 230, height: 76 });
+    const tooltipRect = svgEl("rect", { rx: 7, ry: 7, width: 276, height: 96 });
     const tooltipTitle = svgEl("text", { x: 10, y: 20, class: "chart-tooltip-title" });
-    const tooltipStep = svgEl("text", { x: 10, y: 42, class: "chart-tooltip-text" });
-    const tooltipValue = svgEl("text", { x: 10, y: 61, class: "chart-tooltip-text" });
-    tooltip.append(tooltipRect, tooltipTitle, tooltipStep, tooltipValue);
+    const tooltipSource = svgEl("text", { x: 10, y: 40, class: "chart-tooltip-text" });
+    const tooltipStep = svgEl("text", { x: 10, y: 60, class: "chart-tooltip-text" });
+    const tooltipRun = svgEl("text", { x: 10, y: 80, class: "chart-tooltip-text" });
+    tooltip.append(tooltipRect, tooltipTitle, tooltipSource, tooltipStep, tooltipRun);
     hoverLayer.append(crosshair, focus, tooltip);
     svg.appendChild(hoverLayer);
 
@@ -1120,11 +1364,12 @@ function renderChart() {
       focus.setAttribute("cy", nearest.y);
       focus.setAttribute("fill", nearest.color);
       const rank = nearest.run.leaderboard_meta?.rank_label || roleLabel(nearest.run);
-      tooltipTitle.textContent = `${rank} ${nearest.run.display_name}`.slice(0, 34);
-      tooltipStep.textContent = `step ${intFmt.format(nearest.step)}`;
-      tooltipValue.textContent = `${yMetric} ${formatMetricValue(yMetric, nearest.value)}`;
-      const tooltipX = Math.min(Math.max(nearest.x + 12, margin.left), margin.left + chartWidth - 230);
-      const tooltipY = Math.min(Math.max(nearest.y - 88, margin.top), margin.top + chartHeight - 78);
+      tooltipTitle.textContent = `${rank} ${nearest.run.display_name}`;
+      tooltipSource.textContent = `${roleFilterLabel(suite)} ${roleLabel(nearest.run)} · ${nearest.run.status}`;
+      tooltipStep.textContent = `step ${intFmt.format(nearest.step)} · ${yMetric} ${formatMetricValue(yMetric, nearest.value)}`;
+      tooltipRun.textContent = `run_id ${nearest.run.run_id}`;
+      const tooltipX = Math.min(Math.max(nearest.x + 12, margin.left), margin.left + chartWidth - 276);
+      const tooltipY = Math.min(Math.max(nearest.y - 108, margin.top), margin.top + chartHeight - 98);
       tooltip.setAttribute("transform", `translate(${tooltipX}, ${tooltipY})`);
     });
     overlay.addEventListener("pointerleave", () => {
@@ -1305,6 +1550,9 @@ function renderDataHealth() {
     }).length;
     return `${figure.suite_id}: ${drawable}/${figure.run_ids?.length || 0}`;
   });
+
+  byId("dataHealthSummary").textContent =
+    `${portalData.runs.length} runs · ${portalData.metrics.length} metrics · ${portalData.figures.length} figures · validation passed`;
 
   byId("dataHealth").innerHTML = `
     ${metricLine("generated_at", portalData.meta?.generated_at || "n/a")}

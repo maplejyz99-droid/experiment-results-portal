@@ -284,7 +284,7 @@ main {
 .dashboard-grid,
 .detail-band {
   display: grid;
-  grid-template-columns: minmax(360px, 0.92fr) minmax(520px, 1.08fr);
+  grid-template-columns: minmax(330px, 0.82fr) minmax(560px, 1.18fr);
   gap: 18px;
   margin-top: 18px;
 }
@@ -394,6 +394,9 @@ main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
+  max-height: 178px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: 12px 14px;
 }
 
@@ -468,7 +471,7 @@ main {
 
 .run-filters {
   display: grid;
-  grid-template-columns: minmax(180px, 1.3fr) repeat(3, minmax(104px, 0.9fr)) auto;
+  grid-template-columns: minmax(180px, 1.25fr) repeat(auto-fit, minmax(126px, 0.75fr)) auto auto;
   gap: 8px;
   margin-top: 12px;
   padding: 10px;
@@ -511,6 +514,17 @@ main {
 
 .run-filter-select select {
   padding: 6px;
+}
+
+.filter-summary {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--subtle-ink);
+  font-family: "Menlo", "Monaco", monospace;
+  font-size: 10px;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .empty-table-note {
@@ -581,6 +595,11 @@ main {
 .curve-status.ok {
   background: var(--green-soft);
   color: var(--teal);
+}
+
+.curve-status.plotted {
+  background: var(--blue-soft);
+  color: var(--blue);
 }
 
 .curve-status.missing {
@@ -712,16 +731,29 @@ tbody tr.selected {
   opacity: 0.88;
 }
 
+.chart-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 18px 0;
+  flex-wrap: wrap;
+}
+
 .chart-mode-row,
 .chart-tools {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 14px 18px 0;
+  padding: 0;
 }
 
-.chart-tools {
-  padding-top: 8px;
+.chart-toolbar-meta {
+  flex: 1 1 220px;
+  color: var(--subtle-ink);
+  font-family: "Menlo", "Monaco", monospace;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .chart-mode-label {
@@ -801,7 +833,7 @@ tbody tr.selected {
 .chart-tooltip-text {
   fill: var(--subtle-ink);
   font-family: "Menlo", "Monaco", monospace;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .curve {
@@ -851,8 +883,10 @@ tbody tr.selected {
 
 .target-step-pills {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 7px;
+  overflow-x: auto;
+  padding-bottom: 3px;
 }
 
 .target-step-pills button {
@@ -885,7 +919,8 @@ tbody tr.selected {
 }
 
 .legend button,
-.chart-chips button {
+.chart-chips button,
+.hidden-filter-chip {
   min-height: 32px;
   display: inline-flex;
   align-items: center;
@@ -896,6 +931,25 @@ tbody tr.selected {
   color: var(--ink);
   font: inherit;
   font-size: 12px;
+  cursor: pointer;
+}
+
+.hidden-filter-chip {
+  background: #fbfcfa;
+  color: var(--subtle-ink);
+  font-size: 11px;
+  cursor: default;
+}
+
+.hidden-filter-chip button {
+  min-height: 24px;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 10px;
   cursor: pointer;
 }
 
@@ -1052,11 +1106,26 @@ tbody tr.selected {
   margin-top: 18px;
 }
 
+.health-summary {
+  min-height: 76px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 17px 18px 14px;
+  cursor: pointer;
+}
+
+.health-summary::marker {
+  color: var(--teal);
+}
+
 .data-health {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   padding: 18px;
+  border-top: 1px solid var(--line);
 }
 
 .tag {
@@ -1098,6 +1167,7 @@ code {
   .suite-header,
   .section-heading,
   .panel-heading,
+  .health-summary,
   footer {
     flex-direction: column;
     align-items: flex-start;
