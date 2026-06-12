@@ -4,9 +4,11 @@ Static, source-backed result portal for optimizer experiment comparisons.
 
 ## Current Scope
 
-- Active suite: `modded-nanogpt Track 3`
-- Views: suite cards, official Track 3 history, selectable validation-loss curves, run detail, claim cards
-- Ranking: Track 3 `steps_to_target_3_28`
+- Active suites: `modded-nanogpt Track 3`, `Llama 124M`
+- Partial detail suite: `Llama 210M`
+- Placeholder views: `muP scaling`, `Llama 583M`, `Llama 720M`, `MoE 520M`, `Memory / Speed`
+- Views: suite cards, suite leaderboard, selectable validation-loss curves, run detail, claim cards
+- Ranking: suite-specific `leaderboard_rule.sort_by`
 - Data source: curated static JSON snapshot in `data/portal-data.json`
 
 This published snapshot is a presentation portal, not a live training monitor.
