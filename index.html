@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LLM Optimizer Results Portal</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">experiment-results-portal / minimal static loop</p>
+        <h1>LLM Optimizer Results Portal</h1>
+      </div>
+      <div class="source-pill">
+        <span class="dot"></span>
+        Static seed data
+      </div>
+    </header>
+
+    <main>
+      <section class="overview-band" aria-labelledby="overview-title">
+        <div>
+          <p class="section-kicker">Overview</p>
+          <h2 id="overview-title">Suite-local evidence, not a mixed global ranking.</h2>
+          <p class="lede">
+            Group-meeting and paper-style review for optimizer experiments:
+            suite cards, traceable runs, claim cards, and evidence-ready curves.
+          </p>
+        </div>
+        <div class="metric-strip" id="overviewMetrics" aria-label="Portal summary metrics"></div>
+      </section>
+
+      <section class="suite-cards-band" aria-labelledby="suite-cards-title">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">Suite map</p>
+            <h2 id="suite-cards-title">Choose a benchmark lens.</h2>
+          </div>
+          <p class="muted wide-muted">
+            Only curated suites show leaderboards. Planned suites stay visible without inventing results.
+          </p>
+        </div>
+        <div class="suite-card-grid" id="suiteCards" aria-label="Experiment suites"></div>
+      </section>
+
+      <section class="suite-band" aria-labelledby="suite-title">
+        <div class="suite-header">
+          <div>
+            <p class="section-kicker">Selected suite</p>
+            <h2 id="suite-title">modded-nanogpt Track 3</h2>
+          </div>
+          <div class="target-box" id="targetBox"></div>
+        </div>
+
+        <div class="dashboard-grid" id="suiteDataPanel">
+          <section class="panel leaderboard-panel" aria-labelledby="leaderboard-title">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-kicker">Leaderboard</p>
+                <h3 id="leaderboard-title">Track 3 steps-to-target leaderboard</h3>
+              </div>
+              <p class="muted" id="leaderboardNote">Click a row to inspect provenance.</p>
+            </div>
+            <div id="leaderboardContent"></div>
+          </section>
+
+          <section class="panel chart-panel" aria-labelledby="chart-title">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-kicker">Curve compare</p>
+                <h3 id="chart-title">Validation loss by step</h3>
+              </div>
+              <p class="muted" id="chartMeta">Target line: 3.28</p>
+            </div>
+            <div class="chart-chips" id="chartSelectionChips"></div>
+            <div class="chart-frame">
+              <svg id="lossChart" role="img" aria-label="Track 3 validation loss curves"></svg>
+            </div>
+            <div class="target-step-strip" id="targetStepStrip" aria-label="Selected runs target steps"></div>
+            <div class="legend" id="chartLegend"></div>
+          </section>
+        </div>
+
+        <section class="panel placeholder-panel" id="suitePlaceholder" hidden aria-labelledby="placeholder-title">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-kicker" id="placeholder-kicker">Suite placeholder</p>
+              <h3 id="placeholder-title">Curated data not attached yet</h3>
+            </div>
+            <p class="muted" id="placeholder-status">planned</p>
+          </div>
+          <div class="placeholder-body" id="placeholderBody"></div>
+        </section>
+      </section>
+
+      <section class="detail-band" id="detailBand" aria-labelledby="detail-title">
+        <div class="panel detail-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-kicker">Run source trace</p>
+              <h3 id="detail-title">Selected run</h3>
+            </div>
+            <p class="muted">Every visible result keeps a source path or URL.</p>
+          </div>
+          <div id="runDetail" class="run-detail"></div>
+        </div>
+
+        <div class="panel claim-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-kicker">Claim cards</p>
+              <h3>Evidence notes</h3>
+            </div>
+            <p class="muted">Manual claims only.</p>
+          </div>
+          <div id="claimsList" class="claim-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>Data: <code>data/portal-data.json</code></span>
+      <span>Roadmap item: <code>portal-minimal-static-loop</code></span>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
