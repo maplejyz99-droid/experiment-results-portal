@@ -1014,6 +1014,10 @@ function safeFilename(value) {
 
 function downloadText(filename, text, mimeType) {
   const blob = new Blob([text], { type: mimeType });
+  downloadBlob(filename, blob);
+}
+
+function downloadBlob(filename, blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -1090,12 +1094,21 @@ function exportCurrentChartCsv() {
   downloadText(filename, chartCsv(suite), "text/csv;charset=utf-8");
 }
 
-function exportCurrentChartSvg() {
+function chartExportFilename(suite, extension) {
+  return `${safeFilename(suite.suite_id)}-${safeFilename(curveMetricName(suite))}-${chartScaleMode}.${extension}`;
+}
+
+function chartSvgXml() {
   const suite = activeSuite();
   const svg = byId("lossChart");
   const clone = svg.cloneNode(true);
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-  clone.querySelectorAll(".chart-hover, .chart-tooltip").forEach((node) => node.remove());
+  const viewBox = svg.viewBox.baseVal;
+  const width = Math.ceil(viewBox?.width || svg.clientWidth || 1200);
+  const height = Math.ceil(viewBox?.height || svg.clientHeight || 720);
+  clone.setAttribute("width", width);
+  clone.setAttribute("height", height);
+  clone.querySelectorAll(".chart-hover, .chart-tooltip, .chart-hover-capture").forEach((node) => node.remove());
   const style = svgEl("style");
   style.textContent = `
     .axis{stroke:#9da89e;stroke-width:1}
@@ -1109,14 +1122,51 @@ function exportCurrentChartSvg() {
     .chart-label{fill:#5c625d;font-family:Menlo,Monaco,monospace;font-size:11px}
   `;
   clone.insertBefore(style, clone.firstChild);
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(clone)}\n`;
-  const filename = `${safeFilename(suite.suite_id)}-${safeFilename(curveMetricName(suite))}-${chartScaleMode}.svg`;
-  downloadText(filename, xml, "image/svg+xml;charset=utf-8");
+  const background = svgEl("rect", { x: 0, y: 0, width, height, fill: "#fbfcfa" });
+  clone.insertBefore(background, style.nextSibling);
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(clone)}\n`;
+}
+
+function exportCurrentChartSvg() {
+  const suite = activeSuite();
+  const xml = chartSvgXml();
+  downloadText(chartExportFilename(suite, "svg"), xml, "image/svg+xml;charset=utf-8");
+}
+
+function exportCurrentChartPng() {
+  const suite = activeSuite();
+  const svg = byId("lossChart");
+  const viewBox = svg.viewBox.baseVal;
+  const width = Math.ceil(viewBox?.width || svg.clientWidth || 1200);
+  const height = Math.ceil(viewBox?.height || svg.clientHeight || 720);
+  const xml = chartSvgXml();
+  const svgBlob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(svgBlob);
+  const image = new Image();
+  image.onload = () => {
+    const scale = Math.max(2, Math.ceil(window.devicePixelRatio || 1));
+    const canvas = document.createElement("canvas");
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#fbfcfa";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      downloadBlob(chartExportFilename(suite, "png"), blob);
+    }, "image/png");
+  };
+  image.onerror = () => URL.revokeObjectURL(url);
+  image.src = url;
 }
 
 function bindChartExportControls() {
+  const pngButton = byId("downloadPng");
   const svgButton = byId("downloadSvg");
   const csvButton = byId("downloadCsv");
+  if (pngButton) pngButton.onclick = exportCurrentChartPng;
   if (svgButton) svgButton.onclick = exportCurrentChartSvg;
   if (csvButton) csvButton.onclick = exportCurrentChartCsv;
 }
