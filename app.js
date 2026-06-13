@@ -856,10 +856,10 @@ function renderLeaderboard() {
     const localLabel = suite.suite_id === "track3" ? "Our representative runs" : "Local or comparison runs";
     byId("leaderboardContent").innerHTML = `
       ${selectionBlock}
-      <details class="history-details" ${open}>
+      <details class="history-details ${suite.suite_id === "track3" ? "track3-history-callout" : ""}" ${open}>
         <summary>
           <span>${escapeHtml(referenceLabel)} (${referenceRows.length})</span>
-          <span class="muted">curated source-backed rows</span>
+          <span class="muted">${suite.suite_id === "track3" ? "click to expand · sorted by steps" : "curated source-backed rows"}</span>
         </summary>
         ${referenceRows.length ? leaderboardTable(suite, referenceRows, 1, "compact-table scroll-table") : "<p class=\"empty-table-note\">No reference rows match the current filters.</p>"}
       </details>

@@ -369,6 +369,40 @@ main {
   font-size: 12px;
 }
 
+.track3-history-callout {
+  border-color: rgba(15, 113, 102, 0.38);
+  background:
+    linear-gradient(90deg, rgba(15, 113, 102, 0.09), rgba(251, 252, 250, 0.96) 38%),
+    #fbfcfa;
+  box-shadow: inset 4px 0 0 var(--teal);
+}
+
+.track3-history-callout summary {
+  background: rgba(15, 113, 102, 0.055);
+}
+
+.track3-history-callout summary span:first-child {
+  color: var(--teal);
+}
+
+.track3-history-callout summary::after {
+  content: "expand";
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border: 1px solid rgba(15, 113, 102, 0.36);
+  border-radius: 999px;
+  background: rgba(15, 113, 102, 0.09);
+  color: var(--teal);
+  font-family: "Menlo", "Monaco", monospace;
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.track3-history-callout[open] summary::after {
+  content: "collapse";
+}
+
 .mini-heading {
   min-height: 48px;
   display: flex;
@@ -463,6 +497,13 @@ main {
   cursor: pointer;
 }
 
+.run-filters button {
+  min-height: 28px;
+  padding: 5px 9px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .selection-actions button:hover,
 .run-filters button:hover,
 .chart-tools button:hover {
@@ -470,20 +511,39 @@ main {
 }
 
 .run-filters {
-  display: grid;
-  grid-template-columns: minmax(180px, 1.25fr) repeat(auto-fit, minmax(126px, 0.75fr)) auto auto;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 8px;
   margin-top: 12px;
-  padding: 10px;
+  padding: 6px 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbfcfa;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.run-filters::-webkit-scrollbar {
+  height: 4px;
 }
 
 .run-search,
 .run-filter-select {
-  display: grid;
-  gap: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.run-search {
+  flex: 0 0 230px;
+}
+
+.run-filter-select {
+  flex: 0 0 auto;
 }
 
 .run-search span,
@@ -499,7 +559,7 @@ main {
 .run-search input,
 .run-filter-select select {
   width: 100%;
-  min-height: 32px;
+  min-height: 28px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -509,17 +569,21 @@ main {
 }
 
 .run-search input {
-  padding: 6px 9px;
+  min-width: 150px;
+  padding: 5px 9px;
 }
 
 .run-filter-select select {
-  padding: 6px;
+  width: auto;
+  max-width: 160px;
+  padding: 5px 6px;
 }
 
 .filter-summary {
-  min-height: 32px;
+  min-height: 28px;
   display: inline-flex;
   align-items: center;
+  margin-left: auto;
   color: var(--subtle-ink);
   font-family: "Menlo", "Monaco", monospace;
   font-size: 10px;
@@ -1251,7 +1315,6 @@ code {
     flex-wrap: wrap;
   }
 
-  .run-filters,
   .data-health {
     grid-template-columns: 1fr;
   }
