@@ -1,10 +1,10 @@
 {
   "meta": {
     "title": "LLM Optimizer Results Portal",
-    "version": "0.4.0",
+    "version": "0.4.1",
     "generated_at": "2026-06-12",
-    "mode": "static-track3-history-import",
-    "notes": "Static portal data with Track 3 official README history plus curated local runs.",
+    "mode": "static-track3-supplemental-import",
+    "notes": "Static portal data with Track 3 official history plus RTX5090 supplemental local runs.",
     "publication": "github-pages-public-snapshot",
     "source_path_policy": "Remote absolute paths are replaced with public source labels in this published snapshot."
   },
@@ -3555,7 +3555,7 @@
         "log_path": null,
         "csv_path": null,
         "command": null,
-        "config_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
+        "config_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
         "git_commit": null
       }
     },
@@ -3609,7 +3609,7 @@
         "log_path": null,
         "csv_path": null,
         "command": null,
-        "config_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
+        "config_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
         "git_commit": null
       }
     },
@@ -3663,7 +3663,7 @@
         "log_path": null,
         "csv_path": null,
         "command": null,
-        "config_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
+        "config_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
         "git_commit": null
       }
     },
@@ -3717,7 +3717,7 @@
         "log_path": null,
         "csv_path": null,
         "command": null,
-        "config_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
+        "config_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
         "git_commit": null
       }
     },
@@ -3771,7 +3771,7 @@
         "log_path": null,
         "csv_path": null,
         "command": null,
-        "config_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
+        "config_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
         "git_commit": null
       }
     },
@@ -3825,7 +3825,7 @@
         "log_path": null,
         "csv_path": null,
         "command": null,
-        "config_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
+        "config_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
         "git_commit": null
       }
     },
@@ -3879,7 +3879,7 @@
         "log_path": null,
         "csv_path": null,
         "command": null,
-        "config_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
+        "config_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
         "git_commit": null
       }
     },
@@ -3933,8 +3933,354 @@
         "log_path": null,
         "csv_path": null,
         "command": null,
-        "config_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
+        "config_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
         "git_commit": null
+      }
+    },
+    {
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "display_name": "Gated SoftMuonEq",
+      "suite_id": "track3",
+      "run_role": "ours",
+      "status": "completed",
+      "optimizer": {
+        "name": "Gated SoftMuonEq",
+        "family": "muon",
+        "variant": "cheap_cv_gate ns=12 alpha=0.5"
+      },
+      "model": {
+        "type": "track3_gpt",
+        "params": "124M",
+        "n_layer": 12,
+        "n_head": 6,
+        "n_embd": 768
+      },
+      "dataset": {
+        "name": "fineweb10B-gpt2",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 3400,
+        "train_tokens": 1782579200,
+        "batch_size": 512,
+        "acc_steps": 16,
+        "global_batch_tokens": 524288,
+        "sequence_length": 1024,
+        "scheduler": "linear cooldown",
+        "lr": 0.025,
+        "weight_decay": 0.05,
+        "warmup_steps": 0,
+        "grad_clip": null,
+        "dtype": "bfloat16",
+        "seed": 0,
+        "eval_interval": "125 then 25 near target"
+      },
+      "hardware": {
+        "gpu_type": "NVIDIA GeForce RTX 5090",
+        "num_gpus": 1,
+        "ddp": false,
+        "compile": true,
+        "torch": "2.8.0+cu128",
+        "cuda": "12.8"
+      },
+      "source": {
+        "command": "torchrun --standalone --nproc_per_node=1 run_track3_strict_equilibration.py --method gated_softmuoneq --seed 0",
+        "git_commit": "54c192a77bd0e3d2572a891e0a8a1b0ceeb957d7",
+        "source_type": "local_log",
+        "log_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+      },
+      "leaderboard_meta": {
+        "official_rank": null,
+        "rank_label": "ours",
+        "steps_to_target_3_28": 3300,
+        "evidence": "stat-sig target: val_loss 3.27431 @ step 3300 (n=1)",
+        "date": null,
+        "description": "RTX5090 local Track 3 supplemental run; full run continues to step 3400 but plotted curve stops at official statistically significant target step.",
+        "contributors": "local experiment",
+        "relative_log_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt",
+        "source_paths": [
+          "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+        ],
+        "curve_cutoff_step": 3300,
+        "curve_available": true,
+        "curve_reason": "curated local curve parsed"
+      }
+    },
+    {
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "display_name": "MuonEq Row+Col",
+      "suite_id": "track3",
+      "run_role": "ours",
+      "status": "completed",
+      "optimizer": {
+        "name": "MuonEq",
+        "family": "muon",
+        "variant": "row+col l2 ns=5"
+      },
+      "model": {
+        "type": "track3_gpt",
+        "params": "124M",
+        "n_layer": 12,
+        "n_head": 6,
+        "n_embd": 768
+      },
+      "dataset": {
+        "name": "fineweb10B-gpt2",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 3400,
+        "train_tokens": 1782579200,
+        "batch_size": 512,
+        "acc_steps": 16,
+        "global_batch_tokens": 524288,
+        "sequence_length": 1024,
+        "scheduler": "linear cooldown",
+        "lr": 0.025,
+        "weight_decay": 0.05,
+        "warmup_steps": 0,
+        "grad_clip": null,
+        "dtype": "bfloat16",
+        "seed": 0,
+        "eval_interval": "125 then 25 near target"
+      },
+      "hardware": {
+        "gpu_type": "NVIDIA GeForce RTX 5090",
+        "num_gpus": 1,
+        "ddp": false,
+        "compile": true,
+        "torch": "2.8.0+cu128",
+        "cuda": "12.8"
+      },
+      "source": {
+        "command": "torchrun --standalone --nproc_per_node=1 run_track3_strict_equilibration.py --method muoneq_colrow --seed 0",
+        "git_commit": "54c192a77bd0e3d2572a891e0a8a1b0ceeb957d7",
+        "source_type": "local_log",
+        "log_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+      },
+      "leaderboard_meta": {
+        "official_rank": null,
+        "rank_label": "ours",
+        "steps_to_target_3_28": 3325,
+        "evidence": "stat-sig target: val_loss 3.27459 @ step 3325 (n=1)",
+        "date": null,
+        "description": "RTX5090 local Track 3 supplemental run; full run continues to step 3400 but plotted curve stops at official statistically significant target step.",
+        "contributors": "local experiment",
+        "relative_log_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt",
+        "source_paths": [
+          "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+        ],
+        "curve_cutoff_step": 3325,
+        "curve_available": true,
+        "curve_reason": "curated local curve parsed"
+      }
+    },
+    {
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "display_name": "MuonEq Row",
+      "suite_id": "track3",
+      "run_role": "ours",
+      "status": "completed",
+      "optimizer": {
+        "name": "MuonEq",
+        "family": "muon",
+        "variant": "row l2 ns=5"
+      },
+      "model": {
+        "type": "track3_gpt",
+        "params": "124M",
+        "n_layer": 12,
+        "n_head": 6,
+        "n_embd": 768
+      },
+      "dataset": {
+        "name": "fineweb10B-gpt2",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 3400,
+        "train_tokens": 1782579200,
+        "batch_size": 512,
+        "acc_steps": 16,
+        "global_batch_tokens": 524288,
+        "sequence_length": 1024,
+        "scheduler": "linear cooldown",
+        "lr": 0.025,
+        "weight_decay": 0.05,
+        "warmup_steps": 0,
+        "grad_clip": null,
+        "dtype": "bfloat16",
+        "seed": 0,
+        "eval_interval": "125 then 25 near target"
+      },
+      "hardware": {
+        "gpu_type": "NVIDIA GeForce RTX 5090",
+        "num_gpus": 1,
+        "ddp": false,
+        "compile": true,
+        "torch": "2.8.0+cu128",
+        "cuda": "12.8"
+      },
+      "source": {
+        "command": "torchrun --standalone --nproc_per_node=1 run_track3_strict_equilibration.py --method muoneq_row --seed 0",
+        "git_commit": "54c192a77bd0e3d2572a891e0a8a1b0ceeb957d7",
+        "source_type": "local_log",
+        "log_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+      },
+      "leaderboard_meta": {
+        "official_rank": null,
+        "rank_label": "ours",
+        "steps_to_target_3_28": 3325,
+        "evidence": "stat-sig target: val_loss 3.27536 @ step 3325 (n=1)",
+        "date": null,
+        "description": "RTX5090 local Track 3 supplemental run; full run continues to step 3400 but plotted curve stops at official statistically significant target step.",
+        "contributors": "local experiment",
+        "relative_log_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt",
+        "source_paths": [
+          "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+        ],
+        "curve_cutoff_step": 3325,
+        "curve_available": true,
+        "curve_reason": "curated local curve parsed"
+      }
+    },
+    {
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "display_name": "SoftEq K=1000",
+      "suite_id": "track3",
+      "run_role": "ours",
+      "status": "completed",
+      "optimizer": {
+        "name": "SoftEq",
+        "family": "muon",
+        "variant": "early K=1000 ns=12 alpha=0.5"
+      },
+      "model": {
+        "type": "track3_gpt",
+        "params": "124M",
+        "n_layer": 12,
+        "n_head": 6,
+        "n_embd": 768
+      },
+      "dataset": {
+        "name": "fineweb10B-gpt2",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 3400,
+        "train_tokens": 1782579200,
+        "batch_size": 512,
+        "acc_steps": 16,
+        "global_batch_tokens": 524288,
+        "sequence_length": 1024,
+        "scheduler": "linear cooldown",
+        "lr": 0.025,
+        "weight_decay": 0.05,
+        "warmup_steps": 0,
+        "grad_clip": null,
+        "dtype": "bfloat16",
+        "seed": 0,
+        "eval_interval": "125 then 25 near target"
+      },
+      "hardware": {
+        "gpu_type": "NVIDIA GeForce RTX 5090",
+        "num_gpus": 1,
+        "ddp": false,
+        "compile": true,
+        "torch": "2.8.0+cu128",
+        "cuda": "12.8"
+      },
+      "source": {
+        "command": "torchrun --standalone --nproc_per_node=1 run_track3_strict_equilibration.py --method early_softeq_k1000 --seed 0",
+        "git_commit": "54c192a77bd0e3d2572a891e0a8a1b0ceeb957d7",
+        "source_type": "local_log",
+        "log_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+      },
+      "leaderboard_meta": {
+        "official_rank": null,
+        "rank_label": "ours",
+        "steps_to_target_3_28": 3325,
+        "evidence": "stat-sig target: val_loss 3.27418 @ step 3325 (n=1)",
+        "date": null,
+        "description": "RTX5090 local Track 3 supplemental run; full run continues to step 3400 but plotted curve stops at official statistically significant target step.",
+        "contributors": "local experiment",
+        "relative_log_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt",
+        "source_paths": [
+          "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+        ],
+        "curve_cutoff_step": 3325,
+        "curve_available": true,
+        "curve_reason": "curated local curve parsed"
+      }
+    },
+    {
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "display_name": "SoftEq K=2000 (n=2)",
+      "suite_id": "track3",
+      "run_role": "ours",
+      "status": "completed",
+      "optimizer": {
+        "name": "SoftEq",
+        "family": "muon",
+        "variant": "early K=2000 ns=12 alpha=0.5"
+      },
+      "model": {
+        "type": "track3_gpt",
+        "params": "124M",
+        "n_layer": 12,
+        "n_head": 6,
+        "n_embd": 768
+      },
+      "dataset": {
+        "name": "fineweb10B-gpt2",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 3400,
+        "train_tokens": 1782579200,
+        "batch_size": 512,
+        "acc_steps": 16,
+        "global_batch_tokens": 524288,
+        "sequence_length": 1024,
+        "scheduler": "linear cooldown",
+        "lr": 0.025,
+        "weight_decay": 0.05,
+        "warmup_steps": 0,
+        "grad_clip": null,
+        "dtype": "bfloat16",
+        "seed": "0,1",
+        "eval_interval": "125 then 25 near target"
+      },
+      "hardware": {
+        "gpu_type": "NVIDIA GeForce RTX 5090",
+        "num_gpus": 1,
+        "ddp": false,
+        "compile": true,
+        "torch": "2.8.0+cu128",
+        "cuda": "12.8"
+      },
+      "source": {
+        "command": "torchrun --standalone --nproc_per_node=1 run_track3_strict_equilibration.py --method early_softeq_k2000 --seed {0,1}",
+        "git_commit": "54c192a77bd0e3d2572a891e0a8a1b0ceeb957d7",
+        "source_type": "local_log_bundle",
+        "log_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt"
+      },
+      "leaderboard_meta": {
+        "official_rank": null,
+        "rank_label": "ours",
+        "steps_to_target_3_28": 3300,
+        "evidence": "stat-sig target: mean val_loss 3.27595 @ step 3300 (n=2)",
+        "date": null,
+        "description": "RTX5090 local Track 3 supplemental aggregate; two seeds are merged into one method row by common-step mean curve.",
+        "contributors": "local experiment",
+        "relative_log_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt",
+        "source_paths": [
+          "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt",
+          "local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+        ],
+        "curve_cutoff_step": 3300,
+        "curve_available": true,
+        "curve_reason": "curated local curve parsed"
       }
     }
   ],
@@ -88777,7 +89123,7 @@
       "metric_name": "final_val_loss",
       "value": 5.057,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w128-tail-train-loss",
@@ -88789,7 +89135,7 @@
       "metric_name": "tail_train_loss",
       "value": 5.1647,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w128-final-train-loss",
@@ -88801,7 +89147,7 @@
       "metric_name": "final_train_loss",
       "value": 5.309,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w128-avg-iter-dt",
@@ -88813,7 +89159,7 @@
       "metric_name": "avg_iter_dt",
       "value": 0.0092,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w128-configured-lr",
@@ -88825,7 +89171,7 @@
       "metric_name": "configured_lr",
       "value": 0.001,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w256-final-loss",
@@ -88837,7 +89183,7 @@
       "metric_name": "final_val_loss",
       "value": 4.719,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w256-tail-train-loss",
@@ -88849,7 +89195,7 @@
       "metric_name": "tail_train_loss",
       "value": 4.8391,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w256-final-train-loss",
@@ -88861,7 +89207,7 @@
       "metric_name": "final_train_loss",
       "value": 5.016,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w256-avg-iter-dt",
@@ -88873,7 +89219,7 @@
       "metric_name": "avg_iter_dt",
       "value": 0.0103,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w256-configured-lr",
@@ -88885,7 +89231,7 @@
       "metric_name": "configured_lr",
       "value": 0.001,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w512-final-loss",
@@ -88897,7 +89243,7 @@
       "metric_name": "final_val_loss",
       "value": 4.919,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w512-tail-train-loss",
@@ -88909,7 +89255,7 @@
       "metric_name": "tail_train_loss",
       "value": 5.0081,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w512-final-train-loss",
@@ -88921,7 +89267,7 @@
       "metric_name": "final_train_loss",
       "value": 5.164,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w512-avg-iter-dt",
@@ -88933,7 +89279,7 @@
       "metric_name": "avg_iter_dt",
       "value": 0.0128,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w512-configured-lr",
@@ -88945,7 +89291,7 @@
       "metric_name": "configured_lr",
       "value": 0.001,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w768-final-loss",
@@ -88957,7 +89303,7 @@
       "metric_name": "final_val_loss",
       "value": 5.053,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w768-tail-train-loss",
@@ -88969,7 +89315,7 @@
       "metric_name": "tail_train_loss",
       "value": 5.1499,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w768-final-train-loss",
@@ -88981,7 +89327,7 @@
       "metric_name": "final_train_loss",
       "value": 5.322,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w768-avg-iter-dt",
@@ -88993,7 +89339,7 @@
       "metric_name": "avg_iter_dt",
       "value": 0.0165,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-sp-w768-configured-lr",
@@ -89005,7 +89351,7 @@
       "metric_name": "configured_lr",
       "value": 0.001,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w128-final-loss",
@@ -89017,7 +89363,7 @@
       "metric_name": "final_val_loss",
       "value": 4.783,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w128-tail-train-loss",
@@ -89029,7 +89375,7 @@
       "metric_name": "tail_train_loss",
       "value": 4.9099,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w128-final-train-loss",
@@ -89041,7 +89387,7 @@
       "metric_name": "final_train_loss",
       "value": 5.078,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w128-avg-iter-dt",
@@ -89053,7 +89399,7 @@
       "metric_name": "avg_iter_dt",
       "value": 0.0103,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w128-configured-lr",
@@ -89065,7 +89411,7 @@
       "metric_name": "configured_lr",
       "value": 0.003,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w256-final-loss",
@@ -89077,7 +89423,7 @@
       "metric_name": "final_val_loss",
       "value": 4.644,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w256-tail-train-loss",
@@ -89089,7 +89435,7 @@
       "metric_name": "tail_train_loss",
       "value": 4.7691,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w256-final-train-loss",
@@ -89101,7 +89447,7 @@
       "metric_name": "final_train_loss",
       "value": 4.951,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w256-avg-iter-dt",
@@ -89113,7 +89459,7 @@
       "metric_name": "avg_iter_dt",
       "value": 0.0113,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w256-configured-lr",
@@ -89125,7 +89471,7 @@
       "metric_name": "configured_lr",
       "value": 0.003,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w512-final-loss",
@@ -89137,7 +89483,7 @@
       "metric_name": "final_val_loss",
       "value": 4.545,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w512-tail-train-loss",
@@ -89149,7 +89495,7 @@
       "metric_name": "tail_train_loss",
       "value": 4.6685,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w512-final-train-loss",
@@ -89161,7 +89507,7 @@
       "metric_name": "final_train_loss",
       "value": 4.827,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w512-avg-iter-dt",
@@ -89173,7 +89519,7 @@
       "metric_name": "avg_iter_dt",
       "value": 0.0139,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w512-configured-lr",
@@ -89185,7 +89531,7 @@
       "metric_name": "configured_lr",
       "value": 0.003,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w768-final-loss",
@@ -89197,7 +89543,7 @@
       "metric_name": "final_val_loss",
       "value": 4.491,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w768-tail-train-loss",
@@ -89209,7 +89555,7 @@
       "metric_name": "tail_train_loss",
       "value": 4.6132,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w768-final-train-loss",
@@ -89221,7 +89567,7 @@
       "metric_name": "final_train_loss",
       "value": 4.79,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w768-avg-iter-dt",
@@ -89233,7 +89579,7 @@
       "metric_name": "avg_iter_dt",
       "value": 0.0173,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
     },
     {
       "metric_id": "m-mup-scaling-mup-w768-configured-lr",
@@ -89245,7 +89591,2767 @@
       "metric_name": "configured_lr",
       "value": 0.003,
       "split": "summary",
-      "source_path": "local-workspace:codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-final-val-loss",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": 9194.056,
+      "metric_name": "final_val_loss",
+      "value": 3.2679009437561035,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-best-val-loss",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": 9194.056,
+      "metric_name": "best_val_loss",
+      "value": 3.2679009437561035,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-raw-target-crossing-step",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "summary",
+      "step": 3250,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "raw_target_crossing_step",
+      "value": 3250.0,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-raw-target-crossing-val-loss",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "summary",
+      "step": 3250,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "raw_target_crossing_val_loss",
+      "value": 3.2793900966644287,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-mean-tokens-per-sec",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "mean_tokens_per_sec",
+      "value": 193883.8642457367,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-peak-memory-mb",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "peak_memory_mb",
+      "value": 15925.59423828125,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-train-time-sec",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "train_time_sec",
+      "value": 9194.056488066912,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-mean-step-time-sec",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "mean_step_time_sec",
+      "value": 2.7041342611961503,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-sample-count",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "sample_count",
+      "value": 1,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-gate-ratio",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "gate_ratio",
+      "value": 0.26839460784313723,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-gate-checks-total",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "gate_checks_total",
+      "value": 244800.0,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-0",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 0,
+      "tokens_seen": null,
+      "wall_time_sec": 0.0,
+      "metric_name": "val_loss",
+      "value": 10.82587,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-125",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 125,
+      "tokens_seen": null,
+      "wall_time_sec": 342.14,
+      "metric_name": "val_loss",
+      "value": 4.5513,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-250",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 250,
+      "tokens_seen": null,
+      "wall_time_sec": 679.226,
+      "metric_name": "val_loss",
+      "value": 4.08303,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-375",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 375,
+      "tokens_seen": null,
+      "wall_time_sec": 1015.509,
+      "metric_name": "val_loss",
+      "value": 3.91085,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-500",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 500,
+      "tokens_seen": null,
+      "wall_time_sec": 1353.122,
+      "metric_name": "val_loss",
+      "value": 3.81573,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-625",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 625,
+      "tokens_seen": null,
+      "wall_time_sec": 1691.389,
+      "metric_name": "val_loss",
+      "value": 3.75286,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-750",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 750,
+      "tokens_seen": null,
+      "wall_time_sec": 2029.209,
+      "metric_name": "val_loss",
+      "value": 3.71097,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-875",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 875,
+      "tokens_seen": null,
+      "wall_time_sec": 2367.166,
+      "metric_name": "val_loss",
+      "value": 3.67653,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-1000",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 1000,
+      "tokens_seen": null,
+      "wall_time_sec": 2705.473,
+      "metric_name": "val_loss",
+      "value": 3.64896,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-1125",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 1125,
+      "tokens_seen": null,
+      "wall_time_sec": 3043.84,
+      "metric_name": "val_loss",
+      "value": 3.62064,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-1250",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 1250,
+      "tokens_seen": null,
+      "wall_time_sec": 3381.945,
+      "metric_name": "val_loss",
+      "value": 3.5896,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-1375",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 1375,
+      "tokens_seen": null,
+      "wall_time_sec": 3720.329,
+      "metric_name": "val_loss",
+      "value": 3.56622,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-1500",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 1500,
+      "tokens_seen": null,
+      "wall_time_sec": 4058.538,
+      "metric_name": "val_loss",
+      "value": 3.53977,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-1625",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 1625,
+      "tokens_seen": null,
+      "wall_time_sec": 4396.822,
+      "metric_name": "val_loss",
+      "value": 3.52064,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-1750",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 1750,
+      "tokens_seen": null,
+      "wall_time_sec": 4734.921,
+      "metric_name": "val_loss",
+      "value": 3.49773,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-1875",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 1875,
+      "tokens_seen": null,
+      "wall_time_sec": 5073.182,
+      "metric_name": "val_loss",
+      "value": 3.47713,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-2000",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 2000,
+      "tokens_seen": null,
+      "wall_time_sec": 5411.467,
+      "metric_name": "val_loss",
+      "value": 3.4589,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-2125",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 2125,
+      "tokens_seen": null,
+      "wall_time_sec": 5749.357,
+      "metric_name": "val_loss",
+      "value": 3.4407,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-2250",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 2250,
+      "tokens_seen": null,
+      "wall_time_sec": 6087.203,
+      "metric_name": "val_loss",
+      "value": 3.42261,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-2375",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 2375,
+      "tokens_seen": null,
+      "wall_time_sec": 6425.003,
+      "metric_name": "val_loss",
+      "value": 3.40621,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-2500",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 2500,
+      "tokens_seen": null,
+      "wall_time_sec": 6762.86,
+      "metric_name": "val_loss",
+      "value": 3.38841,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-2625",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 2625,
+      "tokens_seen": null,
+      "wall_time_sec": 7100.345,
+      "metric_name": "val_loss",
+      "value": 3.36939,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-2750",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 2750,
+      "tokens_seen": null,
+      "wall_time_sec": 7437.556,
+      "metric_name": "val_loss",
+      "value": 3.35211,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-2875",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 2875,
+      "tokens_seen": null,
+      "wall_time_sec": 7775.366,
+      "metric_name": "val_loss",
+      "value": 3.33353,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-3000",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 3000,
+      "tokens_seen": null,
+      "wall_time_sec": 8112.743,
+      "metric_name": "val_loss",
+      "value": 3.31485,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-3075",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 3075,
+      "tokens_seen": null,
+      "wall_time_sec": 8315.441,
+      "metric_name": "val_loss",
+      "value": 3.30279,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-3100",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 3100,
+      "tokens_seen": null,
+      "wall_time_sec": 8383.068,
+      "metric_name": "val_loss",
+      "value": 3.29936,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-3125",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 3125,
+      "tokens_seen": null,
+      "wall_time_sec": 8450.71,
+      "metric_name": "val_loss",
+      "value": 3.29587,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-3150",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 3150,
+      "tokens_seen": null,
+      "wall_time_sec": 8518.305,
+      "metric_name": "val_loss",
+      "value": 3.29182,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-3175",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 3175,
+      "tokens_seen": null,
+      "wall_time_sec": 8585.828,
+      "metric_name": "val_loss",
+      "value": 3.28859,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-3200",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 3200,
+      "tokens_seen": null,
+      "wall_time_sec": 8653.397,
+      "metric_name": "val_loss",
+      "value": 3.28523,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-3225",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 3225,
+      "tokens_seen": null,
+      "wall_time_sec": 8721.01,
+      "metric_name": "val_loss",
+      "value": 3.28211,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-3250",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 3250,
+      "tokens_seen": null,
+      "wall_time_sec": 8788.712,
+      "metric_name": "val_loss",
+      "value": 3.27939,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-3275",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 3275,
+      "tokens_seen": null,
+      "wall_time_sec": 8856.38,
+      "metric_name": "val_loss",
+      "value": 3.27669,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-step-3300",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "point",
+      "step": 3300,
+      "tokens_seen": null,
+      "wall_time_sec": 8924.002,
+      "metric_name": "val_loss",
+      "value": 3.27431,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_gated-softmuoneq_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-gated-softmuoneq-steps-to-target",
+      "run_id": "ours-track3-rtx5090-gated-softmuoneq",
+      "metric_scope": "summary",
+      "step": 3300,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "steps_to_target_3_28",
+      "value": 3300,
+      "split": "summary",
+      "source_path": "upstream-track3:README.md"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-final-val-loss",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": 9094.976,
+      "metric_name": "final_val_loss",
+      "value": 3.270369052886963,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-best-val-loss",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": 9094.976,
+      "metric_name": "best_val_loss",
+      "value": 3.270369052886963,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-raw-target-crossing-step",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "summary",
+      "step": 3275,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "raw_target_crossing_step",
+      "value": 3275.0,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-raw-target-crossing-val-loss",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "summary",
+      "step": 3275,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "raw_target_crossing_val_loss",
+      "value": 3.2794461250305176,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-mean-tokens-per-sec",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "mean_tokens_per_sec",
+      "value": 195996.0247427974,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-peak-memory-mb",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "peak_memory_mb",
+      "value": 15925.59375,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-train-time-sec",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "train_time_sec",
+      "value": 9094.976300357375,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-mean-step-time-sec",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "mean_step_time_sec",
+      "value": 2.674993029516875,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-sample-count",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "sample_count",
+      "value": 1,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-0",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 0,
+      "tokens_seen": null,
+      "wall_time_sec": 0.0,
+      "metric_name": "val_loss",
+      "value": 10.82587,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-125",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 125,
+      "tokens_seen": null,
+      "wall_time_sec": 336.272,
+      "metric_name": "val_loss",
+      "value": 4.92112,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-250",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 250,
+      "tokens_seen": null,
+      "wall_time_sec": 671.305,
+      "metric_name": "val_loss",
+      "value": 4.39812,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-375",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 375,
+      "tokens_seen": null,
+      "wall_time_sec": 1005.503,
+      "metric_name": "val_loss",
+      "value": 4.05874,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-500",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 500,
+      "tokens_seen": null,
+      "wall_time_sec": 1340.589,
+      "metric_name": "val_loss",
+      "value": 3.90339,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-625",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 625,
+      "tokens_seen": null,
+      "wall_time_sec": 1675.384,
+      "metric_name": "val_loss",
+      "value": 3.81395,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-750",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 750,
+      "tokens_seen": null,
+      "wall_time_sec": 2009.577,
+      "metric_name": "val_loss",
+      "value": 3.75625,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-875",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 875,
+      "tokens_seen": null,
+      "wall_time_sec": 2344.429,
+      "metric_name": "val_loss",
+      "value": 3.71036,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-1000",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 1000,
+      "tokens_seen": null,
+      "wall_time_sec": 2678.807,
+      "metric_name": "val_loss",
+      "value": 3.6727,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-1125",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 1125,
+      "tokens_seen": null,
+      "wall_time_sec": 3013.478,
+      "metric_name": "val_loss",
+      "value": 3.6443,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-1250",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 1250,
+      "tokens_seen": null,
+      "wall_time_sec": 3347.438,
+      "metric_name": "val_loss",
+      "value": 3.61098,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-1375",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 1375,
+      "tokens_seen": null,
+      "wall_time_sec": 3682.103,
+      "metric_name": "val_loss",
+      "value": 3.58369,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-1500",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 1500,
+      "tokens_seen": null,
+      "wall_time_sec": 4016.361,
+      "metric_name": "val_loss",
+      "value": 3.55356,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-1625",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 1625,
+      "tokens_seen": null,
+      "wall_time_sec": 4350.52,
+      "metric_name": "val_loss",
+      "value": 3.53454,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-1750",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 1750,
+      "tokens_seen": null,
+      "wall_time_sec": 4684.057,
+      "metric_name": "val_loss",
+      "value": 3.50975,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-1875",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 1875,
+      "tokens_seen": null,
+      "wall_time_sec": 5018.101,
+      "metric_name": "val_loss",
+      "value": 3.48938,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-2000",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 2000,
+      "tokens_seen": null,
+      "wall_time_sec": 5352.384,
+      "metric_name": "val_loss",
+      "value": 3.46824,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-2125",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 2125,
+      "tokens_seen": null,
+      "wall_time_sec": 5686.545,
+      "metric_name": "val_loss",
+      "value": 3.45036,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-2250",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 2250,
+      "tokens_seen": null,
+      "wall_time_sec": 6020.762,
+      "metric_name": "val_loss",
+      "value": 3.43079,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-2375",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 2375,
+      "tokens_seen": null,
+      "wall_time_sec": 6355.377,
+      "metric_name": "val_loss",
+      "value": 3.4133,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-2500",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 2500,
+      "tokens_seen": null,
+      "wall_time_sec": 6689.608,
+      "metric_name": "val_loss",
+      "value": 3.39421,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-2625",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 2625,
+      "tokens_seen": null,
+      "wall_time_sec": 7023.682,
+      "metric_name": "val_loss",
+      "value": 3.37524,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-2750",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 2750,
+      "tokens_seen": null,
+      "wall_time_sec": 7357.964,
+      "metric_name": "val_loss",
+      "value": 3.35678,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-2875",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 2875,
+      "tokens_seen": null,
+      "wall_time_sec": 7692.207,
+      "metric_name": "val_loss",
+      "value": 3.33762,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-3000",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 3000,
+      "tokens_seen": null,
+      "wall_time_sec": 8026.053,
+      "metric_name": "val_loss",
+      "value": 3.31854,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-3075",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 3075,
+      "tokens_seen": null,
+      "wall_time_sec": 8226.767,
+      "metric_name": "val_loss",
+      "value": 3.30624,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-3100",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 3100,
+      "tokens_seen": null,
+      "wall_time_sec": 8293.56,
+      "metric_name": "val_loss",
+      "value": 3.30273,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-3125",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 3125,
+      "tokens_seen": null,
+      "wall_time_sec": 8360.308,
+      "metric_name": "val_loss",
+      "value": 3.29922,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-3150",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 3150,
+      "tokens_seen": null,
+      "wall_time_sec": 8427.078,
+      "metric_name": "val_loss",
+      "value": 3.29513,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-3175",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 3175,
+      "tokens_seen": null,
+      "wall_time_sec": 8493.822,
+      "metric_name": "val_loss",
+      "value": 3.29195,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-3200",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 3200,
+      "tokens_seen": null,
+      "wall_time_sec": 8560.654,
+      "metric_name": "val_loss",
+      "value": 3.2883,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-3225",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 3225,
+      "tokens_seen": null,
+      "wall_time_sec": 8627.484,
+      "metric_name": "val_loss",
+      "value": 3.28517,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-3250",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 3250,
+      "tokens_seen": null,
+      "wall_time_sec": 8694.338,
+      "metric_name": "val_loss",
+      "value": 3.2823,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-3275",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 3275,
+      "tokens_seen": null,
+      "wall_time_sec": 8761.143,
+      "metric_name": "val_loss",
+      "value": 3.27945,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-3300",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 3300,
+      "tokens_seen": null,
+      "wall_time_sec": 8827.949,
+      "metric_name": "val_loss",
+      "value": 3.27698,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-step-3325",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "point",
+      "step": 3325,
+      "tokens_seen": null,
+      "wall_time_sec": 8894.732,
+      "metric_name": "val_loss",
+      "value": 3.27459,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-colrow_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-colrow-steps-to-target",
+      "run_id": "ours-track3-rtx5090-muoneq-colrow",
+      "metric_scope": "summary",
+      "step": 3325,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "steps_to_target_3_28",
+      "value": 3325,
+      "split": "summary",
+      "source_path": "upstream-track3:README.md"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-final-val-loss",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": 9099.918,
+      "metric_name": "final_val_loss",
+      "value": 3.2711212635040283,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-best-val-loss",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": 9099.918,
+      "metric_name": "best_val_loss",
+      "value": 3.2711212635040283,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-raw-target-crossing-step",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "summary",
+      "step": 3300,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "raw_target_crossing_step",
+      "value": 3300.0,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-raw-target-crossing-val-loss",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "summary",
+      "step": 3300,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "raw_target_crossing_val_loss",
+      "value": 3.2778241634368896,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-mean-tokens-per-sec",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "mean_tokens_per_sec",
+      "value": 195889.58323683852,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-peak-memory-mb",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "peak_memory_mb",
+      "value": 15925.59375,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-train-time-sec",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "train_time_sec",
+      "value": 9099.918283274863,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-mean-step-time-sec",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "mean_step_time_sec",
+      "value": 2.6764465539043716,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-sample-count",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "sample_count",
+      "value": 1,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-0",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 0,
+      "tokens_seen": null,
+      "wall_time_sec": 0.0,
+      "metric_name": "val_loss",
+      "value": 10.82587,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-125",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 125,
+      "tokens_seen": null,
+      "wall_time_sec": 352.838,
+      "metric_name": "val_loss",
+      "value": 4.94929,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-250",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 250,
+      "tokens_seen": null,
+      "wall_time_sec": 685.869,
+      "metric_name": "val_loss",
+      "value": 4.43849,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-375",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 375,
+      "tokens_seen": null,
+      "wall_time_sec": 1018.136,
+      "metric_name": "val_loss",
+      "value": 4.07899,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-500",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 500,
+      "tokens_seen": null,
+      "wall_time_sec": 1351.528,
+      "metric_name": "val_loss",
+      "value": 3.91702,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-625",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 625,
+      "tokens_seen": null,
+      "wall_time_sec": 1685.576,
+      "metric_name": "val_loss",
+      "value": 3.8193,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-750",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 750,
+      "tokens_seen": null,
+      "wall_time_sec": 2019.195,
+      "metric_name": "val_loss",
+      "value": 3.76257,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-875",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 875,
+      "tokens_seen": null,
+      "wall_time_sec": 2353.114,
+      "metric_name": "val_loss",
+      "value": 3.71479,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-1000",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 1000,
+      "tokens_seen": null,
+      "wall_time_sec": 2687.429,
+      "metric_name": "val_loss",
+      "value": 3.67666,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-1125",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 1125,
+      "tokens_seen": null,
+      "wall_time_sec": 3021.424,
+      "metric_name": "val_loss",
+      "value": 3.645,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-1250",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 1250,
+      "tokens_seen": null,
+      "wall_time_sec": 3355.815,
+      "metric_name": "val_loss",
+      "value": 3.61244,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-1375",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 1375,
+      "tokens_seen": null,
+      "wall_time_sec": 3689.939,
+      "metric_name": "val_loss",
+      "value": 3.58431,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-1500",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 1500,
+      "tokens_seen": null,
+      "wall_time_sec": 4023.28,
+      "metric_name": "val_loss",
+      "value": 3.55419,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-1625",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 1625,
+      "tokens_seen": null,
+      "wall_time_sec": 4357.407,
+      "metric_name": "val_loss",
+      "value": 3.5346,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-1750",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 1750,
+      "tokens_seen": null,
+      "wall_time_sec": 4691.722,
+      "metric_name": "val_loss",
+      "value": 3.50993,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-1875",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 1875,
+      "tokens_seen": null,
+      "wall_time_sec": 5025.69,
+      "metric_name": "val_loss",
+      "value": 3.48976,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-2000",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 2000,
+      "tokens_seen": null,
+      "wall_time_sec": 5359.537,
+      "metric_name": "val_loss",
+      "value": 3.46948,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-2125",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 2125,
+      "tokens_seen": null,
+      "wall_time_sec": 5693.211,
+      "metric_name": "val_loss",
+      "value": 3.45017,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-2250",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 2250,
+      "tokens_seen": null,
+      "wall_time_sec": 6027.206,
+      "metric_name": "val_loss",
+      "value": 3.43099,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-2375",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 2375,
+      "tokens_seen": null,
+      "wall_time_sec": 6361.392,
+      "metric_name": "val_loss",
+      "value": 3.414,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-2500",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 2500,
+      "tokens_seen": null,
+      "wall_time_sec": 6696.142,
+      "metric_name": "val_loss",
+      "value": 3.39514,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-2625",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 2625,
+      "tokens_seen": null,
+      "wall_time_sec": 7029.98,
+      "metric_name": "val_loss",
+      "value": 3.37564,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-2750",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 2750,
+      "tokens_seen": null,
+      "wall_time_sec": 7363.744,
+      "metric_name": "val_loss",
+      "value": 3.35745,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-2875",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 2875,
+      "tokens_seen": null,
+      "wall_time_sec": 7697.525,
+      "metric_name": "val_loss",
+      "value": 3.33828,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-3000",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 3000,
+      "tokens_seen": null,
+      "wall_time_sec": 8031.292,
+      "metric_name": "val_loss",
+      "value": 3.31931,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-3075",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 3075,
+      "tokens_seen": null,
+      "wall_time_sec": 8231.906,
+      "metric_name": "val_loss",
+      "value": 3.30707,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-3100",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 3100,
+      "tokens_seen": null,
+      "wall_time_sec": 8298.797,
+      "metric_name": "val_loss",
+      "value": 3.30347,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-3125",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 3125,
+      "tokens_seen": null,
+      "wall_time_sec": 8365.687,
+      "metric_name": "val_loss",
+      "value": 3.30015,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-3150",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 3150,
+      "tokens_seen": null,
+      "wall_time_sec": 8432.609,
+      "metric_name": "val_loss",
+      "value": 3.29596,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-3175",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 3175,
+      "tokens_seen": null,
+      "wall_time_sec": 8499.508,
+      "metric_name": "val_loss",
+      "value": 3.29262,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-3200",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 3200,
+      "tokens_seen": null,
+      "wall_time_sec": 8566.408,
+      "metric_name": "val_loss",
+      "value": 3.28913,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-3225",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 3225,
+      "tokens_seen": null,
+      "wall_time_sec": 8633.185,
+      "metric_name": "val_loss",
+      "value": 3.28592,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-3250",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 3250,
+      "tokens_seen": null,
+      "wall_time_sec": 8699.952,
+      "metric_name": "val_loss",
+      "value": 3.28306,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-3275",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 3275,
+      "tokens_seen": null,
+      "wall_time_sec": 8766.606,
+      "metric_name": "val_loss",
+      "value": 3.28024,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-3300",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 3300,
+      "tokens_seen": null,
+      "wall_time_sec": 8833.255,
+      "metric_name": "val_loss",
+      "value": 3.27782,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-step-3325",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "point",
+      "step": 3325,
+      "tokens_seen": null,
+      "wall_time_sec": 8899.921,
+      "metric_name": "val_loss",
+      "value": 3.27536,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_muoneq-row_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-muoneq-row-steps-to-target",
+      "run_id": "ours-track3-rtx5090-muoneq-row",
+      "metric_scope": "summary",
+      "step": 3325,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "steps_to_target_3_28",
+      "value": 3325,
+      "split": "summary",
+      "source_path": "upstream-track3:README.md"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-final-val-loss",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": 9160.196,
+      "metric_name": "final_val_loss",
+      "value": 3.2701332569122314,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-best-val-loss",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": 9160.196,
+      "metric_name": "best_val_loss",
+      "value": 3.2701332569122314,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-raw-target-crossing-step",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "summary",
+      "step": 3275,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "raw_target_crossing_step",
+      "value": 3275.0,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-raw-target-crossing-val-loss",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "summary",
+      "step": 3275,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "raw_target_crossing_val_loss",
+      "value": 3.2788197994232178,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-mean-tokens-per-sec",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "mean_tokens_per_sec",
+      "value": 194600.55105505695,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-peak-memory-mb",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "peak_memory_mb",
+      "value": 15925.59375,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-train-time-sec",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "train_time_sec",
+      "value": 9160.196054612752,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-mean-step-time-sec",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "mean_step_time_sec",
+      "value": 2.694175310180221,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-sample-count",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "sample_count",
+      "value": 1,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-0",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 0,
+      "tokens_seen": null,
+      "wall_time_sec": 0.0,
+      "metric_name": "val_loss",
+      "value": 10.82587,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-125",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 125,
+      "tokens_seen": null,
+      "wall_time_sec": 338.478,
+      "metric_name": "val_loss",
+      "value": 4.55782,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-250",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 250,
+      "tokens_seen": null,
+      "wall_time_sec": 675.927,
+      "metric_name": "val_loss",
+      "value": 4.08324,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-375",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 375,
+      "tokens_seen": null,
+      "wall_time_sec": 1012.704,
+      "metric_name": "val_loss",
+      "value": 3.91055,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-500",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 500,
+      "tokens_seen": null,
+      "wall_time_sec": 1349.355,
+      "metric_name": "val_loss",
+      "value": 3.81751,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-625",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 625,
+      "tokens_seen": null,
+      "wall_time_sec": 1685.72,
+      "metric_name": "val_loss",
+      "value": 3.75319,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-750",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 750,
+      "tokens_seen": null,
+      "wall_time_sec": 2022.716,
+      "metric_name": "val_loss",
+      "value": 3.71167,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-875",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 875,
+      "tokens_seen": null,
+      "wall_time_sec": 2359.81,
+      "metric_name": "val_loss",
+      "value": 3.6767,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-1000",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 1000,
+      "tokens_seen": null,
+      "wall_time_sec": 2696.632,
+      "metric_name": "val_loss",
+      "value": 3.64443,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-1125",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 1125,
+      "tokens_seen": null,
+      "wall_time_sec": 3034.184,
+      "metric_name": "val_loss",
+      "value": 3.62338,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-1250",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 1250,
+      "tokens_seen": null,
+      "wall_time_sec": 3371.563,
+      "metric_name": "val_loss",
+      "value": 3.59192,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-1375",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 1375,
+      "tokens_seen": null,
+      "wall_time_sec": 3708.561,
+      "metric_name": "val_loss",
+      "value": 3.56851,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-1500",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 1500,
+      "tokens_seen": null,
+      "wall_time_sec": 4044.722,
+      "metric_name": "val_loss",
+      "value": 3.54229,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-1625",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 1625,
+      "tokens_seen": null,
+      "wall_time_sec": 4380.898,
+      "metric_name": "val_loss",
+      "value": 3.52379,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-1750",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 1750,
+      "tokens_seen": null,
+      "wall_time_sec": 4717.493,
+      "metric_name": "val_loss",
+      "value": 3.5,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-1875",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 1875,
+      "tokens_seen": null,
+      "wall_time_sec": 5054.766,
+      "metric_name": "val_loss",
+      "value": 3.48056,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-2000",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 2000,
+      "tokens_seen": null,
+      "wall_time_sec": 5391.368,
+      "metric_name": "val_loss",
+      "value": 3.46041,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-2125",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 2125,
+      "tokens_seen": null,
+      "wall_time_sec": 5728.03,
+      "metric_name": "val_loss",
+      "value": 3.4427,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-2250",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 2250,
+      "tokens_seen": null,
+      "wall_time_sec": 6065.272,
+      "metric_name": "val_loss",
+      "value": 3.42483,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-2375",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 2375,
+      "tokens_seen": null,
+      "wall_time_sec": 6402.127,
+      "metric_name": "val_loss",
+      "value": 3.40738,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-2500",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 2500,
+      "tokens_seen": null,
+      "wall_time_sec": 6739.108,
+      "metric_name": "val_loss",
+      "value": 3.39044,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-2625",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 2625,
+      "tokens_seen": null,
+      "wall_time_sec": 7076.21,
+      "metric_name": "val_loss",
+      "value": 3.37132,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-2750",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 2750,
+      "tokens_seen": null,
+      "wall_time_sec": 7412.739,
+      "metric_name": "val_loss",
+      "value": 3.35385,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-2875",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 2875,
+      "tokens_seen": null,
+      "wall_time_sec": 7748.704,
+      "metric_name": "val_loss",
+      "value": 3.33564,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-3000",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 3000,
+      "tokens_seen": null,
+      "wall_time_sec": 8084.898,
+      "metric_name": "val_loss",
+      "value": 3.31707,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-3075",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 3075,
+      "tokens_seen": null,
+      "wall_time_sec": 8286.621,
+      "metric_name": "val_loss",
+      "value": 3.3048,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-3100",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 3100,
+      "tokens_seen": null,
+      "wall_time_sec": 8353.727,
+      "metric_name": "val_loss",
+      "value": 3.30141,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-3125",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 3125,
+      "tokens_seen": null,
+      "wall_time_sec": 8420.923,
+      "metric_name": "val_loss",
+      "value": 3.29793,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-3150",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 3150,
+      "tokens_seen": null,
+      "wall_time_sec": 8488.237,
+      "metric_name": "val_loss",
+      "value": 3.29389,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-3175",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 3175,
+      "tokens_seen": null,
+      "wall_time_sec": 8555.515,
+      "metric_name": "val_loss",
+      "value": 3.29077,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-3200",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 3200,
+      "tokens_seen": null,
+      "wall_time_sec": 8622.809,
+      "metric_name": "val_loss",
+      "value": 3.28753,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-3225",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 3225,
+      "tokens_seen": null,
+      "wall_time_sec": 8690.094,
+      "metric_name": "val_loss",
+      "value": 3.28428,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-3250",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 3250,
+      "tokens_seen": null,
+      "wall_time_sec": 8757.406,
+      "metric_name": "val_loss",
+      "value": 3.28158,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-3275",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 3275,
+      "tokens_seen": null,
+      "wall_time_sec": 8824.7,
+      "metric_name": "val_loss",
+      "value": 3.27882,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-3300",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 3300,
+      "tokens_seen": null,
+      "wall_time_sec": 8891.842,
+      "metric_name": "val_loss",
+      "value": 3.27649,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-step-3325",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "point",
+      "step": 3325,
+      "tokens_seen": null,
+      "wall_time_sec": 8959.108,
+      "metric_name": "val_loss",
+      "value": 3.27418,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K1000_seed-0.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k1000-steps-to-target",
+      "run_id": "ours-track3-rtx5090-softeq-k1000",
+      "metric_scope": "summary",
+      "step": 3325,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "steps_to_target_3_28",
+      "value": 3325,
+      "split": "summary",
+      "source_path": "upstream-track3:README.md"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-final-val-loss",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": 9160.6855,
+      "metric_name": "final_val_loss",
+      "value": 3.2694844007492065,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-best-val-loss",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": 9160.6855,
+      "metric_name": "best_val_loss",
+      "value": 3.2694844007492065,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-raw-target-crossing-step",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "summary",
+      "step": 3275,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "raw_target_crossing_step",
+      "value": 3275,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-raw-target-crossing-val-loss",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "summary",
+      "step": 3275,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "raw_target_crossing_val_loss",
+      "value": 3.27829,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-mean-tokens-per-sec",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "mean_tokens_per_sec",
+      "value": 194590.17484880445,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-peak-memory-mb",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "peak_memory_mb",
+      "value": 15925.59375,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-train-time-sec",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "train_time_sec",
+      "value": 9160.685508165974,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-mean-step-time-sec",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "mean_step_time_sec",
+      "value": 2.6943192671076392,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-sample-count",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "summary",
+      "step": 3400,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "sample_count",
+      "value": 2,
+      "split": "summary",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-0",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 0,
+      "tokens_seen": null,
+      "wall_time_sec": 0.0,
+      "metric_name": "val_loss",
+      "value": 10.82587,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-125",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 125,
+      "tokens_seen": null,
+      "wall_time_sec": 340.4745,
+      "metric_name": "val_loss",
+      "value": 4.55825,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-250",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 250,
+      "tokens_seen": null,
+      "wall_time_sec": 677.337,
+      "metric_name": "val_loss",
+      "value": 4.0823,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-375",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 375,
+      "tokens_seen": null,
+      "wall_time_sec": 1013.8075,
+      "metric_name": "val_loss",
+      "value": 3.911475,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-500",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 500,
+      "tokens_seen": null,
+      "wall_time_sec": 1350.8029999999999,
+      "metric_name": "val_loss",
+      "value": 3.816815,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-625",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 625,
+      "tokens_seen": null,
+      "wall_time_sec": 1687.745,
+      "metric_name": "val_loss",
+      "value": 3.754735,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-750",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 750,
+      "tokens_seen": null,
+      "wall_time_sec": 2024.3525,
+      "metric_name": "val_loss",
+      "value": 3.712695,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-875",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 875,
+      "tokens_seen": null,
+      "wall_time_sec": 2360.944,
+      "metric_name": "val_loss",
+      "value": 3.6766550000000002,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-1000",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 1000,
+      "tokens_seen": null,
+      "wall_time_sec": 2697.724,
+      "metric_name": "val_loss",
+      "value": 3.645715,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-1125",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 1125,
+      "tokens_seen": null,
+      "wall_time_sec": 3034.6189999999997,
+      "metric_name": "val_loss",
+      "value": 3.62035,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-1250",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 1250,
+      "tokens_seen": null,
+      "wall_time_sec": 3371.6459999999997,
+      "metric_name": "val_loss",
+      "value": 3.59107,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-1375",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 1375,
+      "tokens_seen": null,
+      "wall_time_sec": 3708.053,
+      "metric_name": "val_loss",
+      "value": 3.56638,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-1500",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 1500,
+      "tokens_seen": null,
+      "wall_time_sec": 4044.2285,
+      "metric_name": "val_loss",
+      "value": 3.537655,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-1625",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 1625,
+      "tokens_seen": null,
+      "wall_time_sec": 4380.556500000001,
+      "metric_name": "val_loss",
+      "value": 3.51973,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-1750",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 1750,
+      "tokens_seen": null,
+      "wall_time_sec": 4716.96,
+      "metric_name": "val_loss",
+      "value": 3.499835,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-1875",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 1875,
+      "tokens_seen": null,
+      "wall_time_sec": 5053.7095,
+      "metric_name": "val_loss",
+      "value": 3.4786799999999998,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-2000",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 2000,
+      "tokens_seen": null,
+      "wall_time_sec": 5390.282,
+      "metric_name": "val_loss",
+      "value": 3.4598050000000002,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-2125",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 2125,
+      "tokens_seen": null,
+      "wall_time_sec": 5728.209,
+      "metric_name": "val_loss",
+      "value": 3.443385,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-2250",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 2250,
+      "tokens_seen": null,
+      "wall_time_sec": 6064.611,
+      "metric_name": "val_loss",
+      "value": 3.42387,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-2375",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 2375,
+      "tokens_seen": null,
+      "wall_time_sec": 6400.924,
+      "metric_name": "val_loss",
+      "value": 3.406985,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-2500",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 2500,
+      "tokens_seen": null,
+      "wall_time_sec": 6737.187,
+      "metric_name": "val_loss",
+      "value": 3.390035,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-2625",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 2625,
+      "tokens_seen": null,
+      "wall_time_sec": 7073.761,
+      "metric_name": "val_loss",
+      "value": 3.371125,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-2750",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 2750,
+      "tokens_seen": null,
+      "wall_time_sec": 7410.366,
+      "metric_name": "val_loss",
+      "value": 3.353745,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-2875",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 2875,
+      "tokens_seen": null,
+      "wall_time_sec": 7746.5135,
+      "metric_name": "val_loss",
+      "value": 3.3349,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-3000",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 3000,
+      "tokens_seen": null,
+      "wall_time_sec": 8083.082,
+      "metric_name": "val_loss",
+      "value": 3.316445,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-3075",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 3075,
+      "tokens_seen": null,
+      "wall_time_sec": 8285.375,
+      "metric_name": "val_loss",
+      "value": 3.304395,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-3100",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 3100,
+      "tokens_seen": null,
+      "wall_time_sec": 8352.786,
+      "metric_name": "val_loss",
+      "value": 3.3008550000000003,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-3125",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 3125,
+      "tokens_seen": null,
+      "wall_time_sec": 8420.195,
+      "metric_name": "val_loss",
+      "value": 3.297625,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-3150",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 3150,
+      "tokens_seen": null,
+      "wall_time_sec": 8487.5965,
+      "metric_name": "val_loss",
+      "value": 3.29366,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-3175",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 3175,
+      "tokens_seen": null,
+      "wall_time_sec": 8554.997,
+      "metric_name": "val_loss",
+      "value": 3.290325,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-3200",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 3200,
+      "tokens_seen": null,
+      "wall_time_sec": 8622.329,
+      "metric_name": "val_loss",
+      "value": 3.286835,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-3225",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 3225,
+      "tokens_seen": null,
+      "wall_time_sec": 8689.6655,
+      "metric_name": "val_loss",
+      "value": 3.2837500000000004,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-3250",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 3250,
+      "tokens_seen": null,
+      "wall_time_sec": 8757.0465,
+      "metric_name": "val_loss",
+      "value": 3.28106,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-3275",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 3275,
+      "tokens_seen": null,
+      "wall_time_sec": 8824.303,
+      "metric_name": "val_loss",
+      "value": 3.27829,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-step-3300",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "point",
+      "step": 3300,
+      "tokens_seen": null,
+      "wall_time_sec": 8891.598,
+      "metric_name": "val_loss",
+      "value": 3.275945,
+      "split": "val",
+      "source_path": "local-rtx5090-log:RTX5090_softeq-K2000_seed-0.full.txt ; local-rtx5090-log:RTX5090_softeq-K2000_seed-1.full.txt"
+    },
+    {
+      "metric_id": "m-rtx5090-softeq-k2000-steps-to-target",
+      "run_id": "ours-track3-rtx5090-softeq-k2000",
+      "metric_scope": "summary",
+      "step": 3300,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "steps_to_target_3_28",
+      "value": 3300,
+      "split": "summary",
+      "source_path": "upstream-track3:README.md"
     }
   ],
   "claims": [
@@ -89412,37 +92518,6 @@
   ],
   "figures": [
     {
-      "figure_id": "track3-loss-curve",
-      "title": "Track 3 Validation Loss Curves",
-      "suite_id": "track3",
-      "figure_type": "loss_curve",
-      "run_ids": [
-        "official-track3-newton-muon-r15",
-        "official-track3-normuon-r10",
-        "official-track3-muon-r12",
-        "official-track3-adamw-r02",
-        "ours-track3-ademamix-tuned-3350",
-        "official-track3-r34-rre-extrapolation"
-      ],
-      "x_axis": "step",
-      "y_metric": "val_loss",
-      "preset": "presentation",
-      "export_formats": [
-        "png",
-        "svg",
-        "csv"
-      ],
-      "caption": "Default Track 3 comparison set; additional official history rows can be selected into the chart.",
-      "source_claim_ids": [
-        "track3-muon-family-near-target",
-        "track3-muon-family-beats-adamw-snapshot",
-        "track3-ademamix-negative-result"
-      ],
-      "selection_mode": "manual",
-      "selection_limit": 8,
-      "target_marker_metric": "steps_to_target_3_28"
-    },
-    {
       "figure_id": "llama-124m-loss-curve",
       "title": "Llama 124M Validation Loss Curves",
       "figure_type": "loss_curve",
@@ -89496,6 +92571,39 @@
       "selection_mode": "manual",
       "selection_limit": 6,
       "suite_id": "llama_210m"
+    },
+    {
+      "figure_id": "track3-loss-curve",
+      "title": "Track 3 Validation Loss Curves",
+      "suite_id": "track3",
+      "figure_type": "loss_curve",
+      "run_ids": [
+        "official-track3-r34-rre-extrapolation",
+        "official-track3-newton-muon-r15",
+        "official-track3-muon-r12",
+        "ours-track3-rtx5090-gated-softmuoneq",
+        "ours-track3-rtx5090-muoneq-colrow",
+        "ours-track3-rtx5090-muoneq-row",
+        "ours-track3-rtx5090-softeq-k1000",
+        "ours-track3-rtx5090-softeq-k2000"
+      ],
+      "x_axis": "step",
+      "y_metric": "val_loss",
+      "preset": "presentation",
+      "export_formats": [
+        "png",
+        "svg",
+        "csv"
+      ],
+      "caption": "Default Track 3 comparison set; additional official history rows can be selected into the chart.",
+      "source_claim_ids": [
+        "track3-muon-family-near-target",
+        "track3-muon-family-beats-adamw-snapshot",
+        "track3-ademamix-negative-result"
+      ],
+      "selection_mode": "manual",
+      "selection_limit": 8,
+      "target_marker_metric": "steps_to_target_3_28"
     }
   ]
 }

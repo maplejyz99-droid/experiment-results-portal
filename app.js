@@ -5,6 +5,11 @@ const COLORS = {
   "official-track3-adamw-r02": "#b7811f",
   "ours-track3-ademamix-tuned-3350": "#bd3f2b",
   "official-track3-r34-rre-extrapolation": "#0e8790",
+  "ours-track3-rtx5090-gated-softmuoneq": "#0f766e",
+  "ours-track3-rtx5090-muoneq-colrow": "#2563eb",
+  "ours-track3-rtx5090-muoneq-row": "#7c3aed",
+  "ours-track3-rtx5090-softeq-k1000": "#ea580c",
+  "ours-track3-rtx5090-softeq-k2000": "#dc2626",
 };
 
 const GENERATED_COLORS = [
@@ -21,6 +26,9 @@ const GENERATED_COLORS = [
   "#486b38",
   "#5d4c9b",
 ];
+
+const TAIL_STEP_MIN = 2900;
+const TAIL_STEP_MAX = 3600;
 
 let portalData;
 let selectedSuiteId;
@@ -824,10 +832,12 @@ function renderLeaderboard() {
   const rows = eligibleRows(suite).map((row, index) => ({ ...row, displayRank: String(index + 1) }));
   const visibleRows = filteredRows(rows, suite);
   const referenceRows = visibleRows.filter((row) => row.run.run_role === "official_reference");
-  const localRows = visibleRows.filter((row) => row.run.run_role !== "official_reference");
+  const localRows = visibleRows.filter(
+    (row) => row.run.run_role !== "official_reference" && (suite.suite_id !== "track3" || row.primaryMetric)
+  );
   const hasReferenceAndLocal =
     rows.some((row) => row.run.run_role === "official_reference") &&
-    rows.some((row) => row.run.run_role !== "official_reference");
+    rows.some((row) => row.run.run_role !== "official_reference" && (suite.suite_id !== "track3" || row.primaryMetric));
 
   if (!selectedRunId && rows.length) selectedRunId = rows[0].run.run_id;
 
@@ -856,14 +866,14 @@ function renderLeaderboard() {
     const localLabel = suite.suite_id === "track3" ? "Our representative runs" : "Local or comparison runs";
     byId("leaderboardContent").innerHTML = `
       ${selectionBlock}
-      <details class="history-details ${suite.suite_id === "track3" ? "track3-history-callout" : ""}" ${open}>
+      <details class="history-details section-callout ${suite.suite_id === "track3" ? "track3-history-callout" : ""}" ${open}>
         <summary>
           <span>${escapeHtml(referenceLabel)} (${referenceRows.length})</span>
           <span class="muted">${suite.suite_id === "track3" ? "click to expand · sorted by steps" : "curated source-backed rows"}</span>
         </summary>
         ${referenceRows.length ? leaderboardTable(suite, referenceRows, 1, "compact-table scroll-table") : "<p class=\"empty-table-note\">No reference rows match the current filters.</p>"}
       </details>
-      <div class="local-runs-block">
+      <div class="local-runs-block section-callout">
         <div class="mini-heading">
           <strong>${escapeHtml(localLabel)}</strong>
           <span>${localRows.length} rows</span>
@@ -883,7 +893,7 @@ function renderLeaderboard() {
 
   byId("leaderboardContent").innerHTML = `
     ${selectionBlock}
-    <details class="history-details optimizer-details" open>
+    <details class="history-details optimizer-details section-callout" open>
       <summary>
         <span>Optimizer runs (${visibleRows.length}/${rows.length})</span>
         <span class="muted">ranked by ${escapeHtml(primaryMetricName(suite))}</span>
@@ -929,7 +939,62 @@ function niceAxisCeiling(rawMax, desiredIntervals = 5) {
 }
 
 function chartScaleModeLabel() {
-  return chartScaleMode === "zoom" ? "Zoom <=5" : "Full";
+  if (chartScaleMode === "zoom") return "Zoom <=5";
+  if (chartScaleMode === "tail") return `Tail ${TAIL_STEP_MIN}-${TAIL_STEP_MAX}`;
+  return "Full";
+}
+
+function shortRunLabel(run) {
+  const rank = run.leaderboard_meta?.official_rank;
+  if (Number.isInteger(rank)) return `R${String(rank).padStart(2, "0")}`;
+  const labels = {
+    "ours-track3-rtx5090-gated-softmuoneq": "Gated",
+    "ours-track3-rtx5090-muoneq-colrow": "Row+Col",
+    "ours-track3-rtx5090-muoneq-row": "Row",
+    "ours-track3-rtx5090-softeq-k1000": "K=1000",
+    "ours-track3-rtx5090-softeq-k2000": "K=2000",
+  };
+  return labels[run.run_id] || run.leaderboard_meta?.rank_label || run.display_name.split(/\s+/).slice(0, 2).join(" ");
+}
+
+function chartDomain(points, markerValues, target, showTargetLine, figure, yMetric) {
+  const xMin = chartScaleMode === "tail" ? TAIL_STEP_MIN : 0;
+  const xMax = chartScaleMode === "tail"
+    ? TAIL_STEP_MAX
+    : niceAxisCeiling(Math.max(...points.map((point) => point.step), ...markerValues, 1), 5);
+  const domainPoints = chartScaleMode === "tail"
+    ? points.filter((point) => point.step >= xMin && point.step <= xMax)
+    : points;
+  const yValues = (domainPoints.length ? domainPoints : points).map((point) => point.value);
+  if (showTargetLine) yValues.push(target.value);
+  const rawMin = Math.min(...yValues);
+  const rawMax = Math.max(...yValues);
+  const configuredYMax = yAxisMaxForFigure(figure, yMetric, chartScaleMode);
+  if (chartScaleMode === "tail") {
+    const spread = Math.max(rawMax - rawMin, 0.02);
+    const padding = Math.max(spread * 0.16, 0.006);
+    return {
+      xMin,
+      xMax,
+      minValue: Math.max(0, rawMin - padding),
+      maxValue: rawMax + padding,
+      configuredYMax: null,
+      clippedRuns: 0,
+    };
+  }
+
+  const padding = Math.max((rawMax - rawMin) * 0.08, 0.08);
+  const maxValue = configuredYMax ?? niceAxisCeiling(rawMax + padding, 6);
+  const minCandidate = Math.max(0, rawMin - padding);
+  const minValue = configuredYMax ? Math.max(0, Math.min(minCandidate, maxValue - 0.1)) : 0;
+  return {
+    xMin,
+    xMax,
+    minValue,
+    maxValue,
+    configuredYMax,
+    clippedRuns: 0,
+  };
 }
 
 function renderChartModeSwitch() {
@@ -944,6 +1009,10 @@ function renderChartModeSwitch() {
       <span class="mode-icon"><=5</span>
       <span>Zoom</span>
     </button>
+    <button type="button" class="${chartScaleMode === "tail" ? "active" : ""}" data-scale-mode="tail" aria-pressed="${chartScaleMode === "tail"}">
+      <span class="mode-icon">2900</span>
+      <span>Tail</span>
+    </button>
   `;
   modeSwitch.querySelectorAll("button").forEach((button) => {
     button.addEventListener("click", () => {
@@ -957,6 +1026,7 @@ function renderTargetMarkerStrip(suite, runs, metricName) {
   const strip = byId("targetStepStrip");
   if (!metricName) {
     strip.hidden = true;
+    strip.classList.remove("target-ranking-panel");
     strip.setAttribute("aria-label", "Selected run milestone markers");
     strip.innerHTML = "";
     return;
@@ -965,6 +1035,55 @@ function renderTargetMarkerStrip(suite, runs, metricName) {
   const markedRuns = runs.filter((run) => summaryMetric(run.run_id, metricName));
   strip.hidden = false;
   strip.setAttribute("aria-label", `Selected run ${metricAriaLabel(metricName)} markers`);
+  if (suite.suite_id === "track3") {
+    const rankedRuns = markedRuns
+      .map((run, index) => ({
+        run,
+        index,
+        metric: summaryMetric(run.run_id, metricName),
+        final: summaryMetric(run.run_id, "final_val_loss"),
+        sampleCount: summaryMetric(run.run_id, "sample_count"),
+      }))
+      .sort((left, right) => left.metric.value - right.metric.value || left.run.display_name.localeCompare(right.run.display_name));
+    const values = rankedRuns.map((item) => item.metric.value);
+    const minStep = values.length ? Math.min(...values) : TAIL_STEP_MIN;
+    const maxStep = values.length ? Math.max(...values) : TAIL_STEP_MAX;
+    const domainMin = Math.floor((minStep - 25) / 25) * 25;
+    const domainMax = Math.ceil((maxStep + 25) / 25) * 25;
+    const span = Math.max(domainMax - domainMin, 1);
+    strip.classList.add("target-ranking-panel");
+    strip.innerHTML = rankedRuns.length
+      ? `
+        <div class="target-ranking-head">
+          <span>Steps to target</span>
+          <span>lower is faster · plotted runs</span>
+        </div>
+        <div class="target-ranking-scale" aria-hidden="true">
+          <span>${escapeHtml(intFmt.format(domainMin))}</span>
+          <span>${escapeHtml(intFmt.format(domainMax))}</span>
+        </div>
+        <div class="target-ranking-rows">
+          ${rankedRuns
+            .map(({ run, index, metric, final, sampleCount }) => {
+              const position = ((metric.value - domainMin) / span) * 100;
+              const nText = sampleCount && sampleCount.value > 1 ? `n=${formatMetricValue("sample_count", sampleCount.value)}` : "";
+              return `
+                <button type="button" class="target-ranking-row ${run.run_id === selectedRunId ? "active" : ""}" data-run-id="${run.run_id}">
+                  <span class="legend-swatch" style="background:${runColor(run, index)}"></span>
+                  <strong>${escapeHtml(shortRunLabel(run))}</strong>
+                  <span class="target-ranking-track"><span class="target-ranking-dot" style="left:${position}%; background:${runColor(run, index)}"></span></span>
+                  <span class="target-ranking-step">${escapeHtml(formatMetricValue(metricName, metric.value))}</span>
+                  <span class="target-ranking-final">final ${escapeHtml(final ? formatMetricValue("final_val_loss", final.value) : "n/a")}</span>
+                  ${nText ? `<span class="target-ranking-n">${escapeHtml(nText)}</span>` : ""}
+                </button>
+              `;
+            })
+            .join("")}
+        </div>
+      `
+      : `<span class="muted">No selected run exposes ${escapeHtml(metricName)}.</span>`;
+  } else {
+    strip.classList.remove("target-ranking-panel");
   strip.innerHTML = markedRuns.length
     ? `
       <span class="target-step-label">${escapeHtml(metricName)}</span>
@@ -984,6 +1103,7 @@ function renderTargetMarkerStrip(suite, runs, metricName) {
       </div>
     `
     : `<span class="muted">No selected run exposes ${escapeHtml(metricName)}.</span>`;
+  }
 
   strip.querySelectorAll("button").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1066,6 +1186,7 @@ function chartCsv(suite) {
     const source = run.source || {};
     const sourcePath = source.log_path || source.csv_path || source.config_path || source.wandb_url || source.command || "";
     pointMetrics(run.run_id, yMetric).forEach((point) => {
+      if (chartScaleMode === "tail" && (point.step < TAIL_STEP_MIN || point.step > TAIL_STEP_MAX)) return;
       rows.push([
         suite.suite_id,
         run.run_id,
@@ -1113,12 +1234,11 @@ function chartSvgXml() {
   style.textContent = `
     .axis{stroke:#9da89e;stroke-width:1}
     .gridline{stroke:#dfe5dc;stroke-width:1}
-    .target-line{stroke:#bd3f2b;stroke-width:1.5;stroke-dasharray:6 5}
-    .target-marker{stroke:#fff;stroke-width:1.5}
-    .target-tick{stroke-width:1.3;opacity:.88}
+    .target-line{stroke:#7e857f;stroke-width:1.5;stroke-dasharray:6 5}
     .curve{fill:none;stroke-width:2.6}
     .curve.ours{stroke-width:3.8}
     .curve.partial{stroke-width:2.2}
+    .curve-point{stroke:#fbfcfa;stroke-width:1.2}
     .chart-label{fill:#5c625d;font-family:Menlo,Monaco,monospace;font-size:11px}
   `;
   clone.insertBefore(style, clone.firstChild);
@@ -1253,28 +1373,21 @@ function renderChart() {
         .map((run) => summaryMetric(run.run_id, markerMetric)?.value)
         .filter((value) => Number.isFinite(value))
     : [];
-  const rawMaxStep = Math.max(...allPoints.map((point) => point.step), ...markerValues, 1);
-  const maxStep = niceAxisCeiling(rawMaxStep, 5);
-  const yValues = allPoints.map((point) => point.value);
-  if (showTargetLine) yValues.push(target.value);
-  const rawMin = Math.min(...yValues);
-  const rawMax = Math.max(...yValues);
-  const padding = Math.max((rawMax - rawMin) * 0.08, 0.08);
-  const configuredYMax = yAxisMaxForFigure(figure, yMetric, chartScaleMode);
-  const maxValue = configuredYMax ?? niceAxisCeiling(rawMax + padding, 6);
-  const minCandidate = Math.max(0, rawMin - padding);
-  const minValue = configuredYMax ? Math.max(0, Math.min(minCandidate, maxValue - 0.1)) : 0;
+  const domain = chartDomain(allPoints, markerValues, target, showTargetLine, figure, yMetric);
+  const { xMin, xMax, minValue, maxValue, configuredYMax } = domain;
   const clippedRuns = configuredYMax
     ? runs.filter((run) => pointMetrics(run.run_id, yMetric).some((point) => point.value > maxValue)).length
     : 0;
   byId("chartToolbarMeta").textContent = [
     `${runs.length}/${chartSelectionLimit(suite)} visible`,
     hiddenRuns.length ? `${hiddenRuns.length} hidden by filters` : "",
-    configuredYMax ? `Zoom y<=${formatMetricValue(yMetric, maxValue)}` : "Full scale",
+    chartScaleMode === "tail" ? `Tail step ${TAIL_STEP_MIN}-${TAIL_STEP_MAX}` : "",
+    configuredYMax ? `Zoom y<=${formatMetricValue(yMetric, maxValue)}` : "",
+    chartScaleMode === "full" ? "Full scale" : "",
     clippedRuns ? `${clippedRuns} ${clippedRuns === 1 ? "run" : "runs"} clipped` : "",
   ].filter(Boolean).join(" · ");
 
-  const x = (step) => margin.left + (step / maxStep) * chartWidth;
+  const x = (step) => margin.left + ((step - xMin) / Math.max(xMax - xMin, 1)) * chartWidth;
   const y = (value) => margin.top + ((maxValue - value) / (maxValue - minValue)) * chartHeight;
   const clipId = `chart-clip-${suite.suite_id.replace(/[^a-z0-9_-]/gi, "-")}`;
   const defs = svgEl("defs");
@@ -1294,13 +1407,10 @@ function renderChart() {
 
   if (showTargetLine) {
     svg.appendChild(svgEl("line", { x1: margin.left, x2: margin.left + chartWidth, y1: y(target.value), y2: y(target.value), class: "target-line" }));
-    const targetLabel = svgEl("text", { x: 8, y: y(target.value) + 4, class: "chart-label" });
-    targetLabel.textContent = `target ${target.value}`;
-    svg.appendChild(targetLabel);
   }
 
-  niceTicks(0, maxStep, 6)
-    .filter((tick) => tick >= 0 && tick <= maxStep)
+  niceTicks(xMin, xMax, 6)
+    .filter((tick) => tick >= xMin && tick <= xMax)
     .forEach((tick) => {
       const tickX = x(tick);
       svg.appendChild(svgEl("line", { x1: tickX, x2: tickX, y1: margin.top, y2: margin.top + chartHeight, class: "gridline" }));
@@ -1337,6 +1447,7 @@ function renderChart() {
     curveLayer.appendChild(path);
 
     points.forEach((point) => {
+      if (point.step < xMin || point.step > xMax) return;
       if (point.value < minValue || point.value > maxValue) return;
       hoverPoints.push({
         run,
@@ -1346,31 +1457,22 @@ function renderChart() {
         x: x(point.step),
         y: y(point.value),
       });
-    });
 
-    const last = points[points.length - 1];
-    const dot = svgEl("circle", {
-      cx: x(last.step),
-      cy: y(last.value),
-      r: run.run_id === selectedRunId ? 5 : 3,
-      fill: runColor(run, index),
+      const marker = svgEl("circle", {
+        cx: x(point.step),
+        cy: y(point.value),
+        r: run.run_id === selectedRunId ? (chartScaleMode === "full" ? 3 : 3.4) : (chartScaleMode === "full" ? 2.1 : 2.8),
+        class: "curve-point",
+        fill: runColor(run, index),
+        opacity: run.run_id === selectedRunId ? "1" : isPartial ? "0.4" : "0.82",
+      });
+      marker.addEventListener("click", () => {
+        selectedRunId = run.run_id;
+        renderAll();
+      });
+      curveLayer.appendChild(marker);
     });
-    dot.addEventListener("click", () => {
-      selectedRunId = run.run_id;
-      renderAll();
-    });
-    curveLayer.appendChild(dot);
   });
-
-  if (showTargetLine && markerMetric) {
-    runs.forEach((run, index) => {
-      const marker = summaryMetric(run.run_id, markerMetric);
-      if (!marker) return;
-      const markerX = x(marker.value);
-      svg.appendChild(svgEl("line", { x1: markerX, x2: markerX, y1: y(target.value) - 13, y2: y(target.value) + 13, class: "target-tick", stroke: runColor(run, index) }));
-      svg.appendChild(svgEl("circle", { cx: markerX, cy: y(target.value), r: run.run_id === selectedRunId ? 5 : 4, class: "target-marker", fill: runColor(run, index) }));
-    });
-  }
 
   if (hoverPoints.length) {
     const hoverLayer = svgEl("g", { class: "chart-hover", style: "display:none" });
