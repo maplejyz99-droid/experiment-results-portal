@@ -107,6 +107,13 @@
           aria-live="polite"
         ></div>
 
+        <section
+          class="protocol-ledger"
+          id="protocolSelector"
+          aria-label="Protocol selector"
+          hidden
+        ></section>
+
         <div class="dashboard-grid" id="suiteDataPanel">
           <section class="panel chart-panel" aria-labelledby="chart-title">
             <div class="panel-heading">
@@ -124,7 +131,7 @@
                 class="chart-emphasis-row"
                 id="chartEmphasisSwitch"
                 role="group"
-                aria-label="Chart emphasis mode"
+                aria-label="Chart focus reset"
               ></div>
               <p class="chart-toolbar-meta" id="chartToolbarMeta"></p>
               <div class="chart-tools" aria-label="Chart export tools">
@@ -222,7 +229,7 @@
 
     <footer>
       <span class="footer-mark">Optimizer Experiment Evidence</span>
-      <span>Source snapshot <code>data/portal-data.json</code></span>
+      <span>Source snapshot <code id="sourceSnapshotPath">data/portal-data.json</code></span>
       <span>Static · protocol-bound · source-traceable</span>
     </footer>
 

@@ -1,0 +1,499 @@
+{
+  "delivery_id": "sha256:5d461cfc37e113595c0c05c65c40cd673563983b43390a6ba4fb9b50f91e8572",
+  "suite_id": "paper-llama-720m-bs1984-48b",
+  "runs": [
+    {
+      "run_id": "paper-paper-llama-720m-bs1984-48b-adamw",
+      "display_name": "AdamW",
+      "suite_id": "paper-llama-720m-bs1984-48b",
+      "run_role": "baseline",
+      "status": "partial",
+      "optimizer": {
+        "name": "AdamW",
+        "family": "adam",
+        "variant": null,
+        "method_group": "adamw",
+        "source_optimizer": "adamw"
+      },
+      "model": {
+        "type": "llama",
+        "params": "Llama 720M",
+        "n_layer": 12,
+        "n_head": 16,
+        "n_embd": 2048
+      },
+      "dataset": {
+        "name": "fineweb",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 48000,
+        "train_tokens": 20112998400,
+        "planned_train_tokens": 48758784000,
+        "batch_size": 62,
+        "acc_steps": 8,
+        "global_batch_tokens": 1015808,
+        "global_batch_sequences": 1984,
+        "sequence_length": 512,
+        "scheduler": "cos",
+        "lr": 0.001,
+        "weight_decay": 0.1,
+        "warmup_steps": 2000,
+        "grad_clip": 0.1,
+        "dtype": "bfloat16",
+        "seed": 0,
+        "eval_interval": 200
+      },
+      "hardware": {
+        "gpu_type": "paper benchmark hardware",
+        "num_gpus": 4,
+        "ddp": true,
+        "compile": false
+      },
+      "source": {
+        "source_type": "wandb_archive",
+        "wandb_url": "https://wandb.ai/semenov-andrei-v/llm-optimizer-benchmark/runs/hpztaede",
+        "log_path": "artifacts/wandb-paper-2509.01440/runs/hpztaede/output.log",
+        "csv_path": null,
+        "command": null,
+        "config_path": "artifacts/wandb-paper-2509.01440/runs/hpztaede/config.yaml",
+        "git_commit": null
+      },
+      "leaderboard_meta": {
+        "official_rank": null,
+        "paper_label": "AdamW",
+        "source_optimizer": "adamw",
+        "archive_run_id": "hpztaede",
+        "source_outcome": "partial_official_protocol",
+        "observed_step": 19800,
+        "planned_step": 48000,
+        "curve_available": false,
+        "curve_reason": "Archived log contains fewer than two finite validation observations.",
+        "selection_basis": "Audited paper appendix configuration and protocol identity; never selected by loss."
+      }
+    },
+    {
+      "run_id": "paper-paper-llama-720m-bs1984-48b-adopt",
+      "display_name": "ADOPT",
+      "suite_id": "paper-llama-720m-bs1984-48b",
+      "run_role": "official_reference",
+      "status": "partial",
+      "optimizer": {
+        "name": "ADOPT",
+        "family": "adam",
+        "variant": null,
+        "method_group": "adopt",
+        "source_optimizer": "adopt"
+      },
+      "model": {
+        "type": "llama",
+        "params": "Llama 720M",
+        "n_layer": 12,
+        "n_head": 16,
+        "n_embd": 2048
+      },
+      "dataset": {
+        "name": "fineweb",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 48000,
+        "train_tokens": 20416724992,
+        "planned_train_tokens": 48758784000,
+        "batch_size": 62,
+        "acc_steps": 8,
+        "global_batch_tokens": 1015808,
+        "global_batch_sequences": 1984,
+        "sequence_length": 512,
+        "scheduler": "cos",
+        "lr": 0.001,
+        "weight_decay": 0.1,
+        "warmup_steps": 2000,
+        "grad_clip": 0.1,
+        "dtype": "bfloat16",
+        "seed": 0,
+        "eval_interval": 200
+      },
+      "hardware": {
+        "gpu_type": "paper benchmark hardware",
+        "num_gpus": 4,
+        "ddp": true,
+        "compile": false
+      },
+      "source": {
+        "source_type": "wandb_archive",
+        "wandb_url": "https://wandb.ai/semenov-andrei-v/llm-optimizer-benchmark/runs/896xt35h",
+        "log_path": "artifacts/wandb-paper-2509.01440/runs/896xt35h/output.log",
+        "csv_path": null,
+        "command": null,
+        "config_path": "artifacts/wandb-paper-2509.01440/runs/896xt35h/config.yaml",
+        "git_commit": null
+      },
+      "leaderboard_meta": {
+        "official_rank": null,
+        "paper_label": "ADOPT",
+        "source_optimizer": "adopt",
+        "archive_run_id": "896xt35h",
+        "source_outcome": "partial_official_protocol",
+        "observed_step": 20100,
+        "planned_step": 48000,
+        "curve_available": false,
+        "curve_reason": "Archived log contains fewer than two finite validation observations.",
+        "selection_basis": "Audited paper appendix configuration and protocol identity; never selected by loss."
+      }
+    },
+    {
+      "run_id": "paper-paper-llama-720m-bs1984-48b-ademamix",
+      "display_name": "AdEMAMix",
+      "suite_id": "paper-llama-720m-bs1984-48b",
+      "run_role": "official_reference",
+      "status": "partial",
+      "optimizer": {
+        "name": "AdEMAMix",
+        "family": "adam",
+        "variant": null,
+        "method_group": "ademamix",
+        "source_optimizer": "ademamix"
+      },
+      "model": {
+        "type": "llama",
+        "params": "Llama 720M",
+        "n_layer": 12,
+        "n_head": 16,
+        "n_embd": 2048
+      },
+      "dataset": {
+        "name": "fineweb",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 48000,
+        "train_tokens": 40632320000,
+        "planned_train_tokens": 48758784000,
+        "batch_size": 62,
+        "acc_steps": 8,
+        "global_batch_tokens": 1015808,
+        "global_batch_sequences": 1984,
+        "sequence_length": 512,
+        "scheduler": "cos",
+        "lr": 0.001,
+        "weight_decay": 0.1,
+        "warmup_steps": 2000,
+        "grad_clip": 0.1,
+        "dtype": "bfloat16",
+        "seed": 0,
+        "eval_interval": 200
+      },
+      "hardware": {
+        "gpu_type": "paper benchmark hardware",
+        "num_gpus": 4,
+        "ddp": true,
+        "compile": false
+      },
+      "source": {
+        "source_type": "wandb_archive",
+        "wandb_url": "https://wandb.ai/semenov-andrei-v/llm-optimizer-benchmark/runs/6shk4xxs",
+        "log_path": "artifacts/wandb-paper-2509.01440/runs/6shk4xxs/output.log",
+        "csv_path": null,
+        "command": null,
+        "config_path": "artifacts/wandb-paper-2509.01440/runs/6shk4xxs/config.yaml",
+        "git_commit": null
+      },
+      "leaderboard_meta": {
+        "official_rank": null,
+        "paper_label": "AdEMAMix",
+        "source_optimizer": "ademamix",
+        "archive_run_id": "6shk4xxs",
+        "source_outcome": "partial_official_protocol",
+        "observed_step": 40000,
+        "planned_step": 48000,
+        "curve_available": false,
+        "curve_reason": "Archived log contains fewer than two finite validation observations.",
+        "selection_basis": "Audited paper appendix configuration and protocol identity; never selected by loss."
+      }
+    },
+    {
+      "run_id": "paper-paper-llama-720m-bs1984-48b-lion",
+      "display_name": "Lion",
+      "suite_id": "paper-llama-720m-bs1984-48b",
+      "run_role": "official_reference",
+      "status": "partial",
+      "optimizer": {
+        "name": "Lion",
+        "family": "momentum",
+        "variant": null,
+        "method_group": "lion",
+        "source_optimizer": "lion"
+      },
+      "model": {
+        "type": "llama",
+        "params": "Llama 720M",
+        "n_layer": 12,
+        "n_head": 16,
+        "n_embd": 2048
+      },
+      "dataset": {
+        "name": "fineweb",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 48000,
+        "train_tokens": 20619886592,
+        "planned_train_tokens": 48758784000,
+        "batch_size": 62,
+        "acc_steps": 8,
+        "global_batch_tokens": 1015808,
+        "global_batch_sequences": 1984,
+        "sequence_length": 512,
+        "scheduler": "cos",
+        "lr": 0.0002,
+        "weight_decay": 0.1,
+        "warmup_steps": 2000,
+        "grad_clip": 1,
+        "dtype": "bfloat16",
+        "seed": 0,
+        "eval_interval": 200
+      },
+      "hardware": {
+        "gpu_type": "paper benchmark hardware",
+        "num_gpus": 4,
+        "ddp": true,
+        "compile": false
+      },
+      "source": {
+        "source_type": "wandb_archive",
+        "wandb_url": "https://wandb.ai/semenov-andrei-v/llm-optimizer-benchmark/runs/i8dpg0f2",
+        "log_path": "artifacts/wandb-paper-2509.01440/runs/i8dpg0f2/output.log",
+        "csv_path": null,
+        "command": null,
+        "config_path": "artifacts/wandb-paper-2509.01440/runs/i8dpg0f2/config.yaml",
+        "git_commit": null
+      },
+      "leaderboard_meta": {
+        "official_rank": null,
+        "paper_label": "Lion",
+        "source_optimizer": "lion",
+        "archive_run_id": "i8dpg0f2",
+        "source_outcome": "partial_official_protocol",
+        "observed_step": 20300,
+        "planned_step": 48000,
+        "curve_available": false,
+        "curve_reason": "Archived log contains fewer than two finite validation observations.",
+        "selection_basis": "Audited paper appendix configuration and protocol identity; never selected by loss."
+      }
+    },
+    {
+      "run_id": "paper-paper-llama-720m-bs1984-48b-signum",
+      "display_name": "Signum",
+      "suite_id": "paper-llama-720m-bs1984-48b",
+      "run_role": "official_reference",
+      "status": "partial",
+      "optimizer": {
+        "name": "Signum",
+        "family": "momentum",
+        "variant": null,
+        "method_group": "signum",
+        "source_optimizer": "signum"
+      },
+      "model": {
+        "type": "llama",
+        "params": "Llama 720M",
+        "n_layer": 12,
+        "n_head": 16,
+        "n_embd": 2048
+      },
+      "dataset": {
+        "name": "fineweb",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 48000,
+        "train_tokens": 20519321600,
+        "planned_train_tokens": 48758784000,
+        "batch_size": 62,
+        "acc_steps": 8,
+        "global_batch_tokens": 1015808,
+        "global_batch_sequences": 1984,
+        "sequence_length": 512,
+        "scheduler": "cos",
+        "lr": 0.0002,
+        "weight_decay": 0.1,
+        "warmup_steps": 2000,
+        "grad_clip": 0.1,
+        "dtype": "bfloat16",
+        "seed": 0,
+        "eval_interval": 200
+      },
+      "hardware": {
+        "gpu_type": "paper benchmark hardware",
+        "num_gpus": 4,
+        "ddp": true,
+        "compile": false
+      },
+      "source": {
+        "source_type": "wandb_archive",
+        "wandb_url": "https://wandb.ai/semenov-andrei-v/llm-optimizer-benchmark/runs/potj070l",
+        "log_path": "artifacts/wandb-paper-2509.01440/runs/potj070l/output.log",
+        "csv_path": null,
+        "command": null,
+        "config_path": "artifacts/wandb-paper-2509.01440/runs/potj070l/config.yaml",
+        "git_commit": null
+      },
+      "leaderboard_meta": {
+        "official_rank": null,
+        "paper_label": "Signum",
+        "source_optimizer": "signum",
+        "archive_run_id": "potj070l",
+        "source_outcome": "partial_official_protocol",
+        "observed_step": 20200,
+        "planned_step": 48000,
+        "curve_available": false,
+        "curve_reason": "Archived log contains fewer than two finite validation observations.",
+        "selection_basis": "Audited paper appendix configuration and protocol identity; never selected by loss."
+      }
+    },
+    {
+      "run_id": "paper-paper-llama-720m-bs1984-48b-soap",
+      "display_name": "SOAP",
+      "suite_id": "paper-llama-720m-bs1984-48b",
+      "run_role": "official_reference",
+      "status": "partial",
+      "optimizer": {
+        "name": "SOAP",
+        "family": "second-order",
+        "variant": null,
+        "method_group": "soap",
+        "source_optimizer": "soap"
+      },
+      "model": {
+        "type": "llama",
+        "params": "Llama 720M",
+        "n_layer": 12,
+        "n_head": 16,
+        "n_embd": 2048
+      },
+      "dataset": {
+        "name": "fineweb",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 48000,
+        "train_tokens": 17675059200,
+        "planned_train_tokens": 48758784000,
+        "batch_size": 31,
+        "acc_steps": 16,
+        "global_batch_tokens": 1015808,
+        "global_batch_sequences": 1984,
+        "sequence_length": 512,
+        "scheduler": "cos",
+        "lr": 0.001,
+        "weight_decay": 0.1,
+        "warmup_steps": 2000,
+        "grad_clip": 0.1,
+        "dtype": "bfloat16",
+        "seed": 0,
+        "eval_interval": 200
+      },
+      "hardware": {
+        "gpu_type": "paper benchmark hardware",
+        "num_gpus": 4,
+        "ddp": true,
+        "compile": false
+      },
+      "source": {
+        "source_type": "wandb_archive",
+        "wandb_url": "https://wandb.ai/semenov-andrei-v/llm-optimizer-benchmark/runs/w86j58ae",
+        "log_path": "artifacts/wandb-paper-2509.01440/runs/w86j58ae/output.log",
+        "csv_path": null,
+        "command": null,
+        "config_path": "artifacts/wandb-paper-2509.01440/runs/w86j58ae/config.yaml",
+        "git_commit": null
+      },
+      "leaderboard_meta": {
+        "official_rank": null,
+        "paper_label": "SOAP",
+        "source_optimizer": "soap",
+        "archive_run_id": "w86j58ae",
+        "source_outcome": "partial_official_protocol",
+        "observed_step": 17400,
+        "planned_step": 48000,
+        "curve_available": false,
+        "curve_reason": "Archived log contains fewer than two finite validation observations.",
+        "selection_basis": "Audited paper appendix configuration and protocol identity; never selected by loss."
+      }
+    },
+    {
+      "run_id": "paper-paper-llama-720m-bs1984-48b-sf-adamw",
+      "display_name": "SF-AdamW",
+      "suite_id": "paper-llama-720m-bs1984-48b",
+      "run_role": "official_reference",
+      "status": "partial",
+      "optimizer": {
+        "name": "SF-AdamW",
+        "family": "schedule-free",
+        "variant": null,
+        "method_group": "sf-adamw",
+        "source_optimizer": "sf-adamw"
+      },
+      "model": {
+        "type": "llama",
+        "params": "Llama 720M",
+        "n_layer": 12,
+        "n_head": 16,
+        "n_embd": 2048
+      },
+      "dataset": {
+        "name": "fineweb",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 48000,
+        "train_tokens": 20365934592,
+        "planned_train_tokens": 48758784000,
+        "batch_size": 62,
+        "acc_steps": 8,
+        "global_batch_tokens": 1015808,
+        "global_batch_sequences": 1984,
+        "sequence_length": 512,
+        "scheduler": "none",
+        "lr": 0.001,
+        "weight_decay": 0.1,
+        "warmup_steps": 8000,
+        "grad_clip": 0.1,
+        "dtype": "bfloat16",
+        "seed": 0,
+        "eval_interval": 200
+      },
+      "hardware": {
+        "gpu_type": "paper benchmark hardware",
+        "num_gpus": 4,
+        "ddp": true,
+        "compile": false
+      },
+      "source": {
+        "source_type": "wandb_archive",
+        "wandb_url": "https://wandb.ai/semenov-andrei-v/llm-optimizer-benchmark/runs/215a52hc",
+        "log_path": "artifacts/wandb-paper-2509.01440/runs/215a52hc/output.log",
+        "csv_path": null,
+        "command": null,
+        "config_path": "artifacts/wandb-paper-2509.01440/runs/215a52hc/config.yaml",
+        "git_commit": null
+      },
+      "leaderboard_meta": {
+        "official_rank": null,
+        "paper_label": "SF-AdamW",
+        "source_optimizer": "sf-adamw",
+        "archive_run_id": "215a52hc",
+        "source_outcome": "partial_official_protocol",
+        "observed_step": 20050,
+        "planned_step": 48000,
+        "curve_available": false,
+        "curve_reason": "Archived log contains fewer than two finite validation observations.",
+        "selection_basis": "Audited paper appendix configuration and protocol identity; never selected by loss."
+      }
+    }
+  ],
+  "metrics": [],
+  "claims": [],
+  "figures": []
+}

@@ -1,6 +1,8 @@
 const SEARCH_DEBOUNCE_MS = 140;
 
 let portalData;
+let portalCatalog;
+let portalLoadMode = "aggregate";
 let dataIndex;
 let selectedSuiteId;
 let selectedRunId;
@@ -8,7 +10,7 @@ let selectedChartRunIds = new Set();
 let referenceHistoryOpen = {};
 let chartSelectionNotice = "";
 let chartScaleMode = "full";
-let chartEmphasisMode = "equal";
+let focusedChartRunId = null;
 let runFilterText = "";
 let runFilterRole = "all";
 let runFilterFamily = "all";
@@ -19,6 +21,13 @@ let runSearchTimer = 0;
 let chartResizeFrame = 0;
 let chartResizeObserver;
 let currentChartModel = null;
+let activeSuiteShardId = null;
+let pendingSuiteId = null;
+let protocolSwitchError = "";
+let suiteLoadGeneration = 0;
+
+const suiteShardCache = new Map();
+const suiteShardRequests = new Map();
 
 const fmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 5 });
 const intFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -158,6 +167,330 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+function safeExternalUrl(value) {
+  if (typeof value !== "string" || !value.trim()) return "";
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : "";
+  } catch {
+    return "";
+  }
+}
+
+function normalizedPortalData(data) {
+  return {
+    ...data,
+    suites: Array.isArray(data?.suites) ? data.suites : [],
+    runs: Array.isArray(data?.runs) ? data.runs : [],
+    metrics: Array.isArray(data?.metrics) ? data.metrics : [],
+    claims: Array.isArray(data?.claims) ? data.claims : [],
+    figures: Array.isArray(data?.figures) ? data.figures : [],
+  };
+}
+
+function catalogSnapshot() {
+  return portalCatalog || portalData || normalizedPortalData({});
+}
+
+function catalogSuites() {
+  return catalogSnapshot().suites || [];
+}
+
+function catalogSuiteById(suiteId) {
+  return catalogSuites().find((suite) => suite.suite_id === suiteId);
+}
+
+function numericEvidenceValue(summary, keys) {
+  for (const key of keys) {
+    const value = summary?.[key];
+    if (Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+function suiteEvidenceSummary(suite) {
+  const configured = suite?.evidence_summary || suite?.protocol?.evidence_summary || {};
+  const loadedRuns = suite ? suiteRuns(suite.suite_id) : [];
+  const statusCounts = configured.status_counts || {};
+  const derivedComplete = loadedRuns.filter((run) => run.status === "completed").length;
+  const derivedPartial = loadedRuns.filter((run) =>
+    ["partial", "stopped", "failed", "oom", "nan"].includes(String(run.status).toLowerCase())
+  ).length;
+  return {
+    expected: numericEvidenceValue(configured, ["expected"]),
+    mapped: numericEvidenceValue(configured, ["mapped", "runs"]) ?? loadedRuns.length,
+    complete:
+      numericEvidenceValue(configured, ["complete", "completed"]) ??
+      numericEvidenceValue(statusCounts, ["completed"]) ??
+      derivedComplete,
+    partial:
+      numericEvidenceValue(configured, ["partial"]) ??
+      derivedPartial,
+    nonfinite: numericEvidenceValue(configured, ["nonfinite"]) ?? 0,
+    unresolved: numericEvidenceValue(configured, ["unresolved"]) ?? 0,
+    drawable:
+      numericEvidenceValue(configured, ["drawable", "curves"]) ??
+      (suite ? loadedRuns.filter((run) => curveAvailable(run, suite)).length : 0),
+    metrics: numericEvidenceValue(configured, ["metrics"]) ?? 0,
+    claims: numericEvidenceValue(configured, ["claims"]) ?? 0,
+    figures: numericEvidenceValue(configured, ["figures"]) ?? 0,
+  };
+}
+
+function sumSuiteEvidence(suites) {
+  const keys = [
+    "expected",
+    "mapped",
+    "complete",
+    "partial",
+    "nonfinite",
+    "unresolved",
+    "drawable",
+    "metrics",
+    "claims",
+    "figures",
+  ];
+  const totals = Object.fromEntries(keys.map((key) => [key, 0]));
+  let hasExpected = false;
+  for (const suite of suites) {
+    const summary = suiteEvidenceSummary(suite);
+    for (const key of keys) {
+      if (key === "expected" && summary[key] === null) continue;
+      totals[key] += summary[key] || 0;
+    }
+    hasExpected ||= summary.expected !== null;
+  }
+  if (!hasExpected) totals.expected = null;
+  return totals;
+}
+
+function groupId(group) {
+  return group?.benchmark_group_id || group?.group_id || "";
+}
+
+function suiteGroupId(suite) {
+  return suite?.benchmark_group_id || "";
+}
+
+function benchmarkGroupRecords() {
+  const raw = catalogSnapshot().benchmark_groups;
+  if (Array.isArray(raw)) return raw;
+  if (!raw || typeof raw !== "object") return [];
+  return Object.entries(raw).map(([benchmarkGroupId, value]) => ({
+    benchmark_group_id: benchmarkGroupId,
+    ...(value || {}),
+  }));
+}
+
+function groupSuiteIds(group) {
+  const configured = group?.suite_ids || group?.protocol_suite_ids || group?.suites || [];
+  return configured
+    .map((entry) => (typeof entry === "string" ? entry : entry?.suite_id))
+    .filter(Boolean);
+}
+
+function benchmarkNavigationEntries() {
+  const suites = catalogSuites();
+  const suitesById = new Map(suites.map((suite) => [suite.suite_id, suite]));
+  const assigned = new Set();
+  const explicit = benchmarkGroupRecords()
+    .map((group, index) => {
+      const id = groupId(group);
+      const ids = groupSuiteIds(group);
+      const inferred = suites
+        .filter((suite) => suiteGroupId(suite) === id)
+        .map((suite) => suite.suite_id);
+      const suiteIds = Array.from(new Set([...ids, ...inferred])).filter((suiteId) =>
+        suitesById.has(suiteId)
+      );
+      suiteIds.forEach((suiteId) => assigned.add(suiteId));
+      const groupSuites = suiteIds.map((suiteId) => suitesById.get(suiteId));
+      const defaultSuite =
+        suitesById.get(group.default_suite_id) ||
+        groupSuites.find((suite) => suite.status === "active") ||
+        groupSuites[0];
+      return {
+        kind: "group",
+        id: id || `group-${index + 1}`,
+        order: Number.isFinite(group.display_order) ? group.display_order : index,
+        record: group,
+        suites: groupSuites,
+        defaultSuite,
+      };
+    })
+    .filter((entry) => entry.suites.length);
+
+  const derivedById = new Map();
+  suites.forEach((suite, index) => {
+    const id = suiteGroupId(suite);
+    if (!id || assigned.has(suite.suite_id)) return;
+    if (!derivedById.has(id)) {
+      derivedById.set(id, {
+        kind: "group",
+        id,
+        order: explicit.length + index,
+        record: { benchmark_group_id: id },
+        suites: [],
+        defaultSuite: null,
+      });
+    }
+    const entry = derivedById.get(id);
+    entry.suites.push(suite);
+    entry.defaultSuite ||= suite;
+    assigned.add(suite.suite_id);
+  });
+
+  const standalone = suites
+    .filter((suite) => !assigned.has(suite.suite_id))
+    .map((suite, index) => ({
+      kind: "suite",
+      id: `suite:${suite.suite_id}`,
+      order: explicit.length + derivedById.size + index,
+      record: null,
+      suites: [suite],
+      defaultSuite: suite,
+    }));
+
+  return [...explicit, ...derivedById.values(), ...standalone].sort(
+    (left, right) => left.order - right.order
+  );
+}
+
+function navigationEntryForSuite(suiteId) {
+  return benchmarkNavigationEntries().find((entry) =>
+    entry.suites.some((suite) => suite.suite_id === suiteId)
+  );
+}
+
+function navigationEntryTitle(entry) {
+  return (
+    entry.record?.title ||
+    entry.record?.model_label ||
+    entry.defaultSuite?.title ||
+    "Untitled benchmark"
+  );
+}
+
+function navigationEntryStatus(entry) {
+  if (entry.record?.status) return entry.record.status;
+  if (entry.suites.some((suite) => suite.status === "active")) return "active";
+  if (entry.suites.some((suite) => suite.status === "partial")) return "partial";
+  if (entry.suites.some((suite) => suite.status === "view")) return "view";
+  return entry.defaultSuite?.status || "planned";
+}
+
+function navigationEntryEvidence(entry) {
+  return entry.record?.evidence_summary || sumSuiteEvidence(entry.suites);
+}
+
+function protocolSourceCoordinate(suite) {
+  const protocol = suite?.protocol || {};
+  const key = protocol.source_kind || protocol.source_id || "protocol";
+  return {
+    key,
+    label:
+      protocol.source_label ||
+      (key === "current_curated"
+        ? "Current"
+        : key === "paper_main_benchmark"
+          ? "Paper"
+          : String(key).replaceAll("_", " ")),
+    dataset:
+      protocol.dataset ||
+      suite?.comparability_constraints?.dataset ||
+      "Dataset not specified",
+  };
+}
+
+function protocolBatchCoordinate(suite) {
+  const protocol = suite?.protocol || {};
+  const batch = protocol.batch_size_sequences ?? protocol.global_batch_sequences ?? protocol.batch_size;
+  const sequenceLength = protocol.sequence_length;
+  return {
+    key: batch === null || batch === undefined ? "unspecified" : String(batch),
+    batch,
+    sequenceLength,
+    label:
+      protocol.batch_label ||
+      (batch !== null && batch !== undefined
+        ? `${intFmt.format(batch)}${Number.isFinite(sequenceLength) ? ` × ${intFmt.format(sequenceLength)}` : ""}`
+        : "Not specified"),
+    tokensPerStep:
+      protocol.tokens_per_step ??
+      (Number.isFinite(batch) && Number.isFinite(sequenceLength) ? batch * sequenceLength : null),
+  };
+}
+
+function protocolBudgetCoordinate(suite) {
+  const protocol = suite?.protocol || {};
+  const plannedTokens = protocol.planned_tokens;
+  const label =
+    protocol.budget_label ||
+    protocol.token_budget_label ||
+    suite?.comparability_constraints?.token_budget ||
+    (Number.isFinite(plannedTokens) ? intFmt.format(plannedTokens) : "Not specified");
+  return {
+    key: protocol.budget_key || (Number.isFinite(plannedTokens) ? String(plannedTokens) : String(label)),
+    label,
+    plannedTokens: Number.isFinite(plannedTokens) ? plannedTokens : null,
+    steps: Number.isFinite(protocol.budget_steps) ? protocol.budget_steps : null,
+  };
+}
+
+function protocolDisplayOrder(suite) {
+  const configured = suite?.protocol?.display_order;
+  if (Number.isFinite(configured)) return configured;
+  return protocolBudgetCoordinate(suite).plannedTokens ?? Number.MAX_SAFE_INTEGER;
+}
+
+function protocolSelectable(suite) {
+  if (!suite?.protocol) return false;
+  if (suite.protocol.enabled === false) return false;
+  const detailAvailable = suiteDetailState(suite) === "available";
+  const drawable = numericEvidenceValue(
+    suite.evidence_summary || suite.protocol.evidence_summary,
+    ["drawable", "curves"]
+  );
+  if (!detailAvailable) return false;
+  return drawable === null ? suite.status === "active" : drawable > 0;
+}
+
+function sortedProtocolSuites(suites) {
+  return suites
+    .filter((suite) => suite?.protocol)
+    .slice()
+    .sort((left, right) => {
+      const orderDelta = protocolDisplayOrder(left) - protocolDisplayOrder(right);
+      return orderDelta || left.suite_id.localeCompare(right.suite_id);
+    });
+}
+
+function chooseProtocolSuite(
+  suites,
+  { sourceKey = "", batchKey = "", budgetKey = "" } = {}
+) {
+  let candidates = sortedProtocolSuites(suites).filter(protocolSelectable);
+  if (sourceKey) {
+    const sourceMatches = candidates.filter(
+      (suite) => protocolSourceCoordinate(suite).key === sourceKey
+    );
+    if (sourceMatches.length) candidates = sourceMatches;
+  }
+  if (batchKey) {
+    const batchMatches = candidates.filter(
+      (suite) => protocolBatchCoordinate(suite).key === String(batchKey)
+    );
+    if (batchMatches.length) candidates = batchMatches;
+  }
+  if (budgetKey) {
+    const budgetMatch = candidates.find(
+      (suite) => protocolBudgetCoordinate(suite).key === String(budgetKey)
+    );
+    if (budgetMatch) return budgetMatch;
+  }
+  return candidates[0] || null;
+}
+
 function activeSuite() {
   return suiteById(selectedSuiteId) || portalData.suites.find((suite) => suite.status === "active") || portalData.suites[0];
 }
@@ -185,6 +518,7 @@ function defaultChartRunIds(suite) {
 
 function initializeChartSelection(suite) {
   selectedChartRunIds = new Set(defaultChartRunIds(suite));
+  focusedChartRunId = null;
   chartSelectionNotice = "";
 }
 
@@ -212,12 +546,19 @@ function normalizeChartScaleMode(suite) {
   if (!allowed.has(chartScaleMode)) chartScaleMode = "full";
 }
 
-function normalizeChartEmphasisMode(value = chartEmphasisMode) {
-  chartEmphasisMode = value === "selected" ? "selected" : "equal";
-}
-
 function chartFocusRunId() {
-  return chartEmphasisMode === "selected" ? selectedRunId : null;
+  const suite = activeSuite();
+  const run = runById(focusedChartRunId);
+  if (
+    !suite ||
+    !run ||
+    run.suite_id !== suite.suite_id ||
+    !selectedChartRunIds.has(run.run_id)
+  ) {
+    return null;
+  }
+  const visibleRunIds = new Set(chartVisibleRuns(suite).map((entry) => entry.run_id));
+  return visibleRunIds.has(run.run_id) ? run.run_id : null;
 }
 
 function curveAvailable(run, suite) {
@@ -302,6 +643,21 @@ function eligibleRows(suite) {
   return dataIndex?.leaderboardRowsBySuite.get(suite.suite_id) || [];
 }
 
+function unrankedRows(suite) {
+  const allowed = new Set(suite.leaderboard_eligibility?.allowed_status || []);
+  return suiteRuns(suite.suite_id)
+    .filter((run) => !allowed.has(run.status))
+    .map((run) => rowFromRun(suite, run))
+    .sort((left, right) => {
+      const statusDelta = String(left.run.status).localeCompare(String(right.run.status));
+      return statusDelta || left.run.display_name.localeCompare(right.run.display_name);
+    });
+}
+
+function allRunRows(suite) {
+  return suiteRuns(suite.suite_id).map((run) => rowFromRun(suite, run));
+}
+
 function leaderboardOrderMap(suite) {
   return dataIndex?.leaderboardOrderBySuite.get(suite.suite_id) || new Map();
 }
@@ -326,7 +682,9 @@ function selectedChartRuns(suite) {
 }
 
 function chartVisibleRuns(suite) {
-  const visibleIds = new Set(filteredRows(eligibleRows(suite), suite).map((row) => row.run.run_id));
+  const visibleIds = new Set(
+    filteredRows(allRunRows(suite), suite).map((row) => row.run.run_id)
+  );
   return selectedChartRuns(suite).filter((run) => visibleIds.has(run.run_id));
 }
 
@@ -395,12 +753,15 @@ function setChartSelection(suite, runIds, notice = "") {
     .slice(0, limit)
     .map((run) => run.run_id);
   selectedChartRunIds = new Set(accepted);
+  if (!selectedChartRunIds.has(focusedChartRunId)) focusedChartRunId = null;
   chartSelectionNotice = notice;
   selectedRunId = firstChartRun(suite)?.run_id || null;
 }
 
 function bestChartRunIds(suite) {
-  return selectableChartRuns(suite)
+  return eligibleRows(suite)
+    .map((row) => row.run)
+    .filter((run) => curveAvailable(run, suite))
     .slice(0, chartSelectionLimit(suite))
     .map((run) => run.run_id);
 }
@@ -544,6 +905,7 @@ function toggleChartRun(runId, shouldSelect) {
   }
 
   selectedChartRunIds.delete(runId);
+  if (focusedChartRunId === runId) focusedChartRunId = null;
   if (selectedRunId === runId) {
     selectedRunId = firstChartRun(suite)?.run_id || null;
   }
@@ -559,7 +921,7 @@ function captureFocusState() {
     chartAction: element.dataset?.chartAction || "",
     filterAction: element.dataset?.filterAction || "",
     scaleMode: element.dataset?.scaleMode || "",
-    emphasisMode: element.dataset?.emphasisMode || "",
+    chartFocusAction: element.dataset?.chartFocusAction || "",
     controlKind: element.matches?.(".plot-toggle input") ? "plot-toggle" : "",
     selectionStart: typeof element.selectionStart === "number" ? element.selectionStart : null,
     selectionEnd: typeof element.selectionEnd === "number" ? element.selectionEnd : null,
@@ -575,7 +937,7 @@ function restoreFocusState(state) {
     ["chartAction", "chartAction"],
     ["filterAction", "filterAction"],
     ["scaleMode", "scaleMode"],
-    ["emphasisMode", "emphasisMode"],
+    ["chartFocusAction", "chartFocusAction"],
   ];
   if (!element) {
     if (state.controlKind === "plot-toggle" && state.runId) {
@@ -604,23 +966,31 @@ function restoreFocusState(state) {
 
 function updateSelectedRunVisuals() {
   const focusedRunId = chartFocusRunId();
-  const selectors = [
+  const detailSelectors = [
     "#leaderboardContent tr[data-run-id]",
     "#leaderboardContent .selected-run-pill[data-run-id]",
-    "#chartSelectionChips button[data-run-id]",
-    "#targetStepStrip button[data-run-id]",
-    "#chartLegend button[data-run-id]",
   ];
-  document.querySelectorAll(selectors.join(",")).forEach((element) => {
+  document.querySelectorAll(detailSelectors.join(",")).forEach((element) => {
     const selected = element.dataset.runId === selectedRunId;
     element.classList.toggle(element.matches("tr") ? "selected" : "active", selected);
     if (element.matches("tr")) {
       element.setAttribute("aria-selected", String(selected));
     } else {
       element.setAttribute("aria-pressed", String(selected));
-      if (element.closest("#targetStepStrip")) {
-        element.setAttribute("aria-current", String(selected));
-      }
+    }
+  });
+
+  const chartSelectors = [
+    "#chartSelectionChips button[data-run-id]",
+    "#targetStepStrip button[data-run-id]",
+    "#chartLegend button[data-run-id]",
+  ];
+  document.querySelectorAll(chartSelectors.join(",")).forEach((element) => {
+    const focused = element.dataset.runId === focusedRunId;
+    element.classList.toggle("active", focused);
+    element.setAttribute("aria-pressed", String(focused));
+    if (element.closest("#targetStepStrip")) {
+      element.setAttribute("aria-current", String(focused));
     }
   });
 
@@ -628,7 +998,7 @@ function updateSelectedRunVisuals() {
     const focused = element.dataset.chartRunId === focusedRunId;
     const opacity = focused
       ? element.dataset.focusOpacity
-      : chartEmphasisMode === "selected"
+      : focusedRunId
         ? element.dataset.contextOpacity
         : element.dataset.neutralOpacity;
     const strokeWidth = focused
@@ -638,7 +1008,7 @@ function updateSelectedRunVisuals() {
     if (strokeWidth) element.setAttribute("stroke-width", strokeWidth);
     element.classList.toggle("selected", focused);
     element.classList.toggle("is-selected", focused);
-    element.classList.toggle("is-context", chartEmphasisMode === "selected" && !focused);
+    element.classList.toggle("is-context", Boolean(focusedRunId) && !focused);
     element.setAttribute("aria-current", String(focused));
   });
 
@@ -650,11 +1020,24 @@ function updateSelectedRunVisuals() {
   }
 }
 
-function selectRun(runId, { updateUrl = true } = {}) {
+function clearChartFocus({ updateUrl = true } = {}) {
+  const changed = focusedChartRunId !== null;
+  focusedChartRunId = null;
+  if (byId("chartEmphasisSwitch")) renderChartEmphasisSwitch();
+  updateSelectedRunVisuals();
+  if (updateUrl) syncUrlState();
+  return changed;
+}
+
+function selectRun(runId, { updateUrl = true, focusChart = false } = {}) {
   const run = runById(runId);
   const suite = activeSuite();
   if (!run || !suite || run.suite_id !== suite.suite_id) return false;
   selectedRunId = run.run_id;
+  if (focusChart && selectedChartRunIds.has(run.run_id)) {
+    focusedChartRunId = run.run_id;
+    if (byId("chartEmphasisSwitch")) renderChartEmphasisSwitch();
+  }
   if (byId("runDetail")) {
     updateSelectedRunVisuals();
     renderRunDetail();
@@ -680,9 +1063,8 @@ function applyUrlState() {
   const requestedScale = params.get("scale");
   if (requestedScale) chartScaleMode = requestedScale;
   normalizeChartScaleMode(suite);
-  normalizeChartEmphasisMode(params.get("emphasis"));
   initializeChartSelection(suite);
-  const rows = eligibleRows(suite);
+  const rows = allRunRows(suite);
   const readFilter = (name, values) => {
     const value = params.get(name);
     return value && values.has(value) ? value : "all";
@@ -703,6 +1085,16 @@ function applyUrlState() {
   selectedRunId = requestedRun?.suite_id === suite.suite_id
     ? requestedRun.run_id
     : firstChartRun(suite)?.run_id || null;
+  const requestedFocus = runById(params.get("focus"));
+  focusedChartRunId =
+    requestedFocus?.suite_id === suite.suite_id &&
+    selectedChartRunIds.has(requestedFocus.run_id)
+      ? requestedFocus.run_id
+      : params.get("emphasis") === "selected" &&
+          selectedRunId &&
+          selectedChartRunIds.has(selectedRunId)
+        ? selectedRunId
+        : null;
 }
 
 function syncUrlState({ push = false } = {}) {
@@ -712,8 +1104,10 @@ function syncUrlState({ push = false } = {}) {
   if (selectedRunId) url.searchParams.set("run", selectedRunId);
   else url.searchParams.delete("run");
   url.searchParams.set("scale", chartScaleMode);
-  if (chartEmphasisMode === "selected") url.searchParams.set("emphasis", "selected");
-  else url.searchParams.delete("emphasis");
+  const focusedRunId = chartFocusRunId();
+  if (focusedRunId) url.searchParams.set("focus", focusedRunId);
+  else url.searchParams.delete("focus");
+  url.searchParams.delete("emphasis");
   const filters = {
     q: runFilterText.trim(),
     role: runFilterRole === "all" ? "" : runFilterRole,
@@ -735,14 +1129,26 @@ function syncUrlState({ push = false } = {}) {
 }
 
 function renderOverview() {
-  const totalSuites = portalData.suites.length;
-  const activeSuites = portalData.suites.filter((suite) => suite.status === "active").length;
-  const curatedRuns = portalData.runs.length;
-  const claimCards = portalData.claims.length;
+  const snapshot = catalogSnapshot();
+  const entries = benchmarkNavigationEntries();
+  const globalEvidence = snapshot.evidence_summary || snapshot.meta?.evidence_summary || {};
+  const summedEvidence = sumSuiteEvidence(catalogSuites());
+  const totalSuites =
+    numericEvidenceValue(globalEvidence, ["benchmark_groups", "groups"]) ??
+    entries.length;
+  const activeSuites =
+    numericEvidenceValue(globalEvidence, ["active_groups"]) ??
+    entries.filter((entry) => navigationEntryStatus(entry) === "active").length;
+  const curatedRuns =
+    numericEvidenceValue(globalEvidence, ["runs", "mapped"]) ??
+    (portalLoadMode === "aggregate" ? portalData.runs.length : summedEvidence.mapped);
+  const claimCards =
+    numericEvidenceValue(globalEvidence, ["claims"]) ??
+    (portalLoadMode === "aggregate" ? portalData.claims.length : summedEvidence.claims);
 
   byId("overviewMetrics").innerHTML = [
-    [String(totalSuites), "tracked suites and views"],
-    [String(activeSuites), "active suites with curated detail"],
+    [String(totalSuites), "benchmark groups and standalone views"],
+    [String(activeSuites), "active workspaces with curated detail"],
     [String(curatedRuns), "curated runs with source trace"],
     [String(claimCards), "manual claim cards"],
   ]
@@ -752,8 +1158,11 @@ function renderOverview() {
 
 function renderSuiteHeader(suite) {
   const runs = suiteRuns(suite.suite_id);
-  const completed = runs.filter((run) => run.status === "completed").length;
-  const drawable = runs.filter((run) => curveAvailable(run, suite)).length;
+  const navigationEntry = navigationEntryForSuite(suite.suite_id);
+  const evidence = suiteEvidenceSummary(suite);
+  const completed = evidence.complete;
+  const mapped = evidence.mapped;
+  const drawable = evidence.drawable;
   const target = suite.target || {};
   const constraints = suite.comparability_constraints || {};
   const figure = figureForSuite(suite);
@@ -763,10 +1172,13 @@ function renderSuiteHeader(suite) {
       ? `${target.metric_name} ${target.direction === "below" ? "<=" : ">="} ${target.value}`
       : "no chart target";
 
-  byId("suite-title").textContent = suite.title;
+  byId("suite-title").textContent =
+    navigationEntry?.kind === "group"
+      ? navigationEntryTitle(navigationEntry)
+      : suite.title;
   byId("targetBox").innerHTML = `
     <span class="target-box-label">Evidence coverage</span>
-    <strong>${completed}/${runs.length} runs complete</strong>
+    <strong>${completed}/${mapped} runs complete</strong>
     <span class="target-box-value">${drawable} curves</span>
     <span class="target-box-meta">${suite.status} · ${suite.family} · static snapshot</span>
   `;
@@ -800,20 +1212,27 @@ function renderSuiteHeader(suite) {
 
 function renderSuiteCards() {
   const selected = activeSuite();
-  byId("suiteCards").innerHTML = portalData.suites
-    .map((suite) => {
-      const runs = suiteRuns(suite.suite_id);
-      const card = suite.card || {};
-      const isSelected = suite.suite_id === selected.suite_id;
+  const entries = benchmarkNavigationEntries();
+  const selectedEntry = navigationEntryForSuite(selected?.suite_id);
+  byId("suiteCards").innerHTML = entries
+    .map((entry) => {
+      const suite = entry.defaultSuite;
+      const card = entry.record?.card || suite?.card || {};
+      const status = navigationEntryStatus(entry);
+      const evidence = navigationEntryEvidence(entry);
+      const isSelected = entry.id === selectedEntry?.id;
+      const targetSuiteId = isSelected ? selected.suite_id : suite?.suite_id;
+      const isPending = entry.suites.some((candidate) => candidate.suite_id === pendingSuiteId);
+      const protocolCount = entry.suites.filter((candidate) => candidate.protocol).length;
       return `
-        <button class="suite-card suite-status-${escapeHtml(suite.status)} ${isSelected ? "selected" : ""} ${suite.status === "view" ? "view-card" : ""}" type="button" data-suite-id="${suite.suite_id}" data-suite-status="${escapeHtml(suite.status)}" aria-pressed="${isSelected}">
+        <button class="suite-card suite-status-${escapeHtml(status)} ${isSelected ? "selected" : ""} ${isPending ? "pending" : ""} ${status === "view" ? "view-card" : ""}" type="button" data-suite-id="${escapeHtml(targetSuiteId)}" data-benchmark-group-id="${escapeHtml(entry.id)}" data-suite-status="${escapeHtml(status)}" aria-pressed="${isSelected}" aria-busy="${isPending}">
           <span class="suite-card-topline">
-            <span class="suite-status">${card.status_label || suite.status}</span>
-            <span>${runs.length} runs</span>
+            <span class="suite-status">${escapeHtml(card.status_label || status)}</span>
+            <span>${escapeHtml(`${evidence.mapped || 0} runs${protocolCount > 1 ? ` · ${protocolCount} protocols` : ""}`)}</span>
           </span>
-          <strong>${suite.title}</strong>
-          <span class="suite-metric">${card.metric_label || primaryMetricName(suite)}</span>
-          <span class="suite-headline">${card.headline || suite.notes || "Curated evidence will be attached later."}</span>
+          <strong>${escapeHtml(navigationEntryTitle(entry))}</strong>
+          <span class="suite-metric">${escapeHtml(card.metric_label || primaryMetricName(suite))}</span>
+          <span class="suite-headline">${escapeHtml(card.headline || suite?.notes || "Curated evidence will be attached later.")}</span>
         </button>
       `;
     })
@@ -821,19 +1240,223 @@ function renderSuiteCards() {
 
   byId("suiteCards").querySelectorAll("button").forEach((button) => {
     button.addEventListener("click", () => {
-      selectedSuiteId = button.dataset.suiteId;
-      const suite = activeSuite();
-      clearTimeout(runSearchTimer);
-      resetRunFilters();
-      normalizeChartScaleMode(suite);
-      normalizeChartEmphasisMode("equal");
-      initializeChartSelection(suite);
-      selectedRunId = firstChartRun(suite)?.run_id || null;
-      renderSuiteView();
-      syncUrlState({ push: true });
-      const selectedButton = Array.from(byId("suiteCards").querySelectorAll("[data-suite-id]"))
-        .find((candidate) => candidate.dataset.suiteId === selectedSuiteId);
-      selectedButton?.focus({ preventScroll: true });
+      if (button.getAttribute("aria-pressed") === "true" && !pendingSuiteId) {
+        button.focus({ preventScroll: true });
+        return;
+      }
+      void requestSuiteChange(button.dataset.suiteId, {
+        push: true,
+        focusGroupId: button.dataset.benchmarkGroupId,
+      });
+    });
+  });
+}
+
+function protocolEvidenceText(summary) {
+  const coverage =
+    summary.expected === null
+      ? `${summary.mapped} mapped`
+      : `${summary.mapped}/${summary.expected} mapped`;
+  return {
+    coverage,
+    status: `${summary.complete} complete · ${summary.partial} partial`,
+    caveat:
+      summary.nonfinite || summary.unresolved
+        ? `${summary.nonfinite} nonfinite · ${summary.unresolved} unresolved`
+        : `${summary.drawable} drawable curves`,
+  };
+}
+
+function renderProtocolSelector(suite) {
+  const mount = byId("protocolSelector");
+  if (!mount) return;
+  const entry = navigationEntryForSuite(suite?.suite_id);
+  const protocolSuites = sortedProtocolSuites(entry?.suites || []);
+
+  if (!suite?.protocol || !entry || !protocolSuites.length) {
+    if (!protocolSwitchError) {
+      mount.hidden = true;
+      mount.innerHTML = "";
+      return;
+    }
+    mount.hidden = false;
+    mount.innerHTML = `
+      <div class="protocol-ledger-error" role="alert">
+        <strong>Protocol unchanged.</strong>
+        <span>${escapeHtml(protocolSwitchError)}</span>
+      </div>
+    `;
+    return;
+  }
+
+  const currentSource = protocolSourceCoordinate(suite);
+  const currentBatch = protocolBatchCoordinate(suite);
+  const currentBudget = protocolBudgetCoordinate(suite);
+  const sources = Array.from(
+    new Map(
+      protocolSuites.map((candidate) => {
+        const coordinate = protocolSourceCoordinate(candidate);
+        return [coordinate.key, coordinate];
+      })
+    ).values()
+  );
+  const sourceSuites = protocolSuites.filter(
+    (candidate) => protocolSourceCoordinate(candidate).key === currentSource.key
+  );
+  const batches = Array.from(
+    new Map(
+      sourceSuites.map((candidate) => {
+        const coordinate = protocolBatchCoordinate(candidate);
+        return [coordinate.key, coordinate];
+      })
+    ).values()
+  );
+  const budgetSuites = sourceSuites.filter(
+    (candidate) => protocolBatchCoordinate(candidate).key === currentBatch.key
+  );
+  const evidence = suiteEvidenceSummary(suite);
+  const evidenceText = protocolEvidenceText(evidence);
+
+  const sourceControl =
+    sources.length > 1
+      ? `<div class="protocol-choice-row" role="group" aria-label="Protocol source">
+          ${sources
+            .map((source) => {
+              const target = chooseProtocolSuite(protocolSuites, {
+                sourceKey: source.key,
+                budgetKey: currentBudget.key,
+              });
+              const active = source.key === currentSource.key;
+              const loading = target?.suite_id === pendingSuiteId;
+              return `
+                <button type="button" class="${active ? "active" : ""} ${loading ? "loading" : ""}" data-target-suite-id="${escapeHtml(target?.suite_id || "")}" aria-pressed="${active}" aria-busy="${loading}" ${target ? "" : "disabled"}>
+                  ${escapeHtml(source.label)}
+                </button>
+              `;
+            })
+            .join("")}
+        </div>`
+      : `<span class="protocol-static-value">${escapeHtml(currentSource.label)}</span>`;
+
+  const batchControl =
+    batches.length > 1
+      ? `<div class="protocol-choice-row" role="group" aria-label="Global batch and sequence length">
+          ${batches
+            .map((batch) => {
+              const target = chooseProtocolSuite(protocolSuites, {
+                sourceKey: currentSource.key,
+                batchKey: batch.key,
+                budgetKey: currentBudget.key,
+              });
+              const active = batch.key === currentBatch.key;
+              const loading = target?.suite_id === pendingSuiteId;
+              return `
+                <button type="button" class="${active ? "active" : ""} ${loading ? "loading" : ""}" data-target-suite-id="${escapeHtml(target?.suite_id || "")}" aria-pressed="${active}" aria-busy="${loading}" ${target ? "" : "disabled"}>
+                  ${escapeHtml(batch.label)}
+                </button>
+              `;
+            })
+            .join("")}
+        </div>`
+      : `<span class="protocol-static-value">${escapeHtml(currentBatch.label)}</span>`;
+
+  const budgetControl = `
+    <div class="protocol-budget-row" role="group" aria-label="Token budget">
+      ${budgetSuites
+        .map((candidate) => {
+          const coordinate = protocolBudgetCoordinate(candidate);
+          const selectable = protocolSelectable(candidate);
+          const active = candidate.suite_id === suite.suite_id;
+          const loading = candidate.suite_id === pendingSuiteId;
+          const detail = [
+            coordinate.steps === null ? "" : `${intFmt.format(coordinate.steps)} steps`,
+            coordinate.plannedTokens === null ? "" : `${intFmt.format(coordinate.plannedTokens)} tokens`,
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          return `
+            <button
+              type="button"
+              class="protocol-budget-chip ${active ? "active" : ""} ${loading ? "loading" : ""}"
+              data-target-suite-id="${escapeHtml(candidate.suite_id)}"
+              aria-pressed="${active}"
+              aria-busy="${loading}"
+              title="${escapeHtml(detail || coordinate.label)}"
+              ${selectable || active ? "" : "disabled"}
+            >
+              ${escapeHtml(coordinate.label)}
+            </button>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+
+  const tokensPerStep =
+    currentBatch.tokensPerStep === null
+      ? "Tokens per step not specified"
+      : `${intFmt.format(currentBatch.tokensPerStep)} tokens / step`;
+  const paper = suite.protocol.paper;
+  const sourceNote = paper?.arxiv_id
+    ? `${paper.arxiv_id}${paper.section ? ` · ${paper.section}` : ""}`
+    : suite.protocol.source_kind === "current_curated"
+      ? "Local curated benchmark"
+      : "Curated static source";
+
+  mount.hidden = false;
+  mount.dataset.loading = pendingSuiteId ? "true" : "false";
+  mount.innerHTML = `
+    <div class="protocol-ledger-head">
+      <div>
+        <p class="panel-kicker">Comparable experiment coordinate</p>
+        <h3 id="protocol-selector-title">Protocol selector</h3>
+      </div>
+      <p>${escapeHtml(sourceNote)}</p>
+    </div>
+    <div class="protocol-ledger-grid">
+      <div class="protocol-ledger-cell protocol-source-cell">
+        <span class="protocol-ledger-label">Source / dataset</span>
+        ${sourceControl}
+        <small>${escapeHtml(currentSource.dataset)}</small>
+      </div>
+      <div class="protocol-ledger-cell protocol-batch-cell">
+        <span class="protocol-ledger-label">Batch × sequence</span>
+        ${batchControl}
+        <small>${escapeHtml(tokensPerStep)}</small>
+      </div>
+      <div class="protocol-ledger-cell protocol-budget-cell">
+        <span class="protocol-ledger-label">Token budget</span>
+        ${budgetControl}
+        <small>Each budget is an isolated leaderboard and figure.</small>
+      </div>
+      <div class="protocol-ledger-cell protocol-evidence-cell" aria-live="polite">
+        <span class="protocol-ledger-label">Evidence</span>
+        <strong>${escapeHtml(evidenceText.coverage)}</strong>
+        <small>${escapeHtml(evidenceText.status)}</small>
+        <small>${escapeHtml(evidenceText.caveat)}</small>
+      </div>
+    </div>
+    <div class="protocol-ledger-error" role="alert" ${protocolSwitchError ? "" : "hidden"}>
+      <strong>Protocol unchanged.</strong>
+      <span>${escapeHtml(protocolSwitchError)}</span>
+    </div>
+  `;
+
+  mount.querySelectorAll("button[data-target-suite-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const targetSuiteId = button.dataset.targetSuiteId;
+      if (!targetSuiteId) {
+        button.focus({ preventScroll: true });
+        return;
+      }
+      if (targetSuiteId === selectedSuiteId && !pendingSuiteId) {
+        button.focus({ preventScroll: true });
+        return;
+      }
+      void requestSuiteChange(targetSuiteId, {
+        push: true,
+        focusProtocolSuiteId: targetSuiteId,
+      });
     });
   });
 }
@@ -854,7 +1477,7 @@ function renderPlaceholder(suite) {
       ${metricLine("curated_runs", String(suiteRuns(suite.suite_id).length))}
       ${metricLine("family", suite.family)}
     </div>
-    <p>${suite.card?.headline || "No complete comparable runs have been curated yet."}</p>
+    <p>${escapeHtml(suite.card?.headline || "No complete comparable runs have been curated yet.")}</p>
     <p class="muted wide-muted">
       This card is visible so the portal shape is stable, but it will not render a leaderboard or curve until the suite is promoted to an available detail state.
     </p>
@@ -877,11 +1500,11 @@ function renderSelectedChartRows(suite) {
       ${selected
         .map(
           (run, index) => `
-            <button class="selected-run-pill ${run.run_id === selectedRunId ? "active" : ""}" type="button" data-run-id="${run.run_id}" aria-pressed="${run.run_id === selectedRunId}">
+            <button class="selected-run-pill ${run.run_id === selectedRunId ? "active" : ""}" type="button" data-run-id="${escapeHtml(run.run_id)}" aria-pressed="${run.run_id === selectedRunId}">
               <span class="legend-swatch" style="background:${runColor(run, index)}"></span>
               ${escapeHtml(runChipLabel(run, suite))}
             </button>
-            <button class="remove-run" type="button" data-remove-run-id="${run.run_id}" aria-label="Remove ${escapeHtml(run.display_name)} from chart">×</button>
+            <button class="remove-run" type="button" data-remove-run-id="${escapeHtml(run.run_id)}" aria-label="Remove ${escapeHtml(run.display_name)} from chart">×</button>
           `
         )
         .join("")}
@@ -895,7 +1518,7 @@ function plotCell(run, suite) {
   const reason = disabled ? "curve unavailable" : "Toggle this run in the chart";
   return `
     <label class="plot-toggle ${disabled ? "disabled" : ""}" title="${escapeHtml(reason)}">
-      <input type="checkbox" data-run-id="${run.run_id}" aria-label="${escapeHtml(`${checked ? "Remove" : "Plot"} ${run.display_name}${disabled ? ", curve unavailable" : ""}`)}" ${checked ? "checked" : ""} ${disabled ? "disabled" : ""} />
+      <input type="checkbox" data-run-id="${escapeHtml(run.run_id)}" aria-label="${escapeHtml(`${checked ? "Remove" : "Plot"} ${run.display_name}${disabled ? ", curve unavailable" : ""}`)}" ${checked ? "checked" : ""} ${disabled ? "disabled" : ""} />
       <span>${checked ? "on" : "plot"}</span>
     </label>
   `;
@@ -914,8 +1537,15 @@ function primaryColumnLabel(suite) {
   return primary.replaceAll("_", " ");
 }
 
+function metricValueWithOptionalStep(metricName, metric) {
+  if (!metric) return "n/a";
+  const value = formatMetricValue(metricName, metric.value);
+  return Number.isFinite(metric.step) ? `${value} @ ${intFmt.format(metric.step)}` : value;
+}
+
 function tableColumnsForRows(suite, rows) {
   const isTrack3 = suite.suite_id === "track3";
+  const allowedStatuses = new Set(suite.leaderboard_eligibility?.allowed_status || []);
   const roles = sortedUnique(rows.map((row) => row.run.run_role));
   const statuses = sortedUnique(rows.map((row) => row.run.status));
   const columns = ["plot", "rank", "run"];
@@ -926,7 +1556,12 @@ function tableColumnsForRows(suite, rows) {
   } else {
     columns.push("best", "final");
   }
-  if (statuses.length > 1) columns.push("status");
+  if (
+    statuses.length > 1 ||
+    rows.some((row) => !allowedStatuses.has(row.run.status))
+  ) {
+    columns.push("status");
+  }
   return columns;
 }
 
@@ -953,9 +1588,7 @@ function tableCell(column, suite, row, rankLabel) {
     : targetStatus(row, suite) === "not_reached"
       ? "Not reached"
       : "n/a";
-  const bestText = row.bestMetric
-    ? `${formatMetricValue("best_val_loss", row.bestMetric.value)} @ ${row.bestMetric.step}`
-    : "n/a";
+  const bestText = metricValueWithOptionalStep("best_val_loss", row.bestMetric);
   const cells = {
     plot: plotCell(run, suite),
     rank: `<span class="rank-token">${escapeHtml(rankLabel)}</span>`,
@@ -989,7 +1622,7 @@ function leaderboardTable(suite, rows, startingRank, tableClass = "") {
               const run = row.run;
               const rankLabel = run.leaderboard_meta?.rank_label || row.displayRank || String(startingRank + index);
               return `
-                <tr class="${run.run_id === selectedRunId ? "selected" : ""}" data-run-id="${run.run_id}" tabindex="0" aria-selected="${run.run_id === selectedRunId}" aria-label="Inspect ${escapeHtml(run.display_name)}">
+                <tr class="${run.run_id === selectedRunId ? "selected" : ""}" data-run-id="${escapeHtml(run.run_id)}" tabindex="0" aria-selected="${run.run_id === selectedRunId}" aria-label="Inspect ${escapeHtml(run.display_name)}">
                   ${columns.map((column) => `<td>${tableCell(column, suite, row, rankLabel)}</td>`).join("")}
                 </tr>
               `;
@@ -1204,7 +1837,10 @@ function renderLeaderboard() {
     ...row,
     displayRank: row.primaryMetric ? String(index + 1) : "—",
   }));
+  const unranked = unrankedRows(suite);
+  const filterableRows = [...rows, ...unranked];
   const visibleRows = filteredRows(rows, suite);
+  const visibleUnranked = filteredRows(unranked, suite);
   const referenceRows = visibleRows.filter((row) => row.run.run_role === "official_reference");
   const localRows = visibleRows.filter((row) => row.run.run_role !== "official_reference");
   const hasReferenceAndLocal =
@@ -1229,8 +1865,32 @@ function renderLeaderboard() {
       ${renderSelectionActions(suite)}
       <p class="selection-notice ${chartSelectionNotice ? "" : "empty"}">${escapeHtml(chartSelectionNotice || "Use the checkboxes below to add or remove plotted curves.")}</p>
     </div>
-    ${renderRunFilters(rows, suite, visibleRows.length)}
+    ${renderRunFilters(
+      filterableRows,
+      suite,
+      visibleRows.length + visibleUnranked.length
+    )}
   `;
+  const unrankedBlock = unranked.length
+    ? `
+      <details class="history-details unranked-evidence section-callout">
+        <summary>
+          <span>Unranked evidence (${visibleUnranked.length}/${unranked.length})</span>
+          <span class="muted">partial, stopped, or non-finite · excluded from rank</span>
+        </summary>
+        ${
+          visibleUnranked.length
+            ? leaderboardTable(
+                suite,
+                visibleUnranked,
+                1,
+                "compact-table scroll-table unranked-table"
+              )
+            : "<p class=\"empty-table-note\">No unranked evidence matches the current filters.</p>"
+        }
+      </details>
+    `
+    : "";
 
   if (hasReferenceAndLocal) {
     const isOpen = Boolean(referenceHistoryOpen[suite.suite_id]);
@@ -1259,6 +1919,7 @@ function renderLeaderboard() {
         </div>
         ${localRows.length ? leaderboardTable(suite, localRows, 1, "compact-table scroll-table") : "<p class=\"empty-table-note\">No local rows match the current filters.</p>"}
       </div>
+      ${unrankedBlock}
     `;
     const details = byId("leaderboardContent").querySelector(".history-details");
     if (details) {
@@ -1292,6 +1953,7 @@ function renderLeaderboard() {
       </summary>
       ${visibleRows.length ? leaderboardTable(suite, visibleRows, 1, "compact-table scroll-table") : "<p class=\"empty-table-note\">No rows match the current filters.</p>"}
     </details>
+    ${unrankedBlock}
   `;
   bindLeaderboardInteractions();
 }
@@ -1348,46 +2010,31 @@ function renderChartModeSwitch() {
 
 function renderChartEmphasisSwitch() {
   const emphasisSwitch = byId("chartEmphasisSwitch");
+  const focusedRunId = chartFocusRunId();
   emphasisSwitch.innerHTML = `
     <span class="chart-mode-label">Emphasis</span>
     <button
       type="button"
-      class="${chartEmphasisMode === "equal" ? "active" : ""}"
-      data-emphasis-mode="equal"
-      aria-pressed="${chartEmphasisMode === "equal"}"
+      class="${focusedRunId ? "" : "active"}"
+      data-chart-focus-action="clear"
+      aria-pressed="${!focusedRunId}"
       title="Give every visible curve equal visual weight"
     >
-      <span class="mode-icon" aria-hidden="true">All</span>
-      <span>Equal</span>
-    </button>
-    <button
-      type="button"
-      class="${chartEmphasisMode === "selected" ? "active" : ""}"
-      data-emphasis-mode="selected"
-      aria-pressed="${chartEmphasisMode === "selected"}"
-      title="Emphasize the run currently selected for inspection"
-    >
-      <span class="mode-icon" aria-hidden="true">1</span>
-      <span>Selected</span>
+      <span>All</span>
     </button>
   `;
-  emphasisSwitch.querySelectorAll("button").forEach((button) => {
-    button.addEventListener("click", () => {
-      const nextMode = button.dataset.emphasisMode;
-      if (nextMode === chartEmphasisMode) return;
-      const focusState = captureFocusState();
-      normalizeChartEmphasisMode(nextMode);
-      renderChartEmphasisSwitch();
-      updateSelectedRunVisuals();
-      restoreFocusState(focusState);
-      syncUrlState();
-    });
+  emphasisSwitch.querySelector("[data-chart-focus-action=\"clear\"]")?.addEventListener("click", () => {
+    if (!focusedChartRunId) return;
+    const focusState = captureFocusState();
+    clearChartFocus();
+    restoreFocusState(focusState);
   });
 }
 
 function renderTargetMarkerStrip(suite, runs, metricName, model = currentChartModel) {
   const strip = byId("targetStepStrip");
   const ruler = model?.evidenceRuler;
+  const focusedRunId = chartFocusRunId();
   if (!ruler?.items?.length) {
     strip.hidden = true;
     strip.classList.remove("target-ranking-panel");
@@ -1422,10 +2069,10 @@ function renderTargetMarkerStrip(suite, runs, metricName, model = currentChartMo
           return `
             <button
               type="button"
-              class="evidence-ruler-row ${item.runId === selectedRunId ? "active" : ""}"
+              class="evidence-ruler-row ${item.runId === focusedRunId ? "active" : ""}"
               data-run-id="${escapeHtml(item.runId)}"
-              aria-pressed="${item.runId === selectedRunId}"
-              aria-current="${item.runId === selectedRunId}"
+              aria-pressed="${item.runId === focusedRunId}"
+              aria-current="${item.runId === focusedRunId}"
             >
               ${seriesKeyHtml(
                 {
@@ -1452,7 +2099,7 @@ function renderTargetMarkerStrip(suite, runs, metricName, model = currentChartMo
 
   strip.querySelectorAll("button").forEach((button) => {
     button.addEventListener("click", () => {
-      selectRun(button.dataset.runId);
+      selectRun(button.dataset.runId, { focusChart: true });
     });
   });
 }
@@ -1608,6 +2255,77 @@ function compactTooltipText(value, maximum = 42) {
   return text.length <= maximum ? text : `${text.slice(0, maximum - 1)}…`;
 }
 
+function closestPointOnSegment(point, start, end) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  const projection = lengthSquared
+    ? ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared
+    : 0;
+  const t = Math.max(0, Math.min(1, projection));
+  return {
+    x: start.x + dx * t,
+    y: start.y + dy * t,
+    t,
+  };
+}
+
+function nearestCurveObservation(
+  seriesList,
+  pointer,
+  { maxDistance = 24, preferredRunId = null } = {}
+) {
+  let best = null;
+  const tieTolerance = 0.25;
+
+  seriesList.forEach((series) => {
+    (series.segments || []).forEach((segment) => {
+      if (!segment.length) return;
+      let startIndex = 0;
+      if (segment.length > 1) {
+        let low = 1;
+        let high = segment.length - 1;
+        while (low < high) {
+          const middle = Math.floor((low + high) / 2);
+          if (segment[middle].x < pointer.x) low = middle + 1;
+          else high = middle;
+        }
+        startIndex = Math.max(0, Math.min(segment.length - 2, low - 1));
+      }
+
+      const start = segment[startIndex];
+      const end = segment[Math.min(startIndex + 1, segment.length - 1)];
+      const curvePoint = closestPointOnSegment(pointer, start, end);
+      const distance = Math.hypot(pointer.x - curvePoint.x, pointer.y - curvePoint.y);
+      const observation =
+        Math.hypot(start.x - curvePoint.x, start.y - curvePoint.y) <=
+        Math.hypot(end.x - curvePoint.x, end.y - curvePoint.y)
+          ? start
+          : end;
+      const candidate = {
+        ...series,
+        ...observation,
+        curveX: curvePoint.x,
+        curveY: curvePoint.y,
+        distance,
+      };
+      const candidatePreferred = series.entry?.runId === preferredRunId;
+      const bestPreferred = best?.entry?.runId === preferredRunId;
+      if (
+        !best ||
+        distance < best.distance - tieTolerance ||
+        (Math.abs(distance - best.distance) <= tieTolerance &&
+          candidatePreferred &&
+          !bestPreferred)
+      ) {
+        best = candidate;
+      }
+    });
+  });
+
+  return best && best.distance <= maxDistance ? best : null;
+}
+
 function renderChart() {
   const svg = byId("lossChart");
   svg.innerHTML = "";
@@ -1633,6 +2351,7 @@ function renderChart() {
   const hiddenRuns = hiddenPlottedRuns(suite);
   const runs = (model?.series || []).map((entry) => runById(entry.runId)).filter(Boolean);
   const seriesByRun = new Map((model?.series || []).map((entry) => [entry.runId, entry]));
+  const focusedRunId = chartFocusRunId();
 
   byId("chartMeta").textContent = model
     ? `${model.axes.y.label} by ${model.axes.x.label}${model.target ? ` · ${model.target.label}` : ""}`
@@ -1647,11 +2366,11 @@ function renderChart() {
             return `
             <button
               type="button"
-              class="${run.run_id === selectedRunId ? "active" : ""}"
+              class="${run.run_id === focusedRunId ? "active" : ""}"
               data-run-id="${escapeHtml(run.run_id)}"
               data-series-family="${escapeHtml(entry?.style?.family || "other")}"
               data-series-method-group="${escapeHtml(entry?.methodGroup || "unknown")}"
-              aria-pressed="${run.run_id === selectedRunId}"
+              aria-pressed="${run.run_id === focusedRunId}"
             >
               ${seriesKeyHtml(entry?.style, entry?.role)}
               ${escapeHtml(`${shortRunLabel(run)} · ${summaryMetricText(run.run_id, primaryMetricName(suite))}`)}
@@ -1666,7 +2385,7 @@ function renderChart() {
       : "<span class=\"muted\">No selected runs have drawable curves.</span>";
   byId("chartSelectionChips").querySelectorAll("button[data-run-id]").forEach((button) => {
     button.addEventListener("click", () => {
-      selectRun(button.dataset.runId);
+      selectRun(button.dataset.runId, { focusChart: true });
     });
   });
   byId("chartSelectionChips").querySelectorAll("[data-filter-action]").forEach((button) => {
@@ -1860,10 +2579,10 @@ function renderChart() {
         ...entry.style.classes,
         entry.role === "ours" ? "ours" : "",
         entry.status !== "completed" ? "partial" : "",
-        selected ? "is-selected selected" : "is-context",
+        selected ? "is-selected selected" : focusedRunId ? "is-context" : "",
       ].filter(Boolean).join(" "),
       stroke: entry.style.color,
-      opacity: selected ? "1" : chartEmphasisMode === "selected" ? defaultOpacity : neutralOpacity,
+      opacity: selected ? "1" : focusedRunId ? defaultOpacity : neutralOpacity,
       "stroke-width": selected ? selectedStrokeWidth : defaultStrokeWidth,
       "stroke-dasharray": entry.style.dash || "none",
       "data-series-role": entry.role,
@@ -1881,32 +2600,34 @@ function renderChart() {
       "aria-current": String(selected),
     });
     path.addEventListener("click", () => {
-      selectRun(entry.runId);
+      selectRun(entry.runId, { focusChart: true });
     });
     path.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      selectRun(entry.runId);
+      selectRun(entry.runId, { focusChart: true });
     });
     curveLayer.appendChild(path);
 
-    const visiblePoints = entry.plotPoints
-      .filter((point) =>
-        point.step >= model.domain.xMin &&
-        point.step <= model.domain.xMax &&
-        point.value >= model.domain.yMin &&
-        point.value <= model.domain.yMax
+    const visibleSegments = entry.segments
+      .map((segment) =>
+        segment
+          .map((point) => ({
+            step: point.step,
+            value: point.value,
+            x: x(point.step),
+            y: y(point.value),
+          }))
       )
-      .map((point) => ({
+      .filter((segment) => segment.length);
+    if (visibleSegments.length) {
+      hoverSeries.push({
         entry,
         run,
         color: entry.style.color,
-        step: point.step,
-        value: point.value,
-        x: x(point.step),
-        y: y(point.value),
-      }));
-    if (visiblePoints.length) hoverSeries.push(visiblePoints);
+        segments: visibleSegments,
+      });
+    }
     });
 
   model.directLabels.forEach((label) => {
@@ -1920,7 +2641,7 @@ function renderChart() {
       y2: label.connector.y2,
       class: `series-end-connector ${selected ? "is-selected selected" : ""}`,
       color: entry.style.color,
-      opacity: selected ? "0.82" : chartEmphasisMode === "selected" ? "0.42" : "0.7",
+      opacity: selected ? "0.82" : focusedRunId ? "0.42" : "0.7",
       "data-chart-run-id": entry.runId,
       "data-context-opacity": "0.42",
       "data-neutral-opacity": "0.7",
@@ -1934,7 +2655,7 @@ function renderChart() {
       "text-anchor": label.textAnchor || "start",
       class: `series-end-label ${selected ? "is-selected selected" : ""}`,
       fill: entry.style.color,
-      opacity: selected ? "1" : chartEmphasisMode === "selected" ? "0.76" : "0.9",
+      opacity: selected ? "1" : focusedRunId ? "0.76" : "0.9",
       "data-chart-run-id": entry.runId,
       "data-context-opacity": "0.76",
       "data-neutral-opacity": "0.9",
@@ -1942,7 +2663,7 @@ function renderChart() {
       "aria-current": String(selected),
     });
     text.textContent = label.text;
-    text.addEventListener("click", () => selectRun(entry.runId));
+    text.addEventListener("click", () => selectRun(entry.runId, { focusChart: true }));
     svg.appendChild(text);
   });
 
@@ -1955,7 +2676,7 @@ function renderChart() {
       d: `M ${markerX} ${plot.top + 3} l 5 -7 l 5 7 Z`,
       class: `chart-clip-marker ${selected ? "is-selected selected" : ""}`,
       fill: entry.style.color,
-      opacity: selected ? "1" : chartEmphasisMode === "selected" ? "0.58" : "0.82",
+      opacity: selected ? "1" : focusedRunId ? "0.58" : "0.82",
       "data-chart-run-id": entry.runId,
       "data-context-opacity": "0.58",
       "data-neutral-opacity": "0.82",
@@ -2008,25 +2729,19 @@ function renderChart() {
       point.x = event.clientX;
       point.y = event.clientY;
       const local = point.matrixTransform(matrix.inverse());
-      return hoverSeries.reduce((best, series) => {
-        let low = 0;
-        let high = series.length - 1;
-        while (low < high) {
-          const middle = Math.floor((low + high) / 2);
-          if (series[middle].x < local.x) low = middle + 1;
-          else high = middle;
-        }
-        const candidates = [series[low], series[Math.max(0, low - 1)]].filter(Boolean);
-        return candidates.reduce((seriesBest, candidate) => {
-          const distance = Math.abs(candidate.x - local.x) * 1.6 + Math.abs(candidate.y - local.y);
-          return !seriesBest || distance < seriesBest.distance ? { ...candidate, distance } : seriesBest;
-        }, best);
-      }, null);
+      return nearestCurveObservation(hoverSeries, local, {
+        maxDistance: event.pointerType === "touch" ? 34 : 24,
+        preferredRunId: chartFocusRunId(),
+      });
     };
 
     const showNearest = (event) => {
       const nearest = nearestPoint(event);
-      if (!nearest) return;
+      if (!nearest) {
+        hoverLayer.setAttribute("style", "display:none");
+        delete overlay.dataset.nearestRunId;
+        return null;
+      }
       hoverLayer.setAttribute("style", "display:block");
       crosshair.setAttribute("x1", nearest.x);
       crosshair.setAttribute("x2", nearest.x);
@@ -2036,11 +2751,11 @@ function renderChart() {
       const rank = nearest.run.leaderboard_meta?.rank_label || roleLabel(nearest.run);
       tooltipTitle.textContent = compactTooltipText(`${rank} ${nearest.run.display_name}`, width < 720 ? 32 : 44);
       tooltipSource.textContent = compactTooltipText(
-        `${roleFilterLabel(suite)} ${roleLabel(nearest.run)} · ${nearest.run.status}`,
+        `Nearest curve · ${roleFilterLabel(suite)} ${roleLabel(nearest.run)} · ${nearest.run.status}`,
         width < 720 ? 35 : 48
       );
       tooltipValue.textContent =
-        `step ${intFmt.format(nearest.step)} · ${yMetric} ${formatMetricValue(yMetric, nearest.value)}`;
+        `observed step ${intFmt.format(nearest.step)} · ${yMetric} ${formatMetricValue(yMetric, nearest.value)}`;
       tooltipContext.textContent = model.target
         ? `target gap ${nearest.value - model.target.value >= 0 ? "+" : ""}${formatMetricValue(yMetric, nearest.value - model.target.value)}`
         : compactTooltipText(`run_id ${nearest.run.run_id}`, width < 720 ? 35 : 48);
@@ -2065,11 +2780,12 @@ function renderChart() {
     overlay.addEventListener("click", (event) => {
       const nearest = showNearest(event);
       const runId = nearest?.entry?.runId || overlay.dataset.nearestRunId;
-      if (runId) selectRun(runId);
+      if (runId) selectRun(runId, { focusChart: true });
     });
     overlay.addEventListener("pointerleave", () => {
       hoverLayer.setAttribute("style", "display:none");
       overlay.dataset.pointerDownRunId = "";
+      delete overlay.dataset.nearestRunId;
     });
     svg.appendChild(overlay);
   }
@@ -2093,7 +2809,7 @@ function sourceList(links) {
 function renderRunDetail() {
   const suite = activeSuite();
   const rows = eligibleRows(suite);
-  const run = runById(selectedRunId) || rows[0]?.run;
+  const run = runById(selectedRunId) || rows[0]?.run || suiteRuns(suite.suite_id)[0];
 
   if (!run) {
     byId("detail-title").textContent = "No run selected";
@@ -2107,6 +2823,7 @@ function renderRunDetail() {
   const training = run.training || {};
   const hardware = run.hardware || {};
   const source = run.source || {};
+  const wandbUrl = safeExternalUrl(source.wandb_url);
   const meta = run.leaderboard_meta || {};
   const primary = primaryMetricName(suite);
   const target = suite.target || {};
@@ -2138,7 +2855,7 @@ function renderRunDetail() {
       ${metricLine("final_val_loss", summaryMetricText(run.run_id, "final_val_loss"))}
       ${metricLine(
         "best_val_loss",
-        summary.best_val_loss ? `${formatMetricValue("best_val_loss", summary.best_val_loss.value)} @ ${summary.best_val_loss.step}` : "n/a"
+        metricValueWithOptionalStep("best_val_loss", summary.best_val_loss)
       )}
       ${targetGap !== null ? metricLine("target_gap", formatMetricValue("target_gap", targetGap)) : ""}
       ${metricLine("optimizer", `${run.optimizer.name}${run.optimizer.variant ? ` · ${run.optimizer.variant}` : ""}`)}
@@ -2164,7 +2881,7 @@ function renderRunDetail() {
       ${meta.description ? metricLine("description", meta.description) : ""}
     </div>
     <div class="source-actions">
-      ${source.wandb_url ? `<a href="${source.wandb_url}" target="_blank" rel="noreferrer">Open WandB</a>` : ""}
+      ${wandbUrl ? `<a href="${escapeHtml(wandbUrl)}" target="_blank" rel="noreferrer">Open WandB</a>` : ""}
       <button type="button" id="copySource">Copy source path</button>
     </div>
   `;
@@ -2224,13 +2941,30 @@ function renderClaims() {
 }
 
 function renderDataHealth() {
-  const activeSuites = portalData.suites.filter((suite) => suite.status === "active").length;
+  const snapshot = catalogSnapshot();
+  const globalEvidence = snapshot.evidence_summary || snapshot.meta?.evidence_summary || {};
+  const summedEvidence = sumSuiteEvidence(catalogSuites());
+  const activeSuites =
+    numericEvidenceValue(globalEvidence, ["active_suites"]) ??
+    catalogSuites().filter((suite) => suite.status === "active").length;
   const drawableRuns = portalData.runs.filter((run) => {
     const suite = suiteById(run.suite_id);
     return suite && curveAvailable(run, suite);
   }).length;
   const pointMetricsCount = portalData.metrics.filter((metric) => metric.metric_scope === "point").length;
   const summaryMetricsCount = portalData.metrics.filter((metric) => metric.metric_scope === "summary").length;
+  const totalRuns =
+    numericEvidenceValue(globalEvidence, ["runs", "mapped"]) ??
+    (portalLoadMode === "aggregate" ? portalData.runs.length : summedEvidence.mapped);
+  const totalMetrics =
+    numericEvidenceValue(globalEvidence, ["metrics"]) ??
+    (portalLoadMode === "aggregate" ? portalData.metrics.length : summedEvidence.metrics);
+  const totalClaims =
+    numericEvidenceValue(globalEvidence, ["claims"]) ??
+    (portalLoadMode === "aggregate" ? portalData.claims.length : summedEvidence.claims);
+  const totalFigures =
+    numericEvidenceValue(globalEvidence, ["figures"]) ??
+    (portalLoadMode === "aggregate" ? portalData.figures.length : summedEvidence.figures);
   const figureCoverage = portalData.figures.map((figure) => {
     const suite = suiteById(figure.suite_id);
     const drawable = (figure.run_ids || []).filter((runId) => {
@@ -2241,15 +2975,15 @@ function renderDataHealth() {
   });
 
   byId("dataHealthSummary").textContent =
-    `${portalData.runs.length} runs · ${portalData.metrics.length} metrics · ${portalData.figures.length} figures · snapshot loaded`;
+    `${totalRuns} runs · ${totalMetrics} metrics · ${totalFigures} figures · ${portalLoadMode === "catalog" ? "active suite shard loaded" : "snapshot loaded"}`;
 
   byId("dataHealth").innerHTML = `
-    ${metricLine("generated_at", portalData.meta?.generated_at || "n/a")}
-    ${metricLine("suites", `${portalData.suites.length} total · ${activeSuites} active`)}
-    ${metricLine("runs", `${portalData.runs.length} curated · ${drawableRuns} drawable`)}
-    ${metricLine("metrics", `${pointMetricsCount} point · ${summaryMetricsCount} summary`)}
-    ${metricLine("claims", String(portalData.claims.length))}
-    ${metricLine("figures", figureCoverage.join(" · ") || "n/a")}
+    ${metricLine("generated_at", snapshot.meta?.generated_at || portalData.meta?.generated_at || "n/a")}
+    ${metricLine("suites", `${catalogSuites().length} total · ${activeSuites} active`)}
+    ${metricLine("runs", `${totalRuns} curated · ${drawableRuns} drawable in loaded suite`)}
+    ${metricLine("metrics", `${totalMetrics} catalogued · ${pointMetricsCount} point and ${summaryMetricsCount} summary loaded`)}
+    ${metricLine("claims", String(totalClaims))}
+    ${metricLine("figures", `${totalFigures} catalogued${figureCoverage.length ? ` · loaded ${figureCoverage.join(" · ")}` : ""}`)}
   `;
 }
 
@@ -2259,6 +2993,7 @@ function renderSuiteView() {
   renderOverview();
   renderSuiteCards();
   renderSuiteHeader(suite);
+  renderProtocolSelector(suite);
   renderDataHealth();
 
   if (suiteHasDetail(suite)) {
@@ -2354,9 +3089,7 @@ function initializeResponsiveChart() {
     window.addEventListener("popstate", () => {
       if (!portalData) return;
       clearTimeout(runSearchTimer);
-      resetRunFilters();
-      applyUrlState();
-      renderSuiteView();
+      void restoreSuiteFromLocation();
     });
     initializeResponsiveChart.windowBound = true;
   }
@@ -2396,20 +3129,366 @@ async function loadPortalSnapshot() {
   return response.json();
 }
 
+function mergePlainObjects(base, extra) {
+  if (!base || typeof base !== "object" || Array.isArray(base)) return extra ?? base;
+  if (!extra || typeof extra !== "object" || Array.isArray(extra)) return extra ?? base;
+  const merged = { ...base };
+  for (const [key, value] of Object.entries(extra)) {
+    merged[key] =
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      merged[key] &&
+      typeof merged[key] === "object" &&
+      !Array.isArray(merged[key])
+        ? mergePlainObjects(merged[key], value)
+        : value;
+  }
+  return merged;
+}
+
+function injectLocalDataScript(src, hasPayload, missingMessage) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = src;
+    script.onload = () => {
+      script.remove();
+      if (hasPayload()) resolve();
+      else reject(new Error(`${src} loaded without registering its data payload`));
+    };
+    script.onerror = () => {
+      script.remove();
+      reject(new Error(missingMessage));
+    };
+    document.head.appendChild(script);
+  });
+}
+
+async function loadPortalCatalogSource() {
+  try {
+    let catalog;
+    if (window.location.protocol === "file:") {
+      if (!globalThis.__PORTAL_CATALOG__) {
+        await injectLocalDataScript(
+          "data/portal-catalog.js",
+          () => Boolean(globalThis.__PORTAL_CATALOG__),
+          "The local portal catalog bundle is missing."
+        );
+      }
+      catalog = globalThis.__PORTAL_CATALOG__;
+    } else {
+      const response = await fetch("data/portal-catalog.json", { cache: "no-cache" });
+      if (!response.ok) throw new Error(`Catalog request failed with HTTP ${response.status}`);
+      catalog = await response.json();
+    }
+
+    if (!catalog || !Array.isArray(catalog.suites)) {
+      throw new Error("Portal catalog does not contain a suites array");
+    }
+    return { data: normalizedPortalData(catalog), mode: "catalog" };
+  } catch (catalogError) {
+    const aggregate = await loadPortalSnapshot();
+    if (!aggregate || !Array.isArray(aggregate.suites)) throw catalogError;
+    return {
+      data: normalizedPortalData(aggregate),
+      mode: "aggregate",
+      fallbackReason: catalogError,
+    };
+  }
+}
+
+function normalizeSuiteShard(rawShard, suiteId) {
+  if (!rawShard || typeof rawShard !== "object") {
+    throw new Error(`Suite shard ${suiteId} is not an object`);
+  }
+  if (rawShard.suite_id && rawShard.suite_id !== suiteId) {
+    throw new Error(`Suite shard ${suiteId} registered as ${rawShard.suite_id}`);
+  }
+  const catalogDeliveryId =
+    portalCatalog?.delivery_id || portalCatalog?.meta?.delivery_id || "";
+  const shardDeliveryId = rawShard.delivery_id || rawShard.meta?.delivery_id || "";
+  if (
+    (catalogDeliveryId || shardDeliveryId) &&
+    (!catalogDeliveryId || !shardDeliveryId || catalogDeliveryId !== shardDeliveryId)
+  ) {
+    throw new Error(
+      `Suite shard ${suiteId} belongs to a different snapshot delivery`
+    );
+  }
+  const shard = {
+    ...rawShard,
+    suite_id: suiteId,
+    runs: Array.isArray(rawShard.runs) ? rawShard.runs : [],
+    metrics: Array.isArray(rawShard.metrics) ? rawShard.metrics : [],
+    claims: Array.isArray(rawShard.claims) ? rawShard.claims : [],
+    figures: Array.isArray(rawShard.figures) ? rawShard.figures : [],
+  };
+  for (const collectionName of ["runs", "claims", "figures"]) {
+    const foreign = shard[collectionName].find(
+      (record) => record.suite_id && record.suite_id !== suiteId
+    );
+    if (foreign) {
+      throw new Error(
+        `Suite shard ${suiteId} contains a foreign ${collectionName.slice(0, -1)} record`
+      );
+    }
+  }
+  const shardRunIds = new Set(shard.runs.map((run) => run.run_id));
+  const foreignMetric = shard.metrics.find(
+    (metric) => metric.run_id && !shardRunIds.has(metric.run_id)
+  );
+  if (foreignMetric) {
+    throw new Error(`Suite shard ${suiteId} contains a metric for an unknown run`);
+  }
+  return shard;
+}
+
+async function loadSuiteShard(suiteId) {
+  if (portalLoadMode !== "catalog") return null;
+  if (suiteShardCache.has(suiteId)) return suiteShardCache.get(suiteId);
+  if (suiteShardRequests.has(suiteId)) return suiteShardRequests.get(suiteId);
+
+  const request = (async () => {
+    let rawShard;
+    if (window.location.protocol === "file:") {
+      globalThis.__PORTAL_SUITE_SHARDS__ ||= {};
+      if (!globalThis.__PORTAL_SUITE_SHARDS__[suiteId]) {
+        const encodedId = encodeURIComponent(suiteId);
+        await injectLocalDataScript(
+          `data/suites/${encodedId}.js`,
+          () => Boolean(globalThis.__PORTAL_SUITE_SHARDS__?.[suiteId]),
+          `The local suite shard for ${suiteId} is missing.`
+        );
+      }
+      rawShard = globalThis.__PORTAL_SUITE_SHARDS__[suiteId];
+    } else {
+      const encodedId = encodeURIComponent(suiteId);
+      const response = await fetch(`data/suites/${encodedId}.json`, { cache: "no-cache" });
+      if (!response.ok) {
+        throw new Error(`Suite ${suiteId} request failed with HTTP ${response.status}`);
+      }
+      rawShard = await response.json();
+    }
+    const shard = normalizeSuiteShard(rawShard, suiteId);
+    suiteShardCache.set(suiteId, shard);
+    return shard;
+  })();
+
+  suiteShardRequests.set(suiteId, request);
+  try {
+    return await request;
+  } finally {
+    suiteShardRequests.delete(suiteId);
+  }
+}
+
+function suiteNeedsShard(suite) {
+  return (
+    portalLoadMode === "catalog" &&
+    suiteDetailState(suite) === "available"
+  );
+}
+
+function composePortalData(catalog, shard = null) {
+  if (portalLoadMode === "aggregate") return normalizedPortalData(catalog);
+  return normalizedPortalData({
+    ...catalog,
+    meta: mergePlainObjects(catalog.meta || {}, shard?.meta || {}),
+    visual_style_registry: mergePlainObjects(
+      catalog.visual_style_registry || {},
+      shard?.visual_style_registry || {}
+    ),
+    runs: shard?.runs || [],
+    metrics: shard?.metrics || [],
+    claims: shard?.claims || [],
+    figures: shard?.figures || [],
+    sources: shard?.sources || [],
+  });
+}
+
+async function portalDataForSuite(suite) {
+  if (!suiteNeedsShard(suite)) return composePortalData(portalCatalog, null);
+  const shard = await loadSuiteShard(suite.suite_id);
+  return composePortalData(portalCatalog, shard);
+}
+
+function resetSuiteInteractionState(suite) {
+  clearTimeout(runSearchTimer);
+  resetRunFilters();
+  chartScaleMode = "full";
+  focusedChartRunId = null;
+  currentChartModel = null;
+  initializeChartSelection(suite);
+  selectedRunId = firstChartRun(suite)?.run_id || null;
+}
+
+function focusSuiteChangeControl({ focusGroupId = "", focusProtocolSuiteId = "" } = {}) {
+  let control = null;
+  if (focusProtocolSuiteId) {
+    control = Array.from(
+      byId("protocolSelector")?.querySelectorAll("[data-target-suite-id]") || []
+    ).find((candidate) => candidate.dataset.targetSuiteId === focusProtocolSuiteId);
+  }
+  if (!control && focusGroupId) {
+    control = Array.from(
+      byId("suiteCards")?.querySelectorAll("[data-benchmark-group-id]") || []
+    ).find((candidate) => candidate.dataset.benchmarkGroupId === focusGroupId);
+  }
+  control?.focus({ preventScroll: true });
+}
+
+async function requestSuiteChange(
+  targetSuiteId,
+  {
+    push = false,
+    restoreUrl = false,
+    initial = false,
+    focusGroupId = "",
+    focusProtocolSuiteId = "",
+  } = {}
+) {
+  const targetCatalogSuite = catalogSuiteById(targetSuiteId);
+  if (!targetCatalogSuite) return false;
+  const generation = ++suiteLoadGeneration;
+
+  if (
+    targetSuiteId === selectedSuiteId &&
+    (portalLoadMode === "aggregate" ||
+      !suiteNeedsShard(targetCatalogSuite) ||
+      activeSuiteShardId === targetSuiteId)
+  ) {
+    pendingSuiteId = null;
+    protocolSwitchError = "";
+    if (restoreUrl) {
+      applyUrlState();
+      renderSuiteView();
+    } else if (portalData) {
+      renderSuiteCards();
+      renderProtocolSelector(activeSuite());
+      setPortalStatus(
+        portalLoadMode === "catalog" ? "Curated catalog · suite loaded" : "Curated static snapshot",
+        "ready"
+      );
+    }
+    focusSuiteChangeControl({ focusGroupId, focusProtocolSuiteId });
+    return true;
+  }
+
+  pendingSuiteId = targetSuiteId;
+  protocolSwitchError = "";
+  if (!initial && portalData) {
+    renderSuiteCards();
+    renderProtocolSelector(activeSuite());
+  }
+  setPortalStatus(`Loading ${targetCatalogSuite.title || targetSuiteId}`, "loading");
+
+  try {
+    const nextPortalData = await portalDataForSuite(targetCatalogSuite);
+    if (generation !== suiteLoadGeneration) return false;
+
+    portalData = nextPortalData;
+    buildDataIndex(portalData);
+    selectedSuiteId = targetSuiteId;
+    activeSuiteShardId = suiteNeedsShard(targetCatalogSuite) ? targetSuiteId : null;
+    pendingSuiteId = null;
+    protocolSwitchError = "";
+
+    const suite = activeSuite();
+    if (restoreUrl) applyUrlState();
+    else resetSuiteInteractionState(suite);
+    renderSuiteView();
+    if (!restoreUrl) syncUrlState({ push });
+    setPortalStatus("Curated static snapshot", "ready");
+    focusSuiteChangeControl({ focusGroupId, focusProtocolSuiteId });
+    return true;
+  } catch (error) {
+    if (generation !== suiteLoadGeneration) return false;
+    pendingSuiteId = null;
+    protocolSwitchError = `Could not load ${targetCatalogSuite.title || targetSuiteId}. ${error?.message || String(error)}`;
+    if (initial) throw error;
+    renderSuiteCards();
+    renderProtocolSelector(activeSuite());
+    setPortalStatus("Curated snapshot · protocol unchanged", "ready");
+    if (restoreUrl) syncUrlState();
+    return false;
+  }
+}
+
+async function restoreSuiteFromLocation() {
+  if (!portalData || !globalThis.location) return;
+  const requestedSuiteId = new URLSearchParams(globalThis.location.search).get("suite");
+  const targetSuiteId = catalogSuiteById(requestedSuiteId)
+    ? requestedSuiteId
+    : selectedSuiteId;
+  await requestSuiteChange(targetSuiteId, { restoreUrl: true });
+}
+
 async function start() {
   setLoadingState(true);
+  ++suiteLoadGeneration;
+  pendingSuiteId = null;
+  protocolSwitchError = "";
+  suiteShardCache.clear();
+  suiteShardRequests.clear();
+  if (window.location.protocol === "file:") {
+    globalThis.__PORTAL_SUITE_SHARDS__ = {};
+  }
   try {
-    portalData = await loadPortalSnapshot();
+    const loaded = await loadPortalCatalogSource();
+    let usedAggregateFallback = Boolean(loaded.fallbackReason);
+    portalLoadMode = loaded.mode;
+    portalCatalog = loaded.data;
+    portalData = composePortalData(portalCatalog, null);
     buildDataIndex(portalData);
-    selectedSuiteId =
-      portalData.suites.find((suite) => suite.status === "active")?.suite_id ||
-      portalData.suites[0]?.suite_id;
-    applyUrlState();
-    renderSuiteView();
+    const defaultSuiteId =
+      portalCatalog.suites.find((suite) => suite.status === "active")?.suite_id ||
+      portalCatalog.suites[0]?.suite_id;
+    const requestedSuiteId = globalThis.location
+      ? new URLSearchParams(globalThis.location.search).get("suite")
+      : null;
+    selectedSuiteId = catalogSuiteById(requestedSuiteId)
+      ? requestedSuiteId
+      : defaultSuiteId;
+    try {
+      await requestSuiteChange(selectedSuiteId, { restoreUrl: true, initial: true });
+    } catch (initialShardError) {
+      const aggregate = normalizedPortalData(await loadPortalSnapshot());
+      if (!Array.isArray(aggregate.suites) || !aggregate.suites.length) {
+        throw initialShardError;
+      }
+      usedAggregateFallback = true;
+      portalLoadMode = "aggregate";
+      portalCatalog = aggregate;
+      portalData = aggregate;
+      activeSuiteShardId = null;
+      pendingSuiteId = null;
+      protocolSwitchError = "";
+      buildDataIndex(portalData);
+      const aggregateDefaultSuiteId =
+        portalCatalog.suites.find((suite) => suite.status === "active")?.suite_id ||
+        portalCatalog.suites[0]?.suite_id;
+      selectedSuiteId = catalogSuiteById(requestedSuiteId)
+        ? requestedSuiteId
+        : aggregateDefaultSuiteId;
+      applyUrlState();
+      renderSuiteView();
+    }
     initializeResponsiveChart();
     syncUrlState();
     setLoadingState(false);
-    setPortalStatus("Curated static snapshot", "ready");
+    const sourcePath = byId("sourceSnapshotPath");
+    if (sourcePath) {
+      sourcePath.textContent =
+        portalLoadMode === "catalog" ? "data/portal-catalog.json" : "data/portal-data.json";
+    }
+    setPortalStatus(
+      usedAggregateFallback
+        ? "Curated static snapshot · aggregate fallback"
+        : portalLoadMode === "catalog"
+          ? "Curated catalog · suite loaded"
+          : "Curated static snapshot",
+      "ready"
+    );
   } catch (error) {
     renderLoadError(error);
   }
@@ -2418,14 +3497,19 @@ async function start() {
 function installPortalTestApi() {
   globalThis.__PORTAL_TEST__ = {
     setData(data) {
-      portalData = data;
-      buildDataIndex(data);
+      portalLoadMode = "aggregate";
+      portalCatalog = normalizedPortalData(data);
+      portalData = portalCatalog;
+      activeSuiteShardId = null;
+      pendingSuiteId = null;
+      protocolSwitchError = "";
+      buildDataIndex(portalData);
       selectedSuiteId =
         data.suites.find((suite) => suite.status === "active")?.suite_id ||
         data.suites[0]?.suite_id ||
         null;
       chartScaleMode = "full";
-      chartEmphasisMode = "equal";
+      focusedChartRunId = null;
       resetRunFilters();
       const suite = activeSuite();
       if (suite) {
@@ -2438,19 +3522,58 @@ function installPortalTestApi() {
       const suite = suiteById(suiteId);
       return suite ? eligibleRows(suite).slice() : [];
     },
-    selectRun(runId) {
+    getUnrankedRows(suiteId = selectedSuiteId) {
+      const suite = suiteById(suiteId);
+      return suite ? unrankedRows(suite).slice() : [];
+    },
+    getVisibleChartRunIds() {
+      const suite = activeSuite();
+      return suite ? chartVisibleRuns(suite).map((run) => run.run_id) : [];
+    },
+    selectRun(runId, { focusChart = false } = {}) {
       const run = runById(runId);
       if (!run || run.suite_id !== selectedSuiteId) return false;
       selectedRunId = runId;
+      if (focusChart && selectedChartRunIds.has(runId)) focusedChartRunId = runId;
       return true;
     },
+    clearChartFocus() {
+      const changed = focusedChartRunId !== null;
+      focusedChartRunId = null;
+      return changed;
+    },
+    getBenchmarkNavigation() {
+      return benchmarkNavigationEntries().map((entry) => ({
+        id: entry.id,
+        title: navigationEntryTitle(entry),
+        status: navigationEntryStatus(entry),
+        suiteIds: entry.suites.map((suite) => suite.suite_id),
+        defaultSuiteId: entry.defaultSuite?.suite_id || null,
+      }));
+    },
+    chooseProtocol(groupSuiteIds, coordinates = {}) {
+      const suites = groupSuiteIds.map(catalogSuiteById).filter(Boolean);
+      return chooseProtocolSuite(suites, coordinates)?.suite_id || null;
+    },
+    composeShard(suiteId, shard) {
+      const previousMode = portalLoadMode;
+      portalLoadMode = "catalog";
+      try {
+        return composePortalData(portalCatalog, normalizeSuiteShard(shard, suiteId));
+      } finally {
+        portalLoadMode = previousMode;
+      }
+    },
+    safeExternalUrl,
     getState() {
       return {
         selectedSuiteId,
         selectedRunId,
         chartScaleMode,
-        chartEmphasisMode,
+        focusedChartRunId,
         selectedChartRunIds: Array.from(selectedChartRunIds),
+        pendingSuiteId,
+        suiteLoadGeneration,
       };
     },
     diagnostics() {

@@ -1,0 +1,922 @@
+{
+  "delivery_id": "sha256:5d461cfc37e113595c0c05c65c40cd673563983b43390a6ba4fb9b50f91e8572",
+  "suite_id": "mup_scaling",
+  "runs": [
+    {
+      "run_id": "mup-scaling-sp-w128",
+      "display_name": "SP width 128 lr=1e-3",
+      "suite_id": "mup_scaling",
+      "run_role": "baseline",
+      "status": "completed",
+      "optimizer": {
+        "name": "adamw",
+        "family": "adam",
+        "variant": "sp"
+      },
+      "model": {
+        "type": "llama",
+        "params": "width-128",
+        "n_layer": null,
+        "n_head": null,
+        "n_embd": 128
+      },
+      "dataset": {
+        "name": "slimpajama",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 5000,
+        "train_tokens": null,
+        "batch_size": null,
+        "acc_steps": 1,
+        "global_batch_tokens": null,
+        "sequence_length": 512,
+        "scheduler": null,
+        "lr": 0.001,
+        "weight_decay": null,
+        "warmup_steps": null,
+        "grad_clip": null,
+        "dtype": null,
+        "seed": 0,
+        "eval_interval": null
+      },
+      "hardware": {
+        "gpu_type": "remote muP sweep",
+        "num_gpus": 1,
+        "ddp": false,
+        "compile": false
+      },
+      "source": {
+        "source_type": "manual",
+        "wandb_url": null,
+        "log_path": null,
+        "csv_path": null,
+        "command": null,
+        "config_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
+        "git_commit": null
+      }
+    },
+    {
+      "run_id": "mup-scaling-sp-w256",
+      "display_name": "SP width 256 lr=1e-3",
+      "suite_id": "mup_scaling",
+      "run_role": "baseline",
+      "status": "completed",
+      "optimizer": {
+        "name": "adamw",
+        "family": "adam",
+        "variant": "sp"
+      },
+      "model": {
+        "type": "llama",
+        "params": "width-256",
+        "n_layer": null,
+        "n_head": null,
+        "n_embd": 256
+      },
+      "dataset": {
+        "name": "slimpajama",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 5000,
+        "train_tokens": null,
+        "batch_size": null,
+        "acc_steps": 1,
+        "global_batch_tokens": null,
+        "sequence_length": 512,
+        "scheduler": null,
+        "lr": 0.001,
+        "weight_decay": null,
+        "warmup_steps": null,
+        "grad_clip": null,
+        "dtype": null,
+        "seed": 0,
+        "eval_interval": null
+      },
+      "hardware": {
+        "gpu_type": "remote muP sweep",
+        "num_gpus": 1,
+        "ddp": false,
+        "compile": false
+      },
+      "source": {
+        "source_type": "manual",
+        "wandb_url": null,
+        "log_path": null,
+        "csv_path": null,
+        "command": null,
+        "config_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
+        "git_commit": null
+      }
+    },
+    {
+      "run_id": "mup-scaling-sp-w512",
+      "display_name": "SP width 512 lr=1e-3",
+      "suite_id": "mup_scaling",
+      "run_role": "baseline",
+      "status": "completed",
+      "optimizer": {
+        "name": "adamw",
+        "family": "adam",
+        "variant": "sp"
+      },
+      "model": {
+        "type": "llama",
+        "params": "width-512",
+        "n_layer": null,
+        "n_head": null,
+        "n_embd": 512
+      },
+      "dataset": {
+        "name": "slimpajama",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 5000,
+        "train_tokens": null,
+        "batch_size": null,
+        "acc_steps": 1,
+        "global_batch_tokens": null,
+        "sequence_length": 512,
+        "scheduler": null,
+        "lr": 0.001,
+        "weight_decay": null,
+        "warmup_steps": null,
+        "grad_clip": null,
+        "dtype": null,
+        "seed": 0,
+        "eval_interval": null
+      },
+      "hardware": {
+        "gpu_type": "remote muP sweep",
+        "num_gpus": 1,
+        "ddp": false,
+        "compile": false
+      },
+      "source": {
+        "source_type": "manual",
+        "wandb_url": null,
+        "log_path": null,
+        "csv_path": null,
+        "command": null,
+        "config_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
+        "git_commit": null
+      }
+    },
+    {
+      "run_id": "mup-scaling-sp-w768",
+      "display_name": "SP width 768 lr=1e-3",
+      "suite_id": "mup_scaling",
+      "run_role": "baseline",
+      "status": "completed",
+      "optimizer": {
+        "name": "adamw",
+        "family": "adam",
+        "variant": "sp"
+      },
+      "model": {
+        "type": "llama",
+        "params": "width-768",
+        "n_layer": null,
+        "n_head": null,
+        "n_embd": 768
+      },
+      "dataset": {
+        "name": "slimpajama",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 5000,
+        "train_tokens": null,
+        "batch_size": null,
+        "acc_steps": 1,
+        "global_batch_tokens": null,
+        "sequence_length": 512,
+        "scheduler": null,
+        "lr": 0.001,
+        "weight_decay": null,
+        "warmup_steps": null,
+        "grad_clip": null,
+        "dtype": null,
+        "seed": 0,
+        "eval_interval": null
+      },
+      "hardware": {
+        "gpu_type": "remote muP sweep",
+        "num_gpus": 1,
+        "ddp": false,
+        "compile": false
+      },
+      "source": {
+        "source_type": "manual",
+        "wandb_url": null,
+        "log_path": null,
+        "csv_path": null,
+        "command": null,
+        "config_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
+        "git_commit": null
+      }
+    },
+    {
+      "run_id": "mup-scaling-mup-w128",
+      "display_name": "muP width 128 lr=3e-3",
+      "suite_id": "mup_scaling",
+      "run_role": "ablation",
+      "status": "completed",
+      "optimizer": {
+        "name": "adamw",
+        "family": "adam",
+        "variant": "mup"
+      },
+      "model": {
+        "type": "mup_llama",
+        "params": "width-128",
+        "n_layer": null,
+        "n_head": null,
+        "n_embd": 128
+      },
+      "dataset": {
+        "name": "slimpajama",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 5000,
+        "train_tokens": null,
+        "batch_size": null,
+        "acc_steps": 1,
+        "global_batch_tokens": null,
+        "sequence_length": 512,
+        "scheduler": null,
+        "lr": 0.003,
+        "weight_decay": null,
+        "warmup_steps": null,
+        "grad_clip": null,
+        "dtype": null,
+        "seed": 0,
+        "eval_interval": null
+      },
+      "hardware": {
+        "gpu_type": "remote muP sweep",
+        "num_gpus": 1,
+        "ddp": false,
+        "compile": false
+      },
+      "source": {
+        "source_type": "manual",
+        "wandb_url": null,
+        "log_path": null,
+        "csv_path": null,
+        "command": null,
+        "config_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
+        "git_commit": null
+      }
+    },
+    {
+      "run_id": "mup-scaling-mup-w256",
+      "display_name": "muP width 256 lr=3e-3",
+      "suite_id": "mup_scaling",
+      "run_role": "ablation",
+      "status": "completed",
+      "optimizer": {
+        "name": "adamw",
+        "family": "adam",
+        "variant": "mup"
+      },
+      "model": {
+        "type": "mup_llama",
+        "params": "width-256",
+        "n_layer": null,
+        "n_head": null,
+        "n_embd": 256
+      },
+      "dataset": {
+        "name": "slimpajama",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 5000,
+        "train_tokens": null,
+        "batch_size": null,
+        "acc_steps": 1,
+        "global_batch_tokens": null,
+        "sequence_length": 512,
+        "scheduler": null,
+        "lr": 0.003,
+        "weight_decay": null,
+        "warmup_steps": null,
+        "grad_clip": null,
+        "dtype": null,
+        "seed": 0,
+        "eval_interval": null
+      },
+      "hardware": {
+        "gpu_type": "remote muP sweep",
+        "num_gpus": 1,
+        "ddp": false,
+        "compile": false
+      },
+      "source": {
+        "source_type": "manual",
+        "wandb_url": null,
+        "log_path": null,
+        "csv_path": null,
+        "command": null,
+        "config_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
+        "git_commit": null
+      }
+    },
+    {
+      "run_id": "mup-scaling-mup-w512",
+      "display_name": "muP width 512 lr=3e-3",
+      "suite_id": "mup_scaling",
+      "run_role": "ablation",
+      "status": "completed",
+      "optimizer": {
+        "name": "adamw",
+        "family": "adam",
+        "variant": "mup"
+      },
+      "model": {
+        "type": "mup_llama",
+        "params": "width-512",
+        "n_layer": null,
+        "n_head": null,
+        "n_embd": 512
+      },
+      "dataset": {
+        "name": "slimpajama",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 5000,
+        "train_tokens": null,
+        "batch_size": null,
+        "acc_steps": 1,
+        "global_batch_tokens": null,
+        "sequence_length": 512,
+        "scheduler": null,
+        "lr": 0.003,
+        "weight_decay": null,
+        "warmup_steps": null,
+        "grad_clip": null,
+        "dtype": null,
+        "seed": 0,
+        "eval_interval": null
+      },
+      "hardware": {
+        "gpu_type": "remote muP sweep",
+        "num_gpus": 1,
+        "ddp": false,
+        "compile": false
+      },
+      "source": {
+        "source_type": "manual",
+        "wandb_url": null,
+        "log_path": null,
+        "csv_path": null,
+        "command": null,
+        "config_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
+        "git_commit": null
+      }
+    },
+    {
+      "run_id": "mup-scaling-mup-w768",
+      "display_name": "muP width 768 lr=3e-3",
+      "suite_id": "mup_scaling",
+      "run_role": "ablation",
+      "status": "completed",
+      "optimizer": {
+        "name": "adamw",
+        "family": "adam",
+        "variant": "mup"
+      },
+      "model": {
+        "type": "mup_llama",
+        "params": "width-768",
+        "n_layer": null,
+        "n_head": null,
+        "n_embd": 768
+      },
+      "dataset": {
+        "name": "slimpajama",
+        "tokenizer": "gpt2"
+      },
+      "training": {
+        "train_steps": 5000,
+        "train_tokens": null,
+        "batch_size": null,
+        "acc_steps": 1,
+        "global_batch_tokens": null,
+        "sequence_length": 512,
+        "scheduler": null,
+        "lr": 0.003,
+        "weight_decay": null,
+        "warmup_steps": null,
+        "grad_clip": null,
+        "dtype": null,
+        "seed": 0,
+        "eval_interval": null
+      },
+      "hardware": {
+        "gpu_type": "remote muP sweep",
+        "num_gpus": 1,
+        "ddp": false,
+        "compile": false
+      },
+      "source": {
+        "source_type": "manual",
+        "wandb_url": null,
+        "log_path": null,
+        "csv_path": null,
+        "command": null,
+        "config_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md",
+        "git_commit": null
+      }
+    }
+  ],
+  "metrics": [
+    {
+      "metric_id": "m-mup-scaling-sp-w128-final-loss",
+      "run_id": "mup-scaling-sp-w128",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "final_val_loss",
+      "value": 5.057,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w128-tail-train-loss",
+      "run_id": "mup-scaling-sp-w128",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "tail_train_loss",
+      "value": 5.1647,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w128-final-train-loss",
+      "run_id": "mup-scaling-sp-w128",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "final_train_loss",
+      "value": 5.309,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w128-avg-iter-dt",
+      "run_id": "mup-scaling-sp-w128",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "avg_iter_dt",
+      "value": 0.0092,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w128-configured-lr",
+      "run_id": "mup-scaling-sp-w128",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "configured_lr",
+      "value": 0.001,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w256-final-loss",
+      "run_id": "mup-scaling-sp-w256",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "final_val_loss",
+      "value": 4.719,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w256-tail-train-loss",
+      "run_id": "mup-scaling-sp-w256",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "tail_train_loss",
+      "value": 4.8391,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w256-final-train-loss",
+      "run_id": "mup-scaling-sp-w256",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "final_train_loss",
+      "value": 5.016,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w256-avg-iter-dt",
+      "run_id": "mup-scaling-sp-w256",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "avg_iter_dt",
+      "value": 0.0103,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w256-configured-lr",
+      "run_id": "mup-scaling-sp-w256",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "configured_lr",
+      "value": 0.001,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w512-final-loss",
+      "run_id": "mup-scaling-sp-w512",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "final_val_loss",
+      "value": 4.919,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w512-tail-train-loss",
+      "run_id": "mup-scaling-sp-w512",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "tail_train_loss",
+      "value": 5.0081,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w512-final-train-loss",
+      "run_id": "mup-scaling-sp-w512",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "final_train_loss",
+      "value": 5.164,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w512-avg-iter-dt",
+      "run_id": "mup-scaling-sp-w512",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "avg_iter_dt",
+      "value": 0.0128,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w512-configured-lr",
+      "run_id": "mup-scaling-sp-w512",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "configured_lr",
+      "value": 0.001,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w768-final-loss",
+      "run_id": "mup-scaling-sp-w768",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "final_val_loss",
+      "value": 5.053,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w768-tail-train-loss",
+      "run_id": "mup-scaling-sp-w768",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "tail_train_loss",
+      "value": 5.1499,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w768-final-train-loss",
+      "run_id": "mup-scaling-sp-w768",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "final_train_loss",
+      "value": 5.322,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w768-avg-iter-dt",
+      "run_id": "mup-scaling-sp-w768",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "avg_iter_dt",
+      "value": 0.0165,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-sp-w768-configured-lr",
+      "run_id": "mup-scaling-sp-w768",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "configured_lr",
+      "value": 0.001,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w128-final-loss",
+      "run_id": "mup-scaling-mup-w128",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "final_val_loss",
+      "value": 4.783,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w128-tail-train-loss",
+      "run_id": "mup-scaling-mup-w128",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "tail_train_loss",
+      "value": 4.9099,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w128-final-train-loss",
+      "run_id": "mup-scaling-mup-w128",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "final_train_loss",
+      "value": 5.078,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w128-avg-iter-dt",
+      "run_id": "mup-scaling-mup-w128",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "avg_iter_dt",
+      "value": 0.0103,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w128-configured-lr",
+      "run_id": "mup-scaling-mup-w128",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "configured_lr",
+      "value": 0.003,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w256-final-loss",
+      "run_id": "mup-scaling-mup-w256",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "final_val_loss",
+      "value": 4.644,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w256-tail-train-loss",
+      "run_id": "mup-scaling-mup-w256",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "tail_train_loss",
+      "value": 4.7691,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w256-final-train-loss",
+      "run_id": "mup-scaling-mup-w256",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "final_train_loss",
+      "value": 4.951,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w256-avg-iter-dt",
+      "run_id": "mup-scaling-mup-w256",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "avg_iter_dt",
+      "value": 0.0113,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w256-configured-lr",
+      "run_id": "mup-scaling-mup-w256",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "configured_lr",
+      "value": 0.003,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w512-final-loss",
+      "run_id": "mup-scaling-mup-w512",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "final_val_loss",
+      "value": 4.545,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w512-tail-train-loss",
+      "run_id": "mup-scaling-mup-w512",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "tail_train_loss",
+      "value": 4.6685,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w512-final-train-loss",
+      "run_id": "mup-scaling-mup-w512",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "final_train_loss",
+      "value": 4.827,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w512-avg-iter-dt",
+      "run_id": "mup-scaling-mup-w512",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "avg_iter_dt",
+      "value": 0.0139,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w512-configured-lr",
+      "run_id": "mup-scaling-mup-w512",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "configured_lr",
+      "value": 0.003,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w768-final-loss",
+      "run_id": "mup-scaling-mup-w768",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "final_val_loss",
+      "value": 4.491,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w768-tail-train-loss",
+      "run_id": "mup-scaling-mup-w768",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "tail_train_loss",
+      "value": 4.6132,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w768-final-train-loss",
+      "run_id": "mup-scaling-mup-w768",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "final_train_loss",
+      "value": 4.79,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w768-avg-iter-dt",
+      "run_id": "mup-scaling-mup-w768",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "avg_iter_dt",
+      "value": 0.0173,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    },
+    {
+      "metric_id": "m-mup-scaling-mup-w768-configured-lr",
+      "run_id": "mup-scaling-mup-w768",
+      "metric_scope": "summary",
+      "step": 5000,
+      "tokens_seen": null,
+      "wall_time_sec": null,
+      "metric_name": "configured_lr",
+      "value": 0.003,
+      "split": "summary",
+      "source_path": "local-workspace:.codestable/compound/2026-05-27-explore-mup-readme-lr-sweep-repro.md"
+    }
+  ],
+  "claims": [],
+  "figures": []
+}
