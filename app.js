@@ -8,6 +8,7 @@ let selectedChartRunIds = new Set();
 let referenceHistoryOpen = {};
 let chartSelectionNotice = "";
 let chartScaleMode = "full";
+let chartEmphasisMode = "equal";
 let runFilterText = "";
 let runFilterRole = "all";
 let runFilterFamily = "all";
@@ -211,6 +212,14 @@ function normalizeChartScaleMode(suite) {
   if (!allowed.has(chartScaleMode)) chartScaleMode = "full";
 }
 
+function normalizeChartEmphasisMode(value = chartEmphasisMode) {
+  chartEmphasisMode = value === "selected" ? "selected" : "equal";
+}
+
+function chartFocusRunId() {
+  return chartEmphasisMode === "selected" ? selectedRunId : null;
+}
+
 function curveAvailable(run, suite) {
   return pointMetrics(run.run_id, curveMetricName(suite)).length >= 2;
 }
@@ -354,7 +363,7 @@ function buildCurrentFigureModel({
     figureId: figure.figure_id,
     selectedRunIds,
     visibleRunIds,
-    focusRunId: selectedRunId,
+    focusRunId: chartFocusRunId(),
     scaleMode: chartScaleMode,
     profile,
     width,
@@ -397,7 +406,23 @@ function bestChartRunIds(suite) {
 }
 
 function runColor(run) {
-  return globalThis.PortalFigureRuntime?.styleForRun(run)?.color || "#475467";
+  return globalThis.PortalFigureRuntime
+    ?.styleForRun(run, portalData?.visual_style_registry)
+    ?.color || "#475467";
+}
+
+function seriesKeyHtml(style, role) {
+  const color = escapeHtml(style?.color || "#475467");
+  return `
+    <span
+      class="series-key"
+      data-series-role="${escapeHtml(role || "unknown")}"
+      style="color:${color}"
+      aria-hidden="true"
+    >
+      <span class="series-key-line"></span>
+    </span>
+  `;
 }
 
 function runChipLabel(run, suite) {
@@ -534,6 +559,7 @@ function captureFocusState() {
     chartAction: element.dataset?.chartAction || "",
     filterAction: element.dataset?.filterAction || "",
     scaleMode: element.dataset?.scaleMode || "",
+    emphasisMode: element.dataset?.emphasisMode || "",
     controlKind: element.matches?.(".plot-toggle input") ? "plot-toggle" : "",
     selectionStart: typeof element.selectionStart === "number" ? element.selectionStart : null,
     selectionEnd: typeof element.selectionEnd === "number" ? element.selectionEnd : null,
@@ -549,6 +575,7 @@ function restoreFocusState(state) {
     ["chartAction", "chartAction"],
     ["filterAction", "filterAction"],
     ["scaleMode", "scaleMode"],
+    ["emphasisMode", "emphasisMode"],
   ];
   if (!element) {
     if (state.controlKind === "plot-toggle" && state.runId) {
@@ -576,6 +603,7 @@ function restoreFocusState(state) {
 }
 
 function updateSelectedRunVisuals() {
+  const focusedRunId = chartFocusRunId();
   const selectors = [
     "#leaderboardContent tr[data-run-id]",
     "#leaderboardContent .selected-run-pill[data-run-id]",
@@ -597,17 +625,29 @@ function updateSelectedRunVisuals() {
   });
 
   document.querySelectorAll("#lossChart [data-chart-run-id]").forEach((element) => {
-    const selected = element.dataset.chartRunId === selectedRunId;
-    const opacity = selected ? element.dataset.selectedOpacity : element.dataset.defaultOpacity;
-    const radius = selected ? element.dataset.selectedRadius : element.dataset.defaultRadius;
-    const strokeWidth = selected ? element.dataset.selectedStrokeWidth : element.dataset.defaultStrokeWidth;
+    const focused = element.dataset.chartRunId === focusedRunId;
+    const opacity = focused
+      ? element.dataset.focusOpacity
+      : chartEmphasisMode === "selected"
+        ? element.dataset.contextOpacity
+        : element.dataset.neutralOpacity;
+    const strokeWidth = focused
+      ? element.dataset.focusStrokeWidth
+      : element.dataset.baseStrokeWidth;
     if (opacity) element.setAttribute("opacity", opacity);
-    if (radius) element.setAttribute("r", radius);
     if (strokeWidth) element.setAttribute("stroke-width", strokeWidth);
-    element.classList.toggle("selected", selected);
-    element.classList.toggle("is-selected", selected);
-    element.setAttribute("aria-current", String(selected));
+    element.classList.toggle("selected", focused);
+    element.classList.toggle("is-selected", focused);
+    element.classList.toggle("is-context", chartEmphasisMode === "selected" && !focused);
+    element.setAttribute("aria-current", String(focused));
   });
+
+  const curveLayer = document.querySelector("#lossChart [data-curve-layer=\"series\"]");
+  if (curveLayer && focusedRunId) {
+    Array.from(curveLayer.children)
+      .filter((element) => element.dataset.chartRunId === focusedRunId)
+      .forEach((element) => curveLayer.appendChild(element));
+  }
 }
 
 function selectRun(runId, { updateUrl = true } = {}) {
@@ -640,6 +680,7 @@ function applyUrlState() {
   const requestedScale = params.get("scale");
   if (requestedScale) chartScaleMode = requestedScale;
   normalizeChartScaleMode(suite);
+  normalizeChartEmphasisMode(params.get("emphasis"));
   initializeChartSelection(suite);
   const rows = eligibleRows(suite);
   const readFilter = (name, values) => {
@@ -671,6 +712,8 @@ function syncUrlState({ push = false } = {}) {
   if (selectedRunId) url.searchParams.set("run", selectedRunId);
   else url.searchParams.delete("run");
   url.searchParams.set("scale", chartScaleMode);
+  if (chartEmphasisMode === "selected") url.searchParams.set("emphasis", "selected");
+  else url.searchParams.delete("emphasis");
   const filters = {
     q: runFilterText.trim(),
     role: runFilterRole === "all" ? "" : runFilterRole,
@@ -783,6 +826,7 @@ function renderSuiteCards() {
       clearTimeout(runSearchTimer);
       resetRunFilters();
       normalizeChartScaleMode(suite);
+      normalizeChartEmphasisMode("equal");
       initializeChartSelection(suite);
       selectedRunId = firstChartRun(suite)?.run_id || null;
       renderSuiteView();
@@ -1302,6 +1346,45 @@ function renderChartModeSwitch() {
   });
 }
 
+function renderChartEmphasisSwitch() {
+  const emphasisSwitch = byId("chartEmphasisSwitch");
+  emphasisSwitch.innerHTML = `
+    <span class="chart-mode-label">Emphasis</span>
+    <button
+      type="button"
+      class="${chartEmphasisMode === "equal" ? "active" : ""}"
+      data-emphasis-mode="equal"
+      aria-pressed="${chartEmphasisMode === "equal"}"
+      title="Give every visible curve equal visual weight"
+    >
+      <span class="mode-icon" aria-hidden="true">All</span>
+      <span>Equal</span>
+    </button>
+    <button
+      type="button"
+      class="${chartEmphasisMode === "selected" ? "active" : ""}"
+      data-emphasis-mode="selected"
+      aria-pressed="${chartEmphasisMode === "selected"}"
+      title="Emphasize the run currently selected for inspection"
+    >
+      <span class="mode-icon" aria-hidden="true">1</span>
+      <span>Selected</span>
+    </button>
+  `;
+  emphasisSwitch.querySelectorAll("button").forEach((button) => {
+    button.addEventListener("click", () => {
+      const nextMode = button.dataset.emphasisMode;
+      if (nextMode === chartEmphasisMode) return;
+      const focusState = captureFocusState();
+      normalizeChartEmphasisMode(nextMode);
+      renderChartEmphasisSwitch();
+      updateSelectedRunVisuals();
+      restoreFocusState(focusState);
+      syncUrlState();
+    });
+  });
+}
+
 function renderTargetMarkerStrip(suite, runs, metricName, model = currentChartModel) {
   const strip = byId("targetStepStrip");
   const ruler = model?.evidenceRuler;
@@ -1336,7 +1419,6 @@ function renderTargetMarkerStrip(suite, runs, metricName, model = currentChartMo
           const position = item.value === null
             ? null
             : Math.max(0, Math.min(100, ((item.value - domainMin) / span) * 100));
-          const style = globalThis.PortalFigureRuntime?.styleForRun(run) || {};
           return `
             <button
               type="button"
@@ -1345,17 +1427,19 @@ function renderTargetMarkerStrip(suite, runs, metricName, model = currentChartMo
               aria-pressed="${item.runId === selectedRunId}"
               aria-current="${item.runId === selectedRunId}"
             >
-              <span
-                class="legend-swatch"
-                data-series-family="${escapeHtml(style.family || "other")}"
-                style="background:${escapeHtml(item.color)}"
-              ></span>
+              ${seriesKeyHtml(
+                {
+                  color: item.color,
+                  marker: item.marker,
+                },
+                item.role
+              )}
               <strong>${escapeHtml(shortRunLabel(run || { display_name: item.label }))}</strong>
               <span class="evidence-ruler-track">
                 ${
                   position === null
                     ? `<span class="evidence-ruler-not-reached">Not reached</span>`
-                    : `<span class="evidence-ruler-marker" style="left:${position}%; background:${escapeHtml(item.color)}"></span>`
+                    : `<span class="evidence-ruler-marker" style="left:${position}%; color:${escapeHtml(item.color)}" aria-hidden="true"></span>`
                 }
               </span>
               <span>${escapeHtml(item.value === null ? "Not reached" : formatMetricValue(ruler.metricName, item.value))}</span>
@@ -1432,6 +1516,7 @@ function chartExportFilename(model, extension) {
   return [
     safeFilename(model?.figure?.id || activeSuite()?.suite_id),
     safeFilename(model?.request?.scaleMode || chartScaleMode),
+    model?.selection?.focusRunId ? "selected-focus" : "equal-emphasis",
     `runs${count}`,
     hash,
     date,
@@ -1518,60 +1603,6 @@ function interactivePathData(model, segments) {
     .join(" ");
 }
 
-function appendSeriesMarker(parent, entry, point, attrs = {}) {
-  const marker = entry.style.marker;
-  const radius = entry.focused ? 4.5 : 3.5;
-  const common = {
-    class: `series-endpoint ${entry.status !== "completed" ? "is-partial" : ""}`,
-    fill: entry.status !== "completed" ? "#ffffff" : entry.style.color,
-    stroke: entry.style.color,
-    "data-chart-run-id": entry.runId,
-    "data-default-opacity": entry.focused ? "1" : "0.48",
-    "data-selected-opacity": "1",
-    "aria-current": String(entry.focused),
-    ...attrs,
-  };
-  let element;
-  if (marker === "square") {
-    element = svgEl("rect", {
-      x: point.x - radius,
-      y: point.y - radius,
-      width: radius * 2,
-      height: radius * 2,
-      rx: 1,
-      ...common,
-    });
-  } else if (marker === "triangle") {
-    element = svgEl("path", {
-      d: `M ${point.x} ${point.y - radius - 1} L ${point.x + radius + 1} ${point.y + radius} L ${point.x - radius - 1} ${point.y + radius} Z`,
-      ...common,
-    });
-  } else if (marker === "diamond") {
-    element = svgEl("path", {
-      d: `M ${point.x} ${point.y - radius - 1} L ${point.x + radius + 1} ${point.y} L ${point.x} ${point.y + radius + 1} L ${point.x - radius - 1} ${point.y} Z`,
-      ...common,
-    });
-  } else if (marker === "plus") {
-    element = svgEl("path", {
-      d: `M ${point.x - radius} ${point.y} H ${point.x + radius} M ${point.x} ${point.y - radius} V ${point.x} ${point.y + radius}`,
-      fill: "none",
-      "stroke-width": 2,
-      ...common,
-    });
-  } else {
-    element = svgEl("circle", {
-      cx: point.x,
-      cy: point.y,
-      r: radius,
-      "data-default-radius": radius,
-      "data-selected-radius": 4.5,
-      ...common,
-    });
-  }
-  parent.appendChild(element);
-  return element;
-}
-
 function compactTooltipText(value, maximum = 42) {
   const text = String(value || "");
   return text.length <= maximum ? text : `${text.slice(0, maximum - 1)}…`;
@@ -1587,6 +1618,7 @@ function renderChart() {
   const yMetric = curveMetricName(suite);
   const markerMetric = targetMarkerMetric(suite);
   renderChartModeSwitch();
+  renderChartEmphasisSwitch();
   bindChartExportControls();
   const width = Math.max(280, Math.round(svg.clientWidth || 740));
   const height = Math.max(280, Math.round(svg.clientHeight || 420));
@@ -1618,9 +1650,10 @@ function renderChart() {
               class="${run.run_id === selectedRunId ? "active" : ""}"
               data-run-id="${escapeHtml(run.run_id)}"
               data-series-family="${escapeHtml(entry?.style?.family || "other")}"
+              data-series-method-group="${escapeHtml(entry?.methodGroup || "unknown")}"
               aria-pressed="${run.run_id === selectedRunId}"
             >
-              <span class="legend-swatch" style="background:${escapeHtml(entry?.style?.color || runColor(run))}"></span>
+              ${seriesKeyHtml(entry?.style, entry?.role)}
               ${escapeHtml(`${shortRunLabel(run)} · ${summaryMetricText(run.run_id, primaryMetricName(suite))}`)}
             </button>
           `;
@@ -1667,16 +1700,17 @@ function renderChart() {
     hiddenRuns.length ? `${hiddenRuns.length} hidden by filters` : "",
     chartScaleMode === "full" ? "Full data range" : "",
     model.clipping.note,
+    ...model.warnings,
   ].filter(Boolean).join(" · ");
   svg.setAttribute(
     "aria-label",
-    `${model.figure.title}. ${model.figure.subtitle}${model.clipping.note ? `. ${model.clipping.note}` : ""}`
+    `${model.figure.title}. ${model.figure.subtitle}${model.clipping.note ? `. ${model.clipping.note}` : ""}${model.warnings.length ? `. ${model.warnings.join(". ")}` : ""}`
   );
   const chartTitle = svgEl("title");
   chartTitle.textContent = model.figure.title;
   const chartDescription = svgEl("desc");
   chartDescription.textContent =
-    `${model.figure.subtitle}${model.clipping.note ? `. ${model.clipping.note}` : ""}`;
+    `${model.figure.subtitle}${model.clipping.note ? `. ${model.clipping.note}` : ""}${model.warnings.length ? `. ${model.warnings.join(". ")}` : ""}`;
   svg.append(chartTitle, chartDescription);
 
   const plot = model.plotRect;
@@ -1801,17 +1835,22 @@ function renderChart() {
     svg.appendChild(note);
   }
 
-  const curveLayer = svgEl("g", { "clip-path": `url(#${clipId})` });
+  const curveLayer = svgEl("g", {
+    "clip-path": `url(#${clipId})`,
+    "data-curve-layer": "series",
+  });
   svg.appendChild(curveLayer);
   const hoverSeries = [];
 
-  model.series.forEach((entry) => {
+  [...model.series]
+    .sort((left, right) => Number(left.focused) - Number(right.focused))
+    .forEach((entry) => {
     const run = runById(entry.runId);
     if (!run || !entry.segments.length) return;
-    const baseStyle = globalThis.PortalFigureRuntime.styleForRun(run);
-    const defaultOpacity = entry.status === "completed" ? "0.34" : "0.26";
-    const defaultStrokeWidth = String(baseStyle.strokeWidth || 2.1);
-    const selectedStrokeWidth = String(Math.max(baseStyle.strokeWidth || 2.1, 2.9));
+    const defaultOpacity = String(entry.style.contextOpacity ?? 0.52);
+    const neutralOpacity = String(entry.style.neutralOpacity ?? 1);
+    const defaultStrokeWidth = String(entry.style.contextStrokeWidth || 2.1);
+    const selectedStrokeWidth = String(entry.style.focusStrokeWidth || 2.9);
     const selected = entry.focused;
     const path = svgEl("path", {
       d: interactivePathData(model, entry.segments),
@@ -1824,16 +1863,18 @@ function renderChart() {
         selected ? "is-selected selected" : "is-context",
       ].filter(Boolean).join(" "),
       stroke: entry.style.color,
-      opacity: selected ? "1" : defaultOpacity,
+      opacity: selected ? "1" : chartEmphasisMode === "selected" ? defaultOpacity : neutralOpacity,
       "stroke-width": selected ? selectedStrokeWidth : defaultStrokeWidth,
       "stroke-dasharray": entry.style.dash || "none",
       "data-series-role": entry.role,
       "data-series-family": entry.style.family,
+      "data-series-method-group": entry.methodGroup,
       "data-chart-run-id": entry.runId,
-      "data-default-opacity": defaultOpacity,
-      "data-selected-opacity": "1",
-      "data-default-stroke-width": defaultStrokeWidth,
-      "data-selected-stroke-width": selectedStrokeWidth,
+      "data-context-opacity": defaultOpacity,
+      "data-neutral-opacity": neutralOpacity,
+      "data-focus-opacity": "1",
+      "data-base-stroke-width": defaultStrokeWidth,
+      "data-focus-stroke-width": selectedStrokeWidth,
       tabindex: "0",
       role: "button",
       "aria-label": `Inspect ${run.display_name}`,
@@ -1866,7 +1907,7 @@ function renderChart() {
         y: y(point.value),
       }));
     if (visiblePoints.length) hoverSeries.push(visiblePoints);
-  });
+    });
 
   model.directLabels.forEach((label) => {
     const entry = seriesByRun.get(label.runId);
@@ -1879,35 +1920,25 @@ function renderChart() {
       y2: label.connector.y2,
       class: `series-end-connector ${selected ? "is-selected selected" : ""}`,
       color: entry.style.color,
-      opacity: selected ? "0.82" : "0.42",
+      opacity: selected ? "0.82" : chartEmphasisMode === "selected" ? "0.42" : "0.7",
       "data-chart-run-id": entry.runId,
-      "data-default-opacity": "0.42",
-      "data-selected-opacity": "0.82",
+      "data-context-opacity": "0.42",
+      "data-neutral-opacity": "0.7",
+      "data-focus-opacity": "0.82",
       "aria-current": String(selected),
     });
     svg.appendChild(connector);
-    const endpoint = appendSeriesMarker(svg, entry, label.point, {
-      class: [
-        "series-endpoint",
-        entry.status !== "completed" ? "is-partial" : "",
-        selected ? "is-selected selected" : "",
-      ].filter(Boolean).join(" "),
-      opacity: selected ? "1" : "0.48",
-      "data-default-opacity": "0.48",
-      "data-selected-opacity": "1",
-      "aria-current": String(selected),
-    });
-    endpoint.addEventListener("click", () => selectRun(entry.runId));
     const text = svgEl("text", {
       x: label.x,
       y: label.y,
       "text-anchor": label.textAnchor || "start",
       class: `series-end-label ${selected ? "is-selected selected" : ""}`,
       fill: entry.style.color,
-      opacity: selected ? "1" : "0.76",
+      opacity: selected ? "1" : chartEmphasisMode === "selected" ? "0.76" : "0.9",
       "data-chart-run-id": entry.runId,
-      "data-default-opacity": "0.76",
-      "data-selected-opacity": "1",
+      "data-context-opacity": "0.76",
+      "data-neutral-opacity": "0.9",
+      "data-focus-opacity": "1",
       "aria-current": String(selected),
     });
     text.textContent = label.text;
@@ -1924,10 +1955,11 @@ function renderChart() {
       d: `M ${markerX} ${plot.top + 3} l 5 -7 l 5 7 Z`,
       class: `chart-clip-marker ${selected ? "is-selected selected" : ""}`,
       fill: entry.style.color,
-      opacity: selected ? "1" : "0.58",
+      opacity: selected ? "1" : chartEmphasisMode === "selected" ? "0.58" : "0.82",
       "data-chart-run-id": entry.runId,
-      "data-default-opacity": "0.58",
-      "data-selected-opacity": "1",
+      "data-context-opacity": "0.58",
+      "data-neutral-opacity": "0.82",
+      "data-focus-opacity": "1",
       "aria-current": String(selected),
     }));
   });
@@ -2393,6 +2425,7 @@ function installPortalTestApi() {
         data.suites[0]?.suite_id ||
         null;
       chartScaleMode = "full";
+      chartEmphasisMode = "equal";
       resetRunFilters();
       const suite = activeSuite();
       if (suite) {
@@ -2416,6 +2449,7 @@ function installPortalTestApi() {
         selectedSuiteId,
         selectedRunId,
         chartScaleMode,
+        chartEmphasisMode,
         selectedChartRunIds: Array.from(selectedChartRunIds),
       };
     },

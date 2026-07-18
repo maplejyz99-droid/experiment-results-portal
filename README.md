@@ -5,8 +5,8 @@ Static, source-backed result portal for optimizer experiment comparisons.
 ## Current Scope
 
 - Active suites: `modded-nanogpt Track 3`, `Llama 124M`
-- Partial detail suite: `Llama 210M`
-- Placeholder views: `muP scaling`, `Llama 583M`, `Llama 720M`, `MoE 520M`, `Memory / Speed`
+- Planned formal-data suite: `Llama 210M`
+- Placeholder views: `Llama 210M`, `muP scaling`, `Llama 583M`, `Llama 720M`, `MoE 520M`, `Memory / Speed`
 - Views: suite cards, suite leaderboard, selectable validation-loss curves, run detail, claim cards
 - Ranking: suite-specific `leaderboard_rule.sort_by`
 - Data source: curated static JSON snapshot in `data/portal-data.json`

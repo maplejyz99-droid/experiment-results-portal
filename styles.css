@@ -1347,6 +1347,7 @@ button:disabled {
 }
 
 .chart-mode-row,
+.chart-emphasis-row,
 .chart-tools {
   display: flex;
   align-items: center;
@@ -1365,7 +1366,8 @@ button:disabled {
   margin-right: 3px;
 }
 
-.chart-mode-row button {
+.chart-mode-row button,
+.chart-emphasis-row button {
   min-height: 40px;
   display: inline-flex;
   align-items: center;
@@ -1384,13 +1386,15 @@ button:disabled {
     background-color 130ms ease;
 }
 
-.chart-mode-row button:hover {
+.chart-mode-row button:hover,
+.chart-emphasis-row button:hover {
   color: var(--blue-700);
   border-color: var(--blue-100);
   background: var(--blue-50);
 }
 
-.chart-mode-row button.active {
+.chart-mode-row button.active,
+.chart-emphasis-row button.active {
   color: #ffffff;
   background: var(--blue-700);
   border-color: var(--blue-700);
@@ -1410,7 +1414,8 @@ button:disabled {
   font-weight: 750;
 }
 
-.chart-mode-row button.active .mode-icon {
+.chart-mode-row button.active .mode-icon,
+.chart-emphasis-row button.active .mode-icon {
   color: var(--navy-950);
   background: #ffffff;
 }
@@ -1653,97 +1658,10 @@ text.chart-clip-note {
 .curve,
 .series-path {
   fill: none;
-  stroke-width: 2.1;
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
   transition: opacity 130ms ease;
-}
-
-.curve.series-family-muon,
-.series-path.series-family-muon,
-.series-selector [data-series-family="muon"] .legend-swatch {
-  stroke: var(--figure-blue);
-  background: var(--figure-blue);
-}
-
-.curve.series-family-adam,
-.series-path.series-family-adam,
-.series-selector [data-series-family="adam"] .legend-swatch {
-  stroke: var(--figure-violet);
-  background: var(--figure-violet);
-}
-
-.curve.series-family-second-order,
-.series-path.series-family-second-order,
-.series-selector [data-series-family="second-order"] .legend-swatch {
-  stroke: var(--figure-teal);
-  background: var(--figure-teal);
-}
-
-.curve.series-family-momentum,
-.curve.series-family-lion,
-.series-path.series-family-momentum,
-.series-path.series-family-lion,
-.series-selector [data-series-family="momentum"] .legend-swatch,
-.series-selector [data-series-family="lion"] .legend-swatch {
-  stroke: var(--figure-ochre);
-  background: var(--figure-ochre);
-}
-
-.curve.series-family-experimental,
-.series-path.series-family-experimental,
-.series-selector [data-series-family="experimental"] .legend-swatch {
-  stroke: var(--figure-rose);
-  background: var(--figure-rose);
-}
-
-.curve.series-family-momentum-sign,
-.series-path.series-family-momentum-sign,
-.series-selector [data-series-family="momentum-sign"] .legend-swatch {
-  stroke: var(--figure-ochre);
-  background: var(--figure-ochre);
-}
-
-.curve.series-family-reference,
-.series-path.series-family-reference,
-.series-selector [data-series-family="reference"] .legend-swatch {
-  stroke: var(--figure-reference);
-  background: var(--figure-reference);
-}
-
-.curve.ours {
-  stroke-width: 2.1;
-}
-
-.curve.partial {
-  stroke-width: 2.1;
-  stroke-dasharray: 1 4;
-}
-
-.curve.series-official,
-.curve.run-role-official-reference,
-.series-path.series-official,
-.series-path.run-role-official-reference,
-.curve[data-series-role="official_reference"],
-.series-path[data-series-role="official_reference"] {
-  stroke-dasharray: 8 4;
-}
-
-.curve.series-ablation,
-.curve.run-role-ablation,
-.series-path.series-ablation,
-.series-path.run-role-ablation,
-.curve[data-series-role="ablation"],
-.series-path[data-series-role="ablation"] {
-  stroke-dasharray: 3 3;
-}
-
-.curve.is-context,
-.curve.series-context,
-.series-path.is-context,
-.series-path.series-context {
-  opacity: 0.28;
 }
 
 .curve.is-selected,
@@ -1753,14 +1671,12 @@ text.chart-clip-note {
 .curve[aria-current="true"],
 .series-path[aria-current="true"] {
   opacity: 1;
-  stroke-width: 2.6;
 }
 
 .curve:focus-visible,
 .series-path:focus-visible {
   outline: none;
   opacity: 1;
-  stroke-width: 2.8;
   filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.98));
 }
 
@@ -1773,7 +1689,6 @@ text.chart-clip-note {
 }
 
 .curve-point,
-.series-endpoint,
 .curve-endpoint,
 .target-crossing-marker {
   stroke: var(--figure-bg);
@@ -1789,7 +1704,6 @@ text.chart-clip-note {
   vector-effect: non-scaling-stroke;
 }
 
-.series-endpoint.is-partial,
 .curve-endpoint.is-partial {
   fill: var(--figure-bg);
   stroke-width: 2.2;
@@ -1868,18 +1782,6 @@ text.chart-clip-note {
   background: none;
 }
 
-.series-key-marker {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  width: 7px;
-  height: 7px;
-  border: 1.5px solid currentColor;
-  border-radius: 50%;
-  background: var(--figure-bg);
-  transform: translate(50%, -50%);
-}
-
 .target-step-strip {
   display: flex;
   align-items: center;
@@ -1934,7 +1836,7 @@ text.chart-clip-note {
 .evidence-ruler-row {
   min-height: 42px;
   display: grid;
-  grid-template-columns: 14px minmax(86px, 0.9fr) minmax(160px, 2fr) auto;
+  grid-template-columns: 26px minmax(86px, 0.9fr) minmax(160px, 2fr) auto;
   align-items: center;
   gap: 8px;
   padding: 7px 8px;
@@ -1958,20 +1860,14 @@ text.chart-clip-note {
   background: var(--slate-300);
 }
 
-.evidence-ruler-marker:not(circle):not(rect):not(path) {
+.evidence-ruler-marker {
   position: absolute;
   top: 50%;
-  width: 10px;
-  height: 10px;
-  border: 2px solid var(--figure-bg);
-  border-radius: 50%;
+  width: 2px;
+  height: 12px;
+  border-radius: 1px;
+  background: currentColor;
   transform: translate(-50%, -50%);
-}
-
-:is(circle, rect, path).evidence-ruler-marker {
-  stroke: var(--figure-bg);
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
 }
 
 .evidence-ruler-not-reached {
@@ -2805,6 +2701,7 @@ footer {
   .run-filters button,
     .chart-tools button,
     .chart-mode-row button,
+    .chart-emphasis-row button,
     .target-step-pills button,
     .series-selector button,
     .legend button,
@@ -2844,13 +2741,29 @@ footer {
     grid-template-columns: auto repeat(3, 1fr);
   }
 
+  .chart-emphasis-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: auto repeat(2, minmax(0, 1fr));
+  }
+
   .chart-mode-row button {
     min-width: 0;
     justify-content: center;
     padding-inline: 6px;
   }
 
+  .chart-emphasis-row button {
+    min-width: 0;
+    justify-content: center;
+    padding-inline: 6px;
+  }
+
   .chart-mode-row button:not(.active) .mode-icon {
+    display: none;
+  }
+
+  .chart-emphasis-row button:not(.active) .mode-icon {
     display: none;
   }
 
@@ -2899,6 +2812,11 @@ footer {
     font-size: 9px;
   }
 
+  .chart-target-label,
+  .target-line-label {
+    display: none;
+  }
+
   .series-end-label {
     display: none;
   }
@@ -2908,8 +2826,7 @@ footer {
     display: block;
   }
 
-  .series-end-connector:not(.is-selected),
-  .series-endpoint:not(.is-selected) {
+  .series-end-connector:not(.is-selected) {
     display: none;
   }
 

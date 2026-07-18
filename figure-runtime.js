@@ -5,24 +5,40 @@
 })(typeof globalThis === "object" ? globalThis : this, function createPortalFigureRuntime() {
   "use strict";
 
-  const SCHEMA_VERSION = "1.0";
+  const SCHEMA_VERSION = "1.1";
   const PROFILES = {
     interactive: { name: "interactive", width: 960, height: 520 },
     presentation: { name: "presentation", width: 1200, height: 900 },
     paper: { name: "paper", width: 980, height: 720 },
   };
-  const FAMILY_STYLES = {
-    muon: { family: "muon", color: "#175CD3" },
-    adam: { family: "adam", color: "#6941C6" },
-    "second-order": { family: "second-order", color: "#087E8B" },
-    mars: { family: "second-order", color: "#087E8B" },
-    lion: { family: "momentum-sign", color: "#A15C07" },
-    momentum: { family: "momentum-sign", color: "#A15C07" },
-    schedulefree: { family: "experimental", color: "#C11574" },
-    optimizer: { family: "other", color: "#475467" },
-    unknown: { family: "other", color: "#475467" },
+  const FAMILY_IDENTITIES = {
+    muon: "muon",
+    adam: "adam",
+    "second-order": "second-order",
+    mars: "second-order",
+    lion: "momentum-sign",
+    momentum: "momentum-sign",
+    schedulefree: "experimental",
+    optimizer: "other",
+    unknown: "other",
   };
-  const MARKERS = ["circle", "square", "triangle", "diamond", "plus"];
+  const METHOD_COLORS = [
+    "#175CD3",
+    "#6941C6",
+    "#087E8B",
+    "#A15C07",
+    "#C11574",
+  ];
+  const MARKERS = [
+    "circle",
+    "square",
+    "triangle",
+    "diamond",
+    "plus",
+    "cross",
+    "hexagon",
+    "star",
+  ];
 
   function finite(value) {
     return typeof value === "number" && Number.isFinite(value);
@@ -48,8 +64,41 @@
       .replaceAll("_", "-");
   }
 
-  function styleForRun(run) {
-    const base = FAMILY_STYLES[familyKey(run)] || FAMILY_STYLES.unknown;
+  function normalizedMethodGroup(value) {
+    const rawValue = String(value || "").trim().toLowerCase();
+    if (!rawValue) return "unknown";
+    const asciiSlug = rawValue
+      .replace(/[^a-z0-9]+/gu, "-")
+      .replace(/^-+|-+$/gu, "");
+    return asciiSlug || `method-${stableHash(rawValue).toString(36)}`;
+  }
+
+  function methodGroupKey(run) {
+    return normalizedMethodGroup(
+      run?.optimizer?.method_group ||
+      run?.optimizer?.name ||
+      run?.optimizer?.family ||
+      "unknown"
+    );
+  }
+
+  function methodGroupsFromRegistry(registry) {
+    if (!registry || typeof registry !== "object") return {};
+    if (registry.method_groups && typeof registry.method_groups === "object") {
+      return registry.method_groups;
+    }
+    return registry;
+  }
+
+  function styleForRun(run, registry) {
+    const optimizerFamily = familyKey(run);
+    const family = FAMILY_IDENTITIES[optimizerFamily] || FAMILY_IDENTITIES.unknown;
+    const methodGroup = methodGroupKey(run);
+    const registered = methodGroupsFromRegistry(registry)[methodGroup];
+    const fallbackColor = METHOD_COLORS[stableHash(methodGroup) % METHOD_COLORS.length];
+    const color = /^#[0-9a-f]{6}$/iu.test(String(registered?.color || ""))
+      ? String(registered.color).toUpperCase()
+      : fallbackColor;
     const role = String(run?.run_role || "unknown");
     const status = String(run?.status || "unknown");
     const incomplete = status !== "completed";
@@ -60,23 +109,66 @@
         : role === "ablation"
           ? "3 3"
           : "";
-    const marker = MARKERS[stableHash(run?.optimizer?.variant || run?.run_id) % MARKERS.length];
+    const markerSeed = [
+      methodGroup,
+      run?.optimizer?.variant || "",
+      run?.run_id || "",
+    ].join("\u0000");
+    const marker = MARKERS[stableHash(markerSeed) % MARKERS.length];
     return {
-      family: base.family,
-      color: base.color,
+      family,
+      optimizerFamily,
+      methodGroup,
+      methodLabel: String(registered?.label || run?.optimizer?.name || methodGroup),
+      color,
       dash,
       marker,
       strokeWidth: 2.1,
       opacity: incomplete ? 0.76 : 0.82,
       role,
       status,
+      collision: false,
+      signature: `${color}|${dash || "solid"}|${marker}`,
       classes: [
-        `series-family-${base.family}`,
+        `series-family-${family}`,
+        `series-method-${methodGroup}`,
         `series-role-${role.replaceAll("_", "-")}`,
         `series-status-${status.replaceAll("_", "-")}`,
         incomplete ? "is-partial" : "",
       ].filter(Boolean),
     };
+  }
+
+  function allocateRunStyles(runs, registry) {
+    const orderedRuns = [...runs].sort((left, right) => {
+      const leftSeed = stableHash(`${methodGroupKey(left)}\u0000${left?.run_id || ""}`);
+      const rightSeed = stableHash(`${methodGroupKey(right)}\u0000${right?.run_id || ""}`);
+      return leftSeed - rightSeed || String(left?.run_id || "").localeCompare(String(right?.run_id || ""));
+    });
+    const usedMarkers = new Set();
+    const styles = new Map();
+    for (const run of orderedRuns) {
+      const base = styleForRun(run, registry);
+      const initialIndex = MARKERS.indexOf(base.marker);
+      let marker = base.marker;
+      let collision = true;
+      for (let offset = 0; offset < MARKERS.length; offset += 1) {
+        const candidate = MARKERS[(Math.max(initialIndex, 0) + offset) % MARKERS.length];
+        if (usedMarkers.has(candidate)) continue;
+        marker = candidate;
+        usedMarkers.add(candidate);
+        collision = false;
+        break;
+      }
+      if (collision) usedMarkers.add(marker);
+      styles.set(run.run_id, {
+        ...base,
+        marker,
+        collision,
+        signature: `${base.color}|${base.dash || "solid"}|${marker}`,
+      });
+    }
+    return styles;
   }
 
   function niceStep(rawStep) {
@@ -250,9 +342,12 @@
     const visible = selected.filter((runId) => requestedVisible.has(runId));
     const visibleSet = new Set(visible);
     const hidden = selected.filter((runId) => !visibleSet.has(runId));
-    const focus = visibleSet.has(request?.focusRunId)
-      ? request.focusRunId
-      : visible[0] || null;
+    const requestedFocus = request?.focusRunId;
+    const focus = requestedFocus === undefined
+      ? visible[0] || null
+      : visibleSet.has(requestedFocus)
+        ? requestedFocus
+        : null;
     return {
       selectedRunIds: selected,
       visibleRunIds: visible,
@@ -397,10 +492,21 @@
       const interval = points[index].step - points[index - 1].step;
       if (interval > 0) intervals.push(interval);
     }
-    const gap = Math.max(median(intervals) * 2.25, 1);
     const segments = [[points[0]]];
     for (let index = 1; index < points.length; index += 1) {
-      if (points[index].step - points[index - 1].step > gap) segments.push([]);
+      const intervalIndex = index - 1;
+      const interval = intervals[intervalIndex];
+      const precedingCadence = median(
+        intervals.slice(Math.max(0, intervalIndex - 3), intervalIndex)
+      );
+      const followingCadence = median(
+        intervals.slice(intervalIndex + 1, intervalIndex + 4)
+      );
+      const localCadence = Math.max(precedingCadence, followingCadence, 1);
+      const isInteriorGap =
+        intervalIndex > 0 &&
+        interval > localCadence * 2.25;
+      if (isInteriorGap) segments.push([]);
       segments[segments.length - 1].push(points[index]);
     }
     return segments.filter((segment) => segment.length);
@@ -503,6 +609,9 @@
         value,
         color: entry.style.color,
         marker: entry.style.marker,
+        methodGroup: entry.methodGroup,
+        role: entry.role,
+        status: entry.status,
         focused: entry.focused,
       };
     });
@@ -562,10 +671,24 @@
     const selection = normalizeSelection(indexes, figure, request || {}, drawable);
     const domain = computeDomain(indexes, suite, figure, drawable, scaleMode);
 
+    const styleRegistry = data?.visual_style_registry || {};
+    const drawableIds = new Set(drawable.map((run) => run.run_id));
+    const anchorRunIds = canonicalRunIds(
+      indexes,
+      figure,
+      (figure.run_ids?.length ? figure.run_ids : selection.selectedRunIds)
+        .filter((runId) => drawableIds.has(runId))
+    );
+    const anchorRuns = anchorRunIds
+      .map((runId) => indexes.runs.get(runId))
+      .filter(Boolean);
+    const allocatedStyles = allocateRunStyles(anchorRuns, styleRegistry);
+    const hasFocusedSeries = selection.focusRunId !== null;
     const series = selection.visibleRunIds.map((runId) => {
       const run = indexes.runs.get(runId);
-      const style = styleForRun(run);
-      const points = (indexes.points.get(pointKey(runId, yMetric)) || []).map((point) => ({
+      const style = allocatedStyles.get(runId) || styleForRun(run, styleRegistry);
+      const points = (indexes.points.get(pointKey(runId, yMetric)) || []).map((point, pointIndex) => ({
+        pointIndex,
         metricId: point.metric_id || "",
         step: point.step,
         value: point.value,
@@ -576,25 +699,61 @@
       const plotPoints = scaleMode === "tail"
         ? points.filter((point) => point.step >= domain.xMin && point.step <= domain.xMax)
         : points;
+      const focused = runId === selection.focusRunId;
+      const contextOpacity = profile.name === "interactive"
+        ? style.status === "completed" ? 0.52 : 0.36
+        : style.status === "completed" ? 0.82 : 0.68;
+      const neutralOpacity = style.status === "completed"
+        ? 1
+        : profile.name === "interactive" ? 0.76 : 0.84;
+      const contextStrokeWidth = style.strokeWidth;
+      const focusStrokeWidth = Math.max(style.strokeWidth, 2.9);
       return {
         runId,
         displayName: run.display_name,
         label: labelForRun(run),
         family: style.family,
+        optimizerFamily: style.optimizerFamily,
+        methodGroup: style.methodGroup,
+        methodLabel: style.methodLabel,
         role: style.role,
         status: style.status,
-        focused: runId === selection.focusRunId,
+        focused,
         style: {
           ...style,
-          opacity: runId === selection.focusRunId ? 1 : 0.34,
-          strokeWidth: runId === selection.focusRunId ? 2.9 : style.strokeWidth,
+          contextOpacity,
+          neutralOpacity,
+          focusOpacity: 1,
+          contextStrokeWidth,
+          focusStrokeWidth,
+          opacity: hasFocusedSeries ? focused ? 1 : contextOpacity : neutralOpacity,
+          strokeWidth: focused ? focusStrokeWidth : contextStrokeWidth,
         },
         points,
         plotPoints,
         segments: splitSegments(plotPoints),
+        markerPoints: [],
         endLabel: null,
       };
     });
+    const grayscaleSignatures = new Map();
+    for (const entry of series) {
+      const signature = `${entry.style.dash || "solid"}|${entry.style.marker}`;
+      if (!grayscaleSignatures.has(signature)) grayscaleSignatures.set(signature, []);
+      grayscaleSignatures.get(signature).push(entry);
+    }
+    const styleCollisions = Array.from(grayscaleSignatures.entries())
+      .filter(([, entries]) => entries.length > 1)
+      .map(([signature, entries]) => ({
+        signature,
+        runIds: entries.map((entry) => entry.runId),
+      }));
+    for (const collision of styleCollisions) {
+      for (const runId of collision.runIds) {
+        const entry = series.find((candidate) => candidate.runId === runId);
+        if (entry) entry.style.collision = true;
+      }
+    }
 
     const provisionalRuler = buildEvidenceRuler(indexes, suite, figure, series, profile);
     const layout = buildLayout(profile, provisionalRuler?.items.length || 0);
@@ -670,6 +829,10 @@
       { name: "focus_run_id", value: selection.focusRunId || "" },
       { name: "snapshot_version", value: snapshot.schemaVersion },
       { name: "snapshot_date", value: snapshot.generatedAt },
+      {
+        name: "method_groups",
+        value: series.map((entry) => entry.methodGroup).join(","),
+      },
     ];
     return {
       schemaVersion: SCHEMA_VERSION,
@@ -730,15 +893,22 @@
       clipping,
       evidenceRuler,
       directLabels,
+      styleCollisions,
       metadata,
-      warnings: selection.hiddenRunIds.length
-        ? [`${selection.hiddenRunIds.length} selected run(s) hidden by filters`]
-        : [],
+      warnings: [
+        ...(selection.hiddenRunIds.length
+          ? [`${selection.hiddenRunIds.length} selected run(s) hidden by filters`]
+          : []),
+      ],
       stats: {
         selectedRuns: selection.selectedRunIds.length,
         visibleRuns: selection.visibleRunIds.length,
         hiddenRuns: selection.hiddenRunIds.length,
         points: series.reduce((total, entry) => total + entry.points.length, 0),
+        observationMarkers: series.reduce(
+          (total, entry) => total + entry.markerPoints.length,
+          0
+        ),
         drawableSuiteRuns: drawable.length,
       },
     };
@@ -787,23 +957,6 @@
       .join(" ");
   }
 
-  function markerSvg(marker, x, y, color, size) {
-    const radius = size || 3.5;
-    if (marker === "square") {
-      return `<rect x="${(x - radius).toFixed(2)}" y="${(y - radius).toFixed(2)}" width="${(radius * 2).toFixed(2)}" height="${(radius * 2).toFixed(2)}" rx="1" fill="${color}"/>`;
-    }
-    if (marker === "triangle") {
-      return `<path d="M${x.toFixed(2)} ${(y - radius - 1).toFixed(2)} L${(x + radius + 1).toFixed(2)} ${(y + radius).toFixed(2)} L${(x - radius - 1).toFixed(2)} ${(y + radius).toFixed(2)} Z" fill="${color}"/>`;
-    }
-    if (marker === "diamond") {
-      return `<path d="M${x.toFixed(2)} ${(y - radius - 1).toFixed(2)} L${(x + radius + 1).toFixed(2)} ${y.toFixed(2)} L${x.toFixed(2)} ${(y + radius + 1).toFixed(2)} L${(x - radius - 1).toFixed(2)} ${y.toFixed(2)} Z" fill="${color}"/>`;
-    }
-    if (marker === "plus") {
-      return `<path d="M${(x - radius).toFixed(2)} ${y.toFixed(2)} H${(x + radius).toFixed(2)} M${x.toFixed(2)} ${(y - radius).toFixed(2)} V${(y + radius).toFixed(2)}" fill="none" stroke="${color}" stroke-width="2"/>`;
-    }
-    return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${radius}" fill="${color}"/>`;
-  }
-
   function serializeStandaloneSvg(model, profileOverride) {
     if (!model?.figure || !model?.layout || !model?.geometry) {
       throw new Error("serializeStandaloneSvg requires a FigureModel.");
@@ -823,7 +976,13 @@
       '<?xml version="1.0" encoding="UTF-8"?>',
       `<svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">`,
       `<title>${escapeXml(model.figure.title)}</title>`,
-      `<desc>${escapeXml(`${model.figure.subtitle}. ${model.clipping.note || ""}`)}</desc>`,
+      `<desc>${escapeXml(
+        [
+          model.figure.subtitle,
+          model.clipping.note,
+          ...model.warnings,
+        ].filter(Boolean).join(". ")
+      )}</desc>`,
       `<metadata>${escapeXml(JSON.stringify({
         schemaVersion: model.schemaVersion,
         figure: model.figure.id,
@@ -850,6 +1009,7 @@
       ".clip-note{font-size:10px;font-weight:650;fill:#985A06}",
       ".ruler-title{font-size:11px;font-weight:700}",
       ".ruler-label{font-size:9px;fill:#475467}",
+      ".ruler-marker{stroke-linecap:round}",
       ".footer{font-size:9px;fill:#667085}",
       "</style>",
       `<rect width="${width}" height="${height}" fill="#FFFFFF"/>`,
@@ -895,8 +1055,6 @@
       lines.push(
         `<path class="curve" d="${pathData(model, entry.segments)}" stroke="${entry.style.color}" stroke-width="${entry.style.strokeWidth}" opacity="${entry.style.opacity}"${entry.style.dash ? ` stroke-dasharray="${entry.style.dash}"` : ""}/>`
       );
-      const label = entry.endLabel;
-      if (label) lines.push(markerSvg(entry.style.marker, label.point.x, label.point.y, entry.style.color, entry.focused ? 4 : 3));
     }
     lines.push("</g>");
 
@@ -925,7 +1083,7 @@
         if (item.value === null) {
           lines.push(`<text class="ruler-label" x="${ruler.track.right}" y="${item.labelY}" text-anchor="end">Not reached</text>`);
         } else {
-          lines.push(markerSvg(item.marker, item.x, item.labelY - 3, item.color, item.focused ? 4 : 3));
+          lines.push(`<line class="ruler-marker" x1="${item.x}" x2="${item.x}" y1="${item.labelY - 9}" y2="${item.labelY + 3}" stroke="${item.color}" stroke-width="${item.focused ? 3 : 2}"/>`);
           lines.push(`<text class="ruler-label" x="${box.right}" y="${item.labelY}" text-anchor="end">${escapeXml(formatNumber(item.value, ruler.metricName.includes("step") ? 0 : 4))}</text>`);
         }
       }
@@ -958,11 +1116,16 @@
       "role",
       "status",
       "optimizer_family",
+      "optimizer_method_group",
+      "series_color",
+      "line_dash",
+      "marker_shape",
       "scale_mode",
       "filter_summary",
       "step",
       "metric_name",
       "value",
+      "observation_marker",
       "in_domain",
       "x_domain_min",
       "x_domain_max",
@@ -976,6 +1139,9 @@
     const comparability = JSON.stringify(model.suite.comparability || {});
     const rows = [headers];
     model.series.forEach((entry, selectionIndex) => {
+      const observationMarkerIndexes = new Set(
+        entry.markerPoints.map((point) => point.pointIndex)
+      );
       entry.points.forEach((point) => {
         const inDomain =
           point.step >= model.domain.xMin &&
@@ -991,12 +1157,17 @@
           entry.focused,
           entry.role,
           entry.status,
-          entry.family,
+          entry.optimizerFamily,
+          entry.methodGroup,
+          entry.style.color,
+          entry.style.dash || "",
+          entry.style.marker,
           model.request.scaleMode,
           model.request.filterSummary,
           point.step,
           model.figure.yMetric,
           point.value,
+          observationMarkerIndexes.has(point.pointIndex),
           inDomain,
           model.domain.xMin,
           model.domain.xMax,
