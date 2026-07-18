@@ -10,6 +10,8 @@ Static, source-backed result portal for optimizer experiment comparisons.
 - Views: suite cards, suite leaderboard, selectable validation-loss curves, run detail, claim cards
 - Ranking: suite-specific `leaderboard_rule.sort_by`
 - Data source: curated static JSON snapshot in `data/portal-data.json`
+- Direct-file mirror: generated `data/portal-data.js`
+- Shared chart contract: `figure-runtime.js`
 
 This published snapshot is a presentation portal, not a live training monitor.
 Remote absolute paths are replaced with public source labels.

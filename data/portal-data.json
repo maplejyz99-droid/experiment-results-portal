@@ -93707,7 +93707,9 @@
       ],
       "selection_mode": "manual",
       "selection_limit": 8,
-      "target_marker_metric": "steps_to_target_3_28"
+      "target_marker_metric": "steps_to_target_3_28",
+      "tail_step_min": 2900,
+      "tail_step_max": 3600
     }
   ]
 }

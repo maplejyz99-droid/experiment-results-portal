@@ -3,43 +3,90 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LLM Optimizer Results Portal</title>
+    <meta
+      name="description"
+      content="A source-traceable evidence portal for suite-local LLM optimizer experiments."
+    />
+    <meta name="theme-color" content="#f7f9fc" />
+    <title>Optimizer Experiment Evidence Portal</title>
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <a class="skip-link" href="#main-content">Skip to experiment evidence</a>
+
     <header class="topbar">
-      <div>
-        <p class="eyebrow">experiment-results-portal / minimal static loop</p>
-        <h1>LLM Optimizer Results Portal</h1>
+      <div class="topbar-shell">
+        <div class="topbar-identity">
+          <div class="document-mark" aria-hidden="true">
+            <span>OE</span>
+            <small>LAB</small>
+          </div>
+          <div class="brand-copy">
+            <p class="eyebrow">Optimizer Evaluation Lab</p>
+            <h1>Experiment Evidence Portal</h1>
+            <p class="topbar-summary">
+              Protocol-bound comparisons for optimizer research, review, and publication.
+            </p>
+          </div>
+        </div>
+        <div class="header-utility">
+          <nav class="portal-nav" aria-label="Portal sections">
+            <a href="#suite-cards-title">Benchmarks</a>
+            <a href="#suite-title">Workspace</a>
+            <a href="#detail-title">Evidence</a>
+          </nav>
+          <div
+            class="source-pill"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            aria-label="Data source: curated static snapshot"
+          >
+            <span class="dot" aria-hidden="true"></span>
+            <span class="source-pill-label">Curated static snapshot</span>
+          </div>
+        </div>
       </div>
-      <div class="source-pill">
-        <span class="dot"></span>
-        Static seed data
+      <div class="protocol-ribbon" aria-label="Portal comparison contract">
+        <span><strong>Scope</strong> Suite-local comparison</span>
+        <span><strong>Evidence</strong> Source-traceable runs</span>
+        <span><strong>Interpretation</strong> Manual claims only</span>
       </div>
     </header>
 
-    <main>
+    <main id="main-content">
       <section class="overview-band" aria-labelledby="overview-title">
-        <div>
-          <p class="section-kicker">Overview</p>
-          <h2 id="overview-title">Suite-local evidence, not a mixed global ranking.</h2>
+        <div class="overview-copy">
+          <p class="section-kicker">Research workspace</p>
+          <h2 id="overview-title">Decisions backed by inspectable evidence.</h2>
           <p class="lede">
-            Group-meeting and paper-style review for optimizer experiments:
-            suite cards, traceable runs, claim cards, and evidence-ready curves.
+            Compare optimizers only within a shared protocol, inspect every selected run, and
+            carry defensible results into figures and research notes.
           </p>
+          <ul class="context-list" aria-label="Portal operating principles">
+            <li>Protocol-aware ranking</li>
+            <li>Run-level provenance</li>
+            <li>Publication-ready curves</li>
+          </ul>
         </div>
-        <div class="metric-strip" id="overviewMetrics" aria-label="Portal summary metrics"></div>
+        <div
+          class="metric-strip"
+          id="overviewMetrics"
+          aria-label="Portal summary metrics"
+          aria-live="polite"
+        ></div>
       </section>
 
       <section class="suite-cards-band" aria-labelledby="suite-cards-title">
         <div class="section-heading">
           <div>
-            <p class="section-kicker">Suite map</p>
-            <h2 id="suite-cards-title">Choose a benchmark lens.</h2>
+            <p class="section-kicker">Benchmark catalog</p>
+            <h2 id="suite-cards-title">Choose a comparison protocol.</h2>
           </div>
           <p class="muted wide-muted">
-            Only curated suites show leaderboards. Planned suites stay visible without inventing results.
+            Leaderboards appear only when the comparison contract is complete. Partial and planned
+            suites stay visible so research gaps remain explicit.
           </p>
         </div>
         <div class="suite-card-grid" id="suiteCards" aria-label="Experiment suites"></div>
@@ -48,31 +95,28 @@
       <section class="suite-band" aria-labelledby="suite-title">
         <div class="suite-header">
           <div>
-            <p class="section-kicker">Selected suite</p>
+            <p class="section-kicker">Active protocol workspace</p>
             <h2 id="suite-title">modded-nanogpt Track 3</h2>
           </div>
-          <div class="target-box" id="targetBox"></div>
+          <div class="target-box" id="targetBox" aria-live="polite"></div>
         </div>
+        <div
+          class="comparability-rail"
+          id="protocolRail"
+          aria-label="Active suite comparability boundary"
+          aria-live="polite"
+        ></div>
 
         <div class="dashboard-grid" id="suiteDataPanel">
-          <section class="panel leaderboard-panel" aria-labelledby="leaderboard-title">
-            <div class="panel-heading">
-              <div>
-                <p class="panel-kicker">Leaderboard</p>
-                <h3 id="leaderboard-title">Track 3 steps-to-target leaderboard</h3>
-              </div>
-              <p class="muted" id="leaderboardNote">Click a row to inspect provenance.</p>
-            </div>
-            <div id="leaderboardContent"></div>
-          </section>
-
           <section class="panel chart-panel" aria-labelledby="chart-title">
             <div class="panel-heading">
               <div>
-                <p class="panel-kicker">Curve compare</p>
-                <h3 id="chart-title">Validation loss by step</h3>
+                <p class="panel-kicker">Observed training trajectories</p>
+                <h3 id="chart-title">Validation loss by training step</h3>
               </div>
-              <p class="muted" id="chartMeta">Target line: 3.28</p>
+              <p class="muted" id="chartMeta">
+                Suite-local curves with the protocol target when defined.
+              </p>
             </div>
             <div class="chart-toolbar" aria-label="Chart tools">
               <div class="chart-mode-row" id="chartModeSwitch" aria-label="Chart scale mode"></div>
@@ -84,19 +128,48 @@
                 <button type="button" id="downloadCsv">Visible CSV</button>
               </div>
             </div>
-            <div class="chart-chips" id="chartSelectionChips"></div>
+            <div
+              class="chart-chips"
+              id="chartSelectionChips"
+              aria-label="Selected chart runs"
+            ></div>
             <div class="chart-frame">
-              <svg id="lossChart" role="img" aria-label="Track 3 validation loss curves"></svg>
+              <svg
+                id="lossChart"
+                role="img"
+                aria-label="Track 3 validation loss curves"
+                tabindex="0"
+              ></svg>
             </div>
-            <div class="target-step-strip" id="targetStepStrip" aria-label="Selected runs target steps"></div>
-            <div class="legend" id="chartLegend"></div>
+            <div
+              class="target-step-strip"
+              id="targetStepStrip"
+              aria-label="Selected runs target steps"
+            ></div>
+            <div class="legend" id="chartLegend" aria-label="Chart legend"></div>
+          </section>
+
+          <section class="panel leaderboard-panel" aria-labelledby="leaderboard-title">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-kicker">02 · Run selection</p>
+                <h3 id="leaderboard-title">Track 3 steps-to-target leaderboard</h3>
+              </div>
+              <p class="muted" id="leaderboardNote">Select a row to inspect its provenance.</p>
+            </div>
+            <div id="leaderboardContent"></div>
           </section>
         </div>
 
-        <section class="panel placeholder-panel" id="suitePlaceholder" hidden aria-labelledby="placeholder-title">
+        <section
+          class="panel placeholder-panel"
+          id="suitePlaceholder"
+          hidden
+          aria-labelledby="placeholder-title"
+        >
           <div class="panel-heading">
             <div>
-              <p class="panel-kicker" id="placeholder-kicker">Suite placeholder</p>
+              <p class="panel-kicker" id="placeholder-kicker">Protocol status</p>
               <h3 id="placeholder-title">Curated data not attached yet</h3>
             </div>
             <p class="muted" id="placeholder-status">planned</p>
@@ -109,21 +182,21 @@
         <div class="panel detail-panel">
           <div class="panel-heading">
             <div>
-              <p class="panel-kicker">Run source trace</p>
+              <p class="panel-kicker">03 · Run provenance</p>
               <h3 id="detail-title">Selected run</h3>
             </div>
-            <p class="muted">Every visible result keeps a source path or URL.</p>
+            <p class="muted">Every published result retains a source path or URL.</p>
           </div>
-          <div id="runDetail" class="run-detail"></div>
+          <div id="runDetail" class="run-detail" aria-live="polite"></div>
         </div>
 
         <div class="panel claim-panel">
           <div class="panel-heading">
             <div>
-              <p class="panel-kicker">Claim cards</p>
-              <h3>Evidence notes</h3>
+              <p class="panel-kicker">04 · Evidence review</p>
+              <h3>Curated research claims</h3>
             </div>
-            <p class="muted">Manual claims only.</p>
+            <p class="muted">Human-authored interpretations only.</p>
           </div>
           <div id="claimsList" class="claim-list"></div>
         </div>
@@ -132,8 +205,8 @@
       <details class="panel health-panel" aria-labelledby="data-health-title">
         <summary class="health-summary">
           <div>
-            <p class="panel-kicker">Data health</p>
-            <h3 id="data-health-title">Static snapshot checks</h3>
+            <p class="panel-kicker">Data integrity</p>
+            <h3 id="data-health-title">Snapshot coverage and checks</h3>
           </div>
           <p class="muted" id="dataHealthSummary">Snapshot coverage</p>
         </summary>
@@ -142,10 +215,15 @@
     </main>
 
     <footer>
-      <span>Data: <code>data/portal-data.json</code></span>
-      <span>Roadmap item: <code>portal-minimal-static-loop</code></span>
+      <span class="footer-mark">Optimizer Experiment Evidence</span>
+      <span>Source snapshot <code>data/portal-data.json</code></span>
+      <span>Static · protocol-bound · source-traceable</span>
     </footer>
 
+    <noscript>
+      <p class="noscript-message">JavaScript is required to inspect the experiment evidence.</p>
+    </noscript>
+    <script src="figure-runtime.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

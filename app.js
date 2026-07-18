@@ -1,36 +1,7 @@
-const COLORS = {
-  "official-track3-newton-muon-r15": "#0d6f63",
-  "official-track3-normuon-r10": "#384fb7",
-  "official-track3-muon-r12": "#7b4aa8",
-  "official-track3-adamw-r02": "#b7811f",
-  "ours-track3-ademamix-tuned-3350": "#bd3f2b",
-  "official-track3-r34-rre-extrapolation": "#0e8790",
-  "ours-track3-rtx5090-gated-softmuoneq": "#0f766e",
-  "ours-track3-rtx5090-muoneq-colrow": "#2563eb",
-  "ours-track3-rtx5090-muoneq-row": "#7c3aed",
-  "ours-track3-rtx5090-softeq-k1000": "#ea580c",
-  "ours-track3-rtx5090-softeq-k2000": "#dc2626",
-};
-
-const GENERATED_COLORS = [
-  "#0d6f63",
-  "#384fb7",
-  "#7b4aa8",
-  "#b7811f",
-  "#bd3f2b",
-  "#0e8790",
-  "#6f5d22",
-  "#8b3b72",
-  "#2f6f9f",
-  "#8f4f28",
-  "#486b38",
-  "#5d4c9b",
-];
-
-const TAIL_STEP_MIN = 2900;
-const TAIL_STEP_MAX = 3600;
+const SEARCH_DEBOUNCE_MS = 140;
 
 let portalData;
+let dataIndex;
 let selectedSuiteId;
 let selectedRunId;
 let selectedChartRunIds = new Set();
@@ -43,6 +14,10 @@ let runFilterFamily = "all";
 let runFilterStatus = "all";
 let runFilterTarget = "all";
 let runFilterCurve = "all";
+let runSearchTimer = 0;
+let chartResizeFrame = 0;
+let chartResizeObserver;
+let currentChartModel = null;
 
 const fmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 5 });
 const intFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -51,40 +26,113 @@ function byId(id) {
   return document.getElementById(id);
 }
 
+function buildDataIndex(data) {
+  const runsById = new Map();
+  const suitesById = new Map();
+  const figuresBySuite = new Map();
+  const runsBySuite = new Map();
+  const claimsBySuite = new Map();
+  const summaryByRun = new Map();
+  const pointsByRunMetric = new Map();
+
+  for (const suite of data.suites || []) {
+    suitesById.set(suite.suite_id, suite);
+    runsBySuite.set(suite.suite_id, []);
+    claimsBySuite.set(suite.suite_id, []);
+  }
+
+  for (const run of data.runs || []) {
+    runsById.set(run.run_id, run);
+    if (!runsBySuite.has(run.suite_id)) runsBySuite.set(run.suite_id, []);
+    runsBySuite.get(run.suite_id).push(run);
+  }
+
+  for (const figure of data.figures || []) {
+    if (figure.figure_type === "loss_curve" && !figuresBySuite.has(figure.suite_id)) {
+      figuresBySuite.set(figure.suite_id, figure);
+    }
+  }
+
+  for (const claim of data.claims || []) {
+    if (!claimsBySuite.has(claim.suite_id)) claimsBySuite.set(claim.suite_id, []);
+    claimsBySuite.get(claim.suite_id).push(claim);
+  }
+
+  for (const metric of data.metrics || []) {
+    if (metric.metric_scope === "summary") {
+      if (!summaryByRun.has(metric.run_id)) summaryByRun.set(metric.run_id, new Map());
+      summaryByRun.get(metric.run_id).set(metric.metric_name, metric);
+      continue;
+    }
+    if (metric.metric_scope !== "point") continue;
+    if (!pointsByRunMetric.has(metric.run_id)) pointsByRunMetric.set(metric.run_id, new Map());
+    const metricsByName = pointsByRunMetric.get(metric.run_id);
+    if (!metricsByName.has(metric.metric_name)) metricsByName.set(metric.metric_name, []);
+    metricsByName.get(metric.metric_name).push(metric);
+  }
+
+  for (const metricsByName of pointsByRunMetric.values()) {
+    for (const points of metricsByName.values()) {
+      points.sort((left, right) => left.step - right.step);
+    }
+  }
+
+  dataIndex = {
+    runsById,
+    suitesById,
+    figuresBySuite,
+    runsBySuite,
+    claimsBySuite,
+    summaryByRun,
+    pointsByRunMetric,
+    leaderboardRowsBySuite: new Map(),
+    leaderboardOrderBySuite: new Map(),
+  };
+
+  for (const suite of data.suites || []) {
+    const allowed = new Set(suite.leaderboard_eligibility?.allowed_status || []);
+    const rows = (runsBySuite.get(suite.suite_id) || [])
+      .filter((run) => allowed.has(run.status))
+      .map((run) => rowFromRun(suite, run))
+      .sort((left, right) => compareRunRows(suite, left, right));
+    dataIndex.leaderboardRowsBySuite.set(suite.suite_id, rows);
+    dataIndex.leaderboardOrderBySuite.set(
+      suite.suite_id,
+      new Map(rows.map((row, index) => [row.run.run_id, index]))
+    );
+  }
+}
+
 function summaryMetric(runId, metricName) {
-  return portalData.metrics.find(
-    (metric) => metric.run_id === runId && metric.metric_scope === "summary" && metric.metric_name === metricName
-  );
+  return dataIndex?.summaryByRun.get(runId)?.get(metricName);
 }
 
 function summaryMetricsForRun(runId) {
-  return portalData.metrics.filter((metric) => metric.run_id === runId && metric.metric_scope === "summary");
+  return Array.from(dataIndex?.summaryByRun.get(runId)?.values() || []);
 }
 
 function pointMetrics(runId, metricName) {
-  return portalData.metrics
-    .filter((metric) => metric.run_id === runId && metric.metric_scope === "point" && metric.metric_name === metricName)
-    .sort((left, right) => left.step - right.step);
+  return dataIndex?.pointsByRunMetric.get(runId)?.get(metricName) || [];
 }
 
 function runById(runId) {
-  return portalData.runs.find((run) => run.run_id === runId);
+  return dataIndex?.runsById.get(runId);
 }
 
 function suiteById(suiteId) {
-  return portalData.suites.find((suite) => suite.suite_id === suiteId);
+  return dataIndex?.suitesById.get(suiteId);
 }
 
 function figureForSuite(suite) {
-  return portalData.figures.find((figure) => figure.suite_id === suite.suite_id && figure.figure_type === "loss_curve");
+  return suite ? dataIndex?.figuresBySuite.get(suite.suite_id) : undefined;
 }
 
 function suiteRuns(suiteId) {
-  return portalData.runs.filter((run) => run.suite_id === suiteId);
+  return dataIndex?.runsBySuite.get(suiteId) || [];
 }
 
 function suiteClaims(suiteId) {
-  return portalData.claims.filter((claim) => claim.suite_id === suiteId);
+  return dataIndex?.claimsBySuite.get(suiteId) || [];
 }
 
 function suiteDetailState(suite) {
@@ -134,15 +182,6 @@ function defaultChartRunIds(suite) {
   return figure?.run_ids?.length ? figure.run_ids : suiteRuns(suite.suite_id).map((run) => run.run_id);
 }
 
-function yAxisMaxForFigure(figure, yMetric, scaleMode) {
-  if (scaleMode === "zoom") {
-    if (Number.isFinite(figure?.y_axis_zoom_max)) return figure.y_axis_zoom_max;
-    if (Number.isFinite(figure?.y_axis_max)) return figure.y_axis_max;
-    return yMetric === "val_loss" ? 5 : null;
-  }
-  return null;
-}
-
 function initializeChartSelection(suite) {
   selectedChartRunIds = new Set(defaultChartRunIds(suite));
   chartSelectionNotice = "";
@@ -155,6 +194,21 @@ function resetRunFilters() {
   runFilterStatus = "all";
   runFilterTarget = "all";
   runFilterCurve = "all";
+}
+
+function tailStepDomain(suite, figure = figureForSuite(suite)) {
+  const configuredMin = figure?.tail_step_min ?? figure?.x_axis_tail_min;
+  const configuredMax = figure?.tail_step_max ?? figure?.x_axis_tail_max;
+  if (Number.isFinite(configuredMin) && Number.isFinite(configuredMax) && configuredMax > configuredMin) {
+    return { min: configuredMin, max: configuredMax };
+  }
+  return null;
+}
+
+function normalizeChartScaleMode(suite) {
+  const allowed = new Set(["full", "zoom"]);
+  if (tailStepDomain(suite)) allowed.add("tail");
+  if (!allowed.has(chartScaleMode)) chartScaleMode = "full";
 }
 
 function curveAvailable(run, suite) {
@@ -236,19 +290,14 @@ function rowFromRun(suite, run) {
 }
 
 function eligibleRows(suite) {
-  const allowed = new Set(suite.leaderboard_eligibility?.allowed_status || []);
-  return suiteRuns(suite.suite_id)
-    .filter((run) => allowed.has(run.status))
-    .map((run) => rowFromRun(suite, run))
-    .sort((left, right) => compareRunRows(suite, left, right));
+  return dataIndex?.leaderboardRowsBySuite.get(suite.suite_id) || [];
 }
 
 function leaderboardOrderMap(suite) {
-  return new Map(eligibleRows(suite).map((row, index) => [row.run.run_id, index]));
+  return dataIndex?.leaderboardOrderBySuite.get(suite.suite_id) || new Map();
 }
 
-function compareRunsForSuite(suite, leftRun, rightRun) {
-  const order = leaderboardOrderMap(suite);
+function compareRunsForSuite(suite, leftRun, rightRun, order = leaderboardOrderMap(suite)) {
   const leftOrder = order.get(leftRun.run_id);
   const rightOrder = order.get(rightRun.run_id);
   if (leftOrder !== undefined && rightOrder !== undefined && leftOrder !== rightOrder) {
@@ -260,10 +309,11 @@ function compareRunsForSuite(suite, leftRun, rightRun) {
 }
 
 function selectedChartRuns(suite) {
+  const order = leaderboardOrderMap(suite);
   return Array.from(selectedChartRunIds)
     .map(runById)
     .filter((run) => run && run.suite_id === suite.suite_id)
-    .sort((left, right) => compareRunsForSuite(suite, left, right));
+    .sort((left, right) => compareRunsForSuite(suite, left, right, order));
 }
 
 function chartVisibleRuns(suite) {
@@ -276,10 +326,48 @@ function hiddenPlottedRuns(suite) {
   return selectedChartRuns(suite).filter((run) => !visibleIds.has(run.run_id));
 }
 
+function chartFilterSummary() {
+  return [
+    runFilterText.trim() ? `search=${runFilterText.trim()}` : "",
+    runFilterRole !== "all" ? `role=${runFilterRole}` : "",
+    runFilterFamily !== "all" ? `family=${runFilterFamily}` : "",
+    runFilterStatus !== "all" ? `status=${runFilterStatus}` : "",
+    runFilterTarget !== "all" ? `target=${runFilterTarget}` : "",
+    runFilterCurve !== "all" ? `curve=${runFilterCurve}` : "",
+  ].filter(Boolean).join(";");
+}
+
+function buildCurrentFigureModel({
+  profile = "interactive",
+  width = 1200,
+  height = 900,
+} = {}) {
+  const runtime = globalThis.PortalFigureRuntime;
+  const suite = activeSuite();
+  const figure = figureForSuite(suite);
+  if (!runtime?.buildFigureModel || !suite || !figure) return null;
+  const selectedRunIds = selectedChartRuns(suite).map((run) => run.run_id);
+  const visibleRunIds = chartVisibleRuns(suite)
+    .filter((run) => curveAvailable(run, suite))
+    .map((run) => run.run_id);
+  return runtime.buildFigureModel(portalData, {
+    figureId: figure.figure_id,
+    selectedRunIds,
+    visibleRunIds,
+    focusRunId: selectedRunId,
+    scaleMode: chartScaleMode,
+    profile,
+    width,
+    height,
+    filterSummary: chartFilterSummary(),
+  });
+}
+
 function selectableChartRuns(suite) {
+  const order = leaderboardOrderMap(suite);
   return suiteRuns(suite.suite_id)
     .filter((run) => curveAvailable(run, suite))
-    .sort((left, right) => compareRunsForSuite(suite, left, right));
+    .sort((left, right) => compareRunsForSuite(suite, left, right, order));
 }
 
 function firstChartRun(suite) {
@@ -308,8 +396,8 @@ function bestChartRunIds(suite) {
     .map((run) => run.run_id);
 }
 
-function runColor(run, index = 0) {
-  return COLORS[run.run_id] || GENERATED_COLORS[index % GENERATED_COLORS.length];
+function runColor(run) {
+  return globalThis.PortalFigureRuntime?.styleForRun(run)?.color || "#475467";
 }
 
 function runChipLabel(run, suite) {
@@ -436,6 +524,173 @@ function toggleChartRun(runId, shouldSelect) {
   }
 }
 
+function captureFocusState() {
+  const element = document.activeElement;
+  if (!element || element === document.body) return null;
+  return {
+    id: element.id || "",
+    runId: element.dataset?.runId || "",
+    removeRunId: element.dataset?.removeRunId || "",
+    chartAction: element.dataset?.chartAction || "",
+    filterAction: element.dataset?.filterAction || "",
+    scaleMode: element.dataset?.scaleMode || "",
+    controlKind: element.matches?.(".plot-toggle input") ? "plot-toggle" : "",
+    selectionStart: typeof element.selectionStart === "number" ? element.selectionStart : null,
+    selectionEnd: typeof element.selectionEnd === "number" ? element.selectionEnd : null,
+  };
+}
+
+function restoreFocusState(state) {
+  if (!state) return;
+  let element = state.id ? byId(state.id) : null;
+  const descriptors = [
+    ["runId", "runId"],
+    ["removeRunId", "removeRunId"],
+    ["chartAction", "chartAction"],
+    ["filterAction", "filterAction"],
+    ["scaleMode", "scaleMode"],
+  ];
+  if (!element) {
+    if (state.controlKind === "plot-toggle" && state.runId) {
+      element = Array.from(document.querySelectorAll(".plot-toggle input[data-run-id]"))
+        .find((candidate) => candidate.dataset.runId === state.runId);
+    }
+  }
+  if (!element) {
+    for (const [stateKey, dataKey] of descriptors) {
+      if (!state[stateKey]) continue;
+      element = Array.from(document.querySelectorAll(`[data-${dataKey.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}]`))
+        .find((candidate) => candidate.dataset[dataKey] === state[stateKey]);
+      if (element) break;
+    }
+  }
+  if (!element) return;
+  element.focus({ preventScroll: true });
+  if (
+    state.selectionStart !== null &&
+    state.selectionEnd !== null &&
+    typeof element.setSelectionRange === "function"
+  ) {
+    element.setSelectionRange(state.selectionStart, state.selectionEnd);
+  }
+}
+
+function updateSelectedRunVisuals() {
+  const selectors = [
+    "#leaderboardContent tr[data-run-id]",
+    "#leaderboardContent .selected-run-pill[data-run-id]",
+    "#chartSelectionChips button[data-run-id]",
+    "#targetStepStrip button[data-run-id]",
+    "#chartLegend button[data-run-id]",
+  ];
+  document.querySelectorAll(selectors.join(",")).forEach((element) => {
+    const selected = element.dataset.runId === selectedRunId;
+    element.classList.toggle(element.matches("tr") ? "selected" : "active", selected);
+    if (element.matches("tr")) {
+      element.setAttribute("aria-selected", String(selected));
+    } else {
+      element.setAttribute("aria-pressed", String(selected));
+      if (element.closest("#targetStepStrip")) {
+        element.setAttribute("aria-current", String(selected));
+      }
+    }
+  });
+
+  document.querySelectorAll("#lossChart [data-chart-run-id]").forEach((element) => {
+    const selected = element.dataset.chartRunId === selectedRunId;
+    const opacity = selected ? element.dataset.selectedOpacity : element.dataset.defaultOpacity;
+    const radius = selected ? element.dataset.selectedRadius : element.dataset.defaultRadius;
+    const strokeWidth = selected ? element.dataset.selectedStrokeWidth : element.dataset.defaultStrokeWidth;
+    if (opacity) element.setAttribute("opacity", opacity);
+    if (radius) element.setAttribute("r", radius);
+    if (strokeWidth) element.setAttribute("stroke-width", strokeWidth);
+    element.classList.toggle("selected", selected);
+    element.classList.toggle("is-selected", selected);
+    element.setAttribute("aria-current", String(selected));
+  });
+}
+
+function selectRun(runId, { updateUrl = true } = {}) {
+  const run = runById(runId);
+  const suite = activeSuite();
+  if (!run || !suite || run.suite_id !== suite.suite_id) return false;
+  selectedRunId = run.run_id;
+  if (byId("runDetail")) {
+    updateSelectedRunVisuals();
+    renderRunDetail();
+  }
+  if (updateUrl) syncUrlState();
+  return true;
+}
+
+function refreshRunViews({ focusState = captureFocusState(), includeDetail = true } = {}) {
+  renderLeaderboard();
+  renderChart();
+  if (includeDetail) renderRunDetail();
+  restoreFocusState(focusState);
+  syncUrlState();
+}
+
+function applyUrlState() {
+  if (!globalThis.location) return;
+  const params = new URLSearchParams(globalThis.location.search);
+  const requestedSuite = params.get("suite");
+  if (requestedSuite && suiteById(requestedSuite)) selectedSuiteId = requestedSuite;
+  const suite = activeSuite();
+  const requestedScale = params.get("scale");
+  if (requestedScale) chartScaleMode = requestedScale;
+  normalizeChartScaleMode(suite);
+  initializeChartSelection(suite);
+  const rows = eligibleRows(suite);
+  const readFilter = (name, values) => {
+    const value = params.get(name);
+    return value && values.has(value) ? value : "all";
+  };
+  runFilterText = params.get("q") || "";
+  runFilterRole = readFilter("role", new Set(rows.map((row) => row.run.run_role)));
+  runFilterFamily = readFilter(
+    "family",
+    new Set(rows.map((row) => row.run.optimizer?.family || row.run.optimizer?.name || "unknown"))
+  );
+  runFilterStatus = readFilter("status", new Set(rows.map((row) => row.run.status)));
+  runFilterTarget = readFilter(
+    "target",
+    new Set(rows.map((row) => targetStatus(row, suite)).filter(Boolean))
+  );
+  runFilterCurve = readFilter("curve", new Set(rows.map((row) => curveState(row, suite))));
+  const requestedRun = runById(params.get("run"));
+  selectedRunId = requestedRun?.suite_id === suite.suite_id
+    ? requestedRun.run_id
+    : firstChartRun(suite)?.run_id || null;
+}
+
+function syncUrlState({ push = false } = {}) {
+  if (!globalThis.location || !globalThis.history?.replaceState || !selectedSuiteId) return;
+  const url = new URL(globalThis.location.href);
+  url.searchParams.set("suite", selectedSuiteId);
+  if (selectedRunId) url.searchParams.set("run", selectedRunId);
+  else url.searchParams.delete("run");
+  url.searchParams.set("scale", chartScaleMode);
+  const filters = {
+    q: runFilterText.trim(),
+    role: runFilterRole === "all" ? "" : runFilterRole,
+    family: runFilterFamily === "all" ? "" : runFilterFamily,
+    status: runFilterStatus === "all" ? "" : runFilterStatus,
+    target: runFilterTarget === "all" ? "" : runFilterTarget,
+    curve: runFilterCurve === "all" ? "" : runFilterCurve,
+  };
+  Object.entries(filters).forEach(([name, value]) => {
+    if (value) url.searchParams.set(name, value);
+    else url.searchParams.delete(name);
+  });
+  const nextLocation = `${url.pathname}${url.search}${url.hash}`;
+  if (push && typeof globalThis.history.pushState === "function") {
+    globalThis.history.pushState(null, "", nextLocation);
+  } else {
+    globalThis.history.replaceState(null, "", nextLocation);
+  }
+}
+
 function renderOverview() {
   const totalSuites = portalData.suites.length;
   const activeSuites = portalData.suites.filter((suite) => suite.status === "active").length;
@@ -455,7 +710,9 @@ function renderOverview() {
 function renderSuiteHeader(suite) {
   const runs = suiteRuns(suite.suite_id);
   const completed = runs.filter((run) => run.status === "completed").length;
+  const drawable = runs.filter((run) => curveAvailable(run, suite)).length;
   const target = suite.target || {};
+  const constraints = suite.comparability_constraints || {};
   const figure = figureForSuite(suite);
   const yMetric = figure?.y_metric || primaryMetricName(suite);
   const targetText =
@@ -465,10 +722,37 @@ function renderSuiteHeader(suite) {
 
   byId("suite-title").textContent = suite.title;
   byId("targetBox").innerHTML = `
-    <strong>${suite.card?.metric_label || primaryMetricName(suite)}</strong><br />
-    ${targetText}<br />
-    <span>${completed} completed · ${suite.status} · ${suite.family}</span>
+    <span class="target-box-label">Evidence coverage</span>
+    <strong>${completed}/${runs.length} runs complete</strong>
+    <span class="target-box-value">${drawable} curves</span>
+    <span class="target-box-meta">${suite.status} · ${suite.family} · static snapshot</span>
   `;
+
+  const rankDirection = suite.leaderboard_rule?.direction === "desc" ? "higher first" : "lower first";
+  const railItems = [
+    ["Model", constraints.model || "Not specified"],
+    ["Dataset", constraints.dataset || "Not specified"],
+    ["Token budget", constraints.token_budget || "Not specified"],
+    [
+      "Rank metric",
+      `${suite.leaderboard_rule?.formal_rank_metric || suite.leaderboard_rule?.sort_by || primaryMetricName(suite)} · ${rankDirection}`,
+    ],
+    ["Target", targetText === "no chart target" ? "No target declared" : targetText],
+    ["Hardware scope", constraints.hardware_scope || "Not specified"],
+  ];
+  const protocolRail = byId("protocolRail");
+  protocolRail.dataset.status = suite.status;
+  protocolRail.innerHTML = railItems
+    .map(
+      ([label, value], index) => `
+        <div class="protocol-node">
+          <span class="protocol-index">${String(index + 1).padStart(2, "0")}</span>
+          <span class="protocol-label">${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value)}</strong>
+        </div>
+      `
+    )
+    .join("");
 }
 
 function renderSuiteCards() {
@@ -479,7 +763,7 @@ function renderSuiteCards() {
       const card = suite.card || {};
       const isSelected = suite.suite_id === selected.suite_id;
       return `
-        <button class="suite-card ${isSelected ? "selected" : ""} ${suite.status === "view" ? "view-card" : ""}" type="button" data-suite-id="${suite.suite_id}" aria-pressed="${isSelected}">
+        <button class="suite-card suite-status-${escapeHtml(suite.status)} ${isSelected ? "selected" : ""} ${suite.status === "view" ? "view-card" : ""}" type="button" data-suite-id="${suite.suite_id}" data-suite-status="${escapeHtml(suite.status)}" aria-pressed="${isSelected}">
           <span class="suite-card-topline">
             <span class="suite-status">${card.status_label || suite.status}</span>
             <span>${runs.length} runs</span>
@@ -496,10 +780,16 @@ function renderSuiteCards() {
     button.addEventListener("click", () => {
       selectedSuiteId = button.dataset.suiteId;
       const suite = activeSuite();
+      clearTimeout(runSearchTimer);
       resetRunFilters();
+      normalizeChartScaleMode(suite);
       initializeChartSelection(suite);
       selectedRunId = firstChartRun(suite)?.run_id || null;
-      renderAll();
+      renderSuiteView();
+      syncUrlState({ push: true });
+      const selectedButton = Array.from(byId("suiteCards").querySelectorAll("[data-suite-id]"))
+        .find((candidate) => candidate.dataset.suiteId === selectedSuiteId);
+      selectedButton?.focus({ preventScroll: true });
     });
   });
 }
@@ -543,7 +833,7 @@ function renderSelectedChartRows(suite) {
       ${selected
         .map(
           (run, index) => `
-            <button class="selected-run-pill ${run.run_id === selectedRunId ? "active" : ""}" type="button" data-run-id="${run.run_id}">
+            <button class="selected-run-pill ${run.run_id === selectedRunId ? "active" : ""}" type="button" data-run-id="${run.run_id}" aria-pressed="${run.run_id === selectedRunId}">
               <span class="legend-swatch" style="background:${runColor(run, index)}"></span>
               ${escapeHtml(runChipLabel(run, suite))}
             </button>
@@ -561,7 +851,7 @@ function plotCell(run, suite) {
   const reason = disabled ? "curve unavailable" : "Toggle this run in the chart";
   return `
     <label class="plot-toggle ${disabled ? "disabled" : ""}" title="${escapeHtml(reason)}">
-      <input type="checkbox" data-run-id="${run.run_id}" ${checked ? "checked" : ""} ${disabled ? "disabled" : ""} />
+      <input type="checkbox" data-run-id="${run.run_id}" aria-label="${escapeHtml(`${checked ? "Remove" : "Plot"} ${run.display_name}${disabled ? ", curve unavailable" : ""}`)}" ${checked ? "checked" : ""} ${disabled ? "disabled" : ""} />
       <span>${checked ? "on" : "plot"}</span>
     </label>
   `;
@@ -614,7 +904,11 @@ function tableHeader(column, suite) {
 function tableCell(column, suite, row, rankLabel) {
   const run = row.run;
   const primary = primaryMetricName(suite);
-  const primaryText = row.primaryMetric ? formatMetricValue(primary, row.primaryMetric.value) : "n/a";
+  const primaryText = row.primaryMetric
+    ? formatMetricValue(primary, row.primaryMetric.value)
+    : targetStatus(row, suite) === "not_reached"
+      ? "Not reached"
+      : "n/a";
   const bestText = row.bestMetric
     ? `${formatMetricValue("best_val_loss", row.bestMetric.value)} @ ${row.bestMetric.step}`
     : "n/a";
@@ -639,10 +933,10 @@ function leaderboardTable(suite, rows, startingRank, tableClass = "") {
   const columns = tableColumnsForRows(suite, rows);
   return `
     <div class="table-wrap ${tableClass}">
-      <table>
+      <table aria-label="${escapeHtml(`${suite.title} run results`)}">
         <thead>
           <tr>
-            ${columns.map((column) => `<th>${escapeHtml(tableHeader(column, suite))}</th>`).join("")}
+            ${columns.map((column) => `<th scope="col">${escapeHtml(tableHeader(column, suite))}</th>`).join("")}
           </tr>
         </thead>
         <tbody>
@@ -651,7 +945,7 @@ function leaderboardTable(suite, rows, startingRank, tableClass = "") {
               const run = row.run;
               const rankLabel = run.leaderboard_meta?.rank_label || row.displayRank || String(startingRank + index);
               return `
-                <tr class="${run.run_id === selectedRunId ? "selected" : ""}" data-run-id="${run.run_id}">
+                <tr class="${run.run_id === selectedRunId ? "selected" : ""}" data-run-id="${run.run_id}" tabindex="0" aria-selected="${run.run_id === selectedRunId}" aria-label="Inspect ${escapeHtml(run.display_name)}">
                   ${columns.map((column) => `<td>${tableCell(column, suite, row, rankLabel)}</td>`).join("")}
                 </tr>
               `;
@@ -719,36 +1013,63 @@ function renderRunFilters(rows, suite, visibleCount) {
         <input id="runSearch" type="search" value="${escapeHtml(runFilterText)}" placeholder="optimizer, rank, run id" autocomplete="off" />
       </label>
       ${controls.join("")}
-      <span class="filter-summary">Showing ${visibleCount}/${rows.length}${activeFilterCount() ? ` · ${activeFilterCount()} active` : ""}</span>
+      <span class="filter-summary" aria-live="polite">Showing ${visibleCount}/${rows.length}${activeFilterCount() ? ` · ${activeFilterCount()} active` : ""}</span>
       <button type="button" id="clearRunFilters">Reset filters</button>
     </div>
   `;
 }
 
-function bindLeaderboardInteractions() {
-  byId("leaderboardContent").querySelectorAll("tr[data-run-id], .selected-run-pill").forEach((target) => {
-    target.addEventListener("click", () => {
-      selectedRunId = target.dataset.runId;
-      renderAll();
+function bindRowInteractions(root) {
+  root.querySelectorAll("tr[data-run-id], .selected-run-pill").forEach((target) => {
+    target.addEventListener("click", (event) => {
+      if (
+        target.matches("tr") &&
+        event.target !== target &&
+        event.target?.closest?.("a, button, input, select, textarea, label")
+      ) return;
+      selectRun(target.dataset.runId);
     });
+    if (target.matches("tr")) {
+      target.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        if (
+          event.target !== target &&
+          event.target?.closest?.("a, button, input, select, textarea, label")
+        ) return;
+        event.preventDefault();
+        selectRun(target.dataset.runId);
+      });
+    }
   });
 
-  byId("leaderboardContent").querySelectorAll(".plot-toggle input").forEach((input) => {
+  root.querySelectorAll(".plot-toggle input").forEach((input) => {
     input.addEventListener("click", (event) => event.stopPropagation());
+    input.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      if (![" ", "Space", "Spacebar"].includes(event.key)) return;
+      event.preventDefault();
+      input.checked = !input.checked;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
     input.addEventListener("change", () => {
       toggleChartRun(input.dataset.runId, input.checked);
-      renderAll();
+      refreshRunViews();
     });
   });
 
-  byId("leaderboardContent").querySelectorAll("[data-remove-run-id]").forEach((button) => {
+  root.querySelectorAll("[data-remove-run-id]").forEach((button) => {
     button.addEventListener("click", () => {
       toggleChartRun(button.dataset.removeRunId, false);
-      renderAll();
+      refreshRunViews();
     });
   });
+}
 
-  byId("leaderboardContent").querySelectorAll("[data-chart-action]").forEach((button) => {
+function bindLeaderboardInteractions() {
+  const content = byId("leaderboardContent");
+  bindRowInteractions(content);
+
+  content.querySelectorAll("[data-chart-action]").forEach((button) => {
     button.addEventListener("click", () => {
       const suite = activeSuite();
       const action = button.dataset.chartAction;
@@ -759,7 +1080,7 @@ function bindLeaderboardInteractions() {
       } else if (action === "clear") {
         setChartSelection(suite, [], "Chart cleared. Pick rows from the tables below.");
       }
-      renderAll();
+      refreshRunViews();
     });
   });
 
@@ -767,8 +1088,20 @@ function bindLeaderboardInteractions() {
   if (search) {
     search.addEventListener("input", () => {
       runFilterText = search.value;
-      renderLeaderboard();
-      renderChart();
+      const focusState = {
+        id: "runSearch",
+        selectionStart: search.selectionStart,
+        selectionEnd: search.selectionEnd,
+      };
+      clearTimeout(runSearchTimer);
+      runSearchTimer = setTimeout(() => {
+        refreshRunViews({ focusState, includeDetail: false });
+      }, SEARCH_DEBOUNCE_MS);
+    });
+    search.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      clearTimeout(runSearchTimer);
+      refreshRunViews();
     });
   }
 
@@ -776,8 +1109,7 @@ function bindLeaderboardInteractions() {
   if (role) {
     role.addEventListener("change", () => {
       runFilterRole = role.value;
-      renderLeaderboard();
-      renderChart();
+      refreshRunViews({ includeDetail: false });
     });
   }
 
@@ -785,8 +1117,7 @@ function bindLeaderboardInteractions() {
   if (family) {
     family.addEventListener("change", () => {
       runFilterFamily = family.value;
-      renderLeaderboard();
-      renderChart();
+      refreshRunViews({ includeDetail: false });
     });
   }
 
@@ -794,8 +1125,7 @@ function bindLeaderboardInteractions() {
   if (status) {
     status.addEventListener("change", () => {
       runFilterStatus = status.value;
-      renderLeaderboard();
-      renderChart();
+      refreshRunViews({ includeDetail: false });
     });
   }
 
@@ -803,8 +1133,7 @@ function bindLeaderboardInteractions() {
   if (target) {
     target.addEventListener("change", () => {
       runFilterTarget = target.value;
-      renderLeaderboard();
-      renderChart();
+      refreshRunViews({ includeDetail: false });
     });
   }
 
@@ -812,8 +1141,7 @@ function bindLeaderboardInteractions() {
   if (curve) {
     curve.addEventListener("change", () => {
       runFilterCurve = curve.value;
-      renderLeaderboard();
-      renderChart();
+      refreshRunViews({ includeDetail: false });
     });
   }
 
@@ -821,23 +1149,23 @@ function bindLeaderboardInteractions() {
   if (clearFilters) {
     clearFilters.addEventListener("click", () => {
       resetRunFilters();
-      renderLeaderboard();
-      renderChart();
+      refreshRunViews({ includeDetail: false });
     });
   }
 }
 
 function renderLeaderboard() {
   const suite = activeSuite();
-  const rows = eligibleRows(suite).map((row, index) => ({ ...row, displayRank: String(index + 1) }));
+  const rows = eligibleRows(suite).map((row, index) => ({
+    ...row,
+    displayRank: row.primaryMetric ? String(index + 1) : "—",
+  }));
   const visibleRows = filteredRows(rows, suite);
   const referenceRows = visibleRows.filter((row) => row.run.run_role === "official_reference");
-  const localRows = visibleRows.filter(
-    (row) => row.run.run_role !== "official_reference" && (suite.suite_id !== "track3" || row.primaryMetric)
-  );
+  const localRows = visibleRows.filter((row) => row.run.run_role !== "official_reference");
   const hasReferenceAndLocal =
     rows.some((row) => row.run.run_role === "official_reference") &&
-    rows.some((row) => row.run.run_role !== "official_reference" && (suite.suite_id !== "track3" || row.primaryMetric));
+    rows.some((row) => row.run.run_role !== "official_reference");
 
   if (!selectedRunId && rows.length) selectedRunId = rows[0].run.run_id;
 
@@ -861,7 +1189,8 @@ function renderLeaderboard() {
   `;
 
   if (hasReferenceAndLocal) {
-    const open = referenceHistoryOpen[suite.suite_id] ? "open" : "";
+    const isOpen = Boolean(referenceHistoryOpen[suite.suite_id]);
+    const open = isOpen ? "open" : "";
     const referenceLabel = suite.suite_id === "track3" ? "Official Track 3 history" : "Reference history";
     const localLabel = suite.suite_id === "track3" ? "Our representative runs" : "Local or comparison runs";
     byId("leaderboardContent").innerHTML = `
@@ -871,7 +1200,13 @@ function renderLeaderboard() {
           <span>${escapeHtml(referenceLabel)} (${referenceRows.length})</span>
           <span class="muted">${suite.suite_id === "track3" ? "click to expand · sorted by steps" : "curated source-backed rows"}</span>
         </summary>
-        ${referenceRows.length ? leaderboardTable(suite, referenceRows, 1, "compact-table scroll-table") : "<p class=\"empty-table-note\">No reference rows match the current filters.</p>"}
+        <div class="history-table-slot" data-mounted="${isOpen}">
+          ${isOpen
+            ? referenceRows.length
+              ? leaderboardTable(suite, referenceRows, 1, "compact-table scroll-table")
+              : "<p class=\"empty-table-note\">No reference rows match the current filters.</p>"
+            : ""}
+        </div>
       </details>
       <div class="local-runs-block section-callout">
         <div class="mini-heading">
@@ -885,6 +1220,19 @@ function renderLeaderboard() {
     if (details) {
       details.addEventListener("toggle", () => {
         referenceHistoryOpen[suite.suite_id] = details.open;
+        const slot = details.querySelector(".history-table-slot");
+        if (!slot) return;
+        if (!details.open) {
+          slot.replaceChildren();
+          slot.dataset.mounted = "false";
+          return;
+        }
+        if (slot.dataset.mounted === "true") return;
+        slot.innerHTML = referenceRows.length
+          ? leaderboardTable(suite, referenceRows, 1, "compact-table scroll-table")
+          : "<p class=\"empty-table-note\">No reference rows match the current filters.</p>";
+        slot.dataset.mounted = "true";
+        bindRowInteractions(slot);
       });
     }
     bindLeaderboardInteractions();
@@ -910,40 +1258,6 @@ function svgEl(name, attrs = {}) {
   return element;
 }
 
-function niceStep(rawStep) {
-  if (!Number.isFinite(rawStep) || rawStep <= 0) return 1;
-  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
-  const normalized = rawStep / magnitude;
-  if (normalized <= 1) return magnitude;
-  if (normalized <= 2) return 2 * magnitude;
-  if (normalized <= 5) return 5 * magnitude;
-  return 10 * magnitude;
-}
-
-function niceTicks(min, max, count = 5) {
-  if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) return [min || 0];
-  const step = niceStep((max - min) / Math.max(count - 1, 1));
-  const start = Math.floor(min / step) * step;
-  const end = Math.ceil(max / step) * step;
-  const ticks = [];
-  for (let value = start; value <= end + step / 2; value += step) {
-    ticks.push(Number(value.toFixed(6)));
-  }
-  return ticks;
-}
-
-function niceAxisCeiling(rawMax, desiredIntervals = 5) {
-  if (!Number.isFinite(rawMax) || rawMax <= 0) return 1;
-  const step = niceStep(rawMax / Math.max(desiredIntervals, 1));
-  return Math.ceil(rawMax / step) * step;
-}
-
-function chartScaleModeLabel() {
-  if (chartScaleMode === "zoom") return "Zoom <=5";
-  if (chartScaleMode === "tail") return `Tail ${TAIL_STEP_MIN}-${TAIL_STEP_MAX}`;
-  return "Full";
-}
-
 function shortRunLabel(run) {
   const rank = run.leaderboard_meta?.official_rank;
   if (Number.isInteger(rank)) return `R${String(rank).padStart(2, "0")}`;
@@ -957,48 +1271,9 @@ function shortRunLabel(run) {
   return labels[run.run_id] || run.leaderboard_meta?.rank_label || run.display_name.split(/\s+/).slice(0, 2).join(" ");
 }
 
-function chartDomain(points, markerValues, target, showTargetLine, figure, yMetric) {
-  const xMin = chartScaleMode === "tail" ? TAIL_STEP_MIN : 0;
-  const xMax = chartScaleMode === "tail"
-    ? TAIL_STEP_MAX
-    : niceAxisCeiling(Math.max(...points.map((point) => point.step), ...markerValues, 1), 5);
-  const domainPoints = chartScaleMode === "tail"
-    ? points.filter((point) => point.step >= xMin && point.step <= xMax)
-    : points;
-  const yValues = (domainPoints.length ? domainPoints : points).map((point) => point.value);
-  if (showTargetLine) yValues.push(target.value);
-  const rawMin = Math.min(...yValues);
-  const rawMax = Math.max(...yValues);
-  const configuredYMax = yAxisMaxForFigure(figure, yMetric, chartScaleMode);
-  if (chartScaleMode === "tail") {
-    const spread = Math.max(rawMax - rawMin, 0.02);
-    const padding = Math.max(spread * 0.16, 0.006);
-    return {
-      xMin,
-      xMax,
-      minValue: Math.max(0, rawMin - padding),
-      maxValue: rawMax + padding,
-      configuredYMax: null,
-      clippedRuns: 0,
-    };
-  }
-
-  const padding = Math.max((rawMax - rawMin) * 0.08, 0.08);
-  const maxValue = configuredYMax ?? niceAxisCeiling(rawMax + padding, 6);
-  const minCandidate = Math.max(0, rawMin - padding);
-  const minValue = configuredYMax ? Math.max(0, Math.min(minCandidate, maxValue - 0.1)) : 0;
-  return {
-    xMin,
-    xMax,
-    minValue,
-    maxValue,
-    configuredYMax,
-    clippedRuns: 0,
-  };
-}
-
 function renderChartModeSwitch() {
   const modeSwitch = byId("chartModeSwitch");
+  const tailDomain = tailStepDomain(activeSuite());
   modeSwitch.innerHTML = `
     <span class="chart-mode-label">Scale</span>
     <button type="button" class="${chartScaleMode === "full" ? "active" : ""}" data-scale-mode="full" aria-pressed="${chartScaleMode === "full"}">
@@ -1009,106 +1284,91 @@ function renderChartModeSwitch() {
       <span class="mode-icon"><=5</span>
       <span>Zoom</span>
     </button>
-    <button type="button" class="${chartScaleMode === "tail" ? "active" : ""}" data-scale-mode="tail" aria-pressed="${chartScaleMode === "tail"}">
-      <span class="mode-icon">2900</span>
-      <span>Tail</span>
-    </button>
+    ${tailDomain ? `
+      <button type="button" class="${chartScaleMode === "tail" ? "active" : ""}" data-scale-mode="tail" aria-pressed="${chartScaleMode === "tail"}">
+        <span class="mode-icon">${escapeHtml(tailDomain.min)}</span>
+        <span>Tail</span>
+      </button>
+    ` : ""}
   `;
   modeSwitch.querySelectorAll("button").forEach((button) => {
     button.addEventListener("click", () => {
+      const focusState = captureFocusState();
       chartScaleMode = button.dataset.scaleMode;
       renderChart();
+      restoreFocusState(focusState);
+      syncUrlState();
     });
   });
 }
 
-function renderTargetMarkerStrip(suite, runs, metricName) {
+function renderTargetMarkerStrip(suite, runs, metricName, model = currentChartModel) {
   const strip = byId("targetStepStrip");
-  if (!metricName) {
+  const ruler = model?.evidenceRuler;
+  if (!ruler?.items?.length) {
     strip.hidden = true;
     strip.classList.remove("target-ranking-panel");
-    strip.setAttribute("aria-label", "Selected run milestone markers");
+    strip.classList.remove("evidence-ruler");
+    strip.setAttribute("aria-label", "Selected run evidence ruler");
     strip.innerHTML = "";
     return;
   }
 
-  const markedRuns = runs.filter((run) => summaryMetric(run.run_id, metricName));
   strip.hidden = false;
-  strip.setAttribute("aria-label", `Selected run ${metricAriaLabel(metricName)} markers`);
-  if (suite.suite_id === "track3") {
-    const rankedRuns = markedRuns
-      .map((run, index) => ({
-        run,
-        index,
-        metric: summaryMetric(run.run_id, metricName),
-        final: summaryMetric(run.run_id, "final_val_loss"),
-        sampleCount: summaryMetric(run.run_id, "sample_count"),
-      }))
-      .sort((left, right) => left.metric.value - right.metric.value || left.run.display_name.localeCompare(right.run.display_name));
-    const values = rankedRuns.map((item) => item.metric.value);
-    const minStep = values.length ? Math.min(...values) : TAIL_STEP_MIN;
-    const maxStep = values.length ? Math.max(...values) : TAIL_STEP_MAX;
-    const domainMin = Math.floor((minStep - 25) / 25) * 25;
-    const domainMax = Math.ceil((maxStep + 25) / 25) * 25;
-    const span = Math.max(domainMax - domainMin, 1);
-    strip.classList.add("target-ranking-panel");
-    strip.innerHTML = rankedRuns.length
-      ? `
-        <div class="target-ranking-head">
-          <span>Steps to target</span>
-          <span>lower is faster · plotted runs</span>
-        </div>
-        <div class="target-ranking-scale" aria-hidden="true">
-          <span>${escapeHtml(intFmt.format(domainMin))}</span>
-          <span>${escapeHtml(intFmt.format(domainMax))}</span>
-        </div>
-        <div class="target-ranking-rows">
-          ${rankedRuns
-            .map(({ run, index, metric, final, sampleCount }) => {
-              const position = ((metric.value - domainMin) / span) * 100;
-              const nText = sampleCount && sampleCount.value > 1 ? `n=${formatMetricValue("sample_count", sampleCount.value)}` : "";
-              return `
-                <button type="button" class="target-ranking-row ${run.run_id === selectedRunId ? "active" : ""}" data-run-id="${run.run_id}">
-                  <span class="legend-swatch" style="background:${runColor(run, index)}"></span>
-                  <strong>${escapeHtml(shortRunLabel(run))}</strong>
-                  <span class="target-ranking-track"><span class="target-ranking-dot" style="left:${position}%; background:${runColor(run, index)}"></span></span>
-                  <span class="target-ranking-step">${escapeHtml(formatMetricValue(metricName, metric.value))}</span>
-                  <span class="target-ranking-final">final ${escapeHtml(final ? formatMetricValue("final_val_loss", final.value) : "n/a")}</span>
-                  ${nText ? `<span class="target-ranking-n">${escapeHtml(nText)}</span>` : ""}
-                </button>
-              `;
-            })
-            .join("")}
-        </div>
-      `
-      : `<span class="muted">No selected run exposes ${escapeHtml(metricName)}.</span>`;
-  } else {
-    strip.classList.remove("target-ranking-panel");
-  strip.innerHTML = markedRuns.length
-    ? `
-      <span class="target-step-label">${escapeHtml(metricName)}</span>
-      <div class="target-step-pills">
-        ${markedRuns
-          .map((run, index) => {
-            const metric = summaryMetric(run.run_id, metricName);
-            return `
-              <button type="button" class="${run.run_id === selectedRunId ? "active" : ""}" data-run-id="${run.run_id}">
-                <span class="legend-swatch" style="background:${runColor(run, index)}"></span>
-                <strong>${escapeHtml(run.leaderboard_meta?.rank_label || run.display_name)}</strong>
-                <span>@${escapeHtml(formatMetricValue(metricName, metric.value))}</span>
-              </button>
-            `;
-          })
-          .join("")}
-      </div>
-    `
-    : `<span class="muted">No selected run exposes ${escapeHtml(metricName)}.</span>`;
-  }
+  strip.classList.add("target-ranking-panel", "evidence-ruler");
+  strip.setAttribute("aria-label", `Selected run ${metricAriaLabel(ruler.metricName)} evidence ruler`);
+  const [domainMin, domainMax] = ruler.domain;
+  const span = Math.max(domainMax - domainMin, Number.EPSILON);
+  const directionText = ruler.direction === "lower" ? "lower is better" : "higher is better";
+  strip.innerHTML = `
+    <div class="evidence-ruler-head">
+      <span>${escapeHtml(ruler.label)}</span>
+      <small>${escapeHtml(directionText)} · formal summary metric</small>
+    </div>
+    <div class="evidence-ruler-scale" aria-hidden="true">
+      <span>${escapeHtml(formatMetricValue(ruler.metricName, domainMin))}</span>
+      <span>${escapeHtml(formatMetricValue(ruler.metricName, domainMax))}</span>
+    </div>
+    <div class="evidence-ruler-rows">
+      ${ruler.items
+        .map((item) => {
+          const run = runById(item.runId);
+          const position = item.value === null
+            ? null
+            : Math.max(0, Math.min(100, ((item.value - domainMin) / span) * 100));
+          const style = globalThis.PortalFigureRuntime?.styleForRun(run) || {};
+          return `
+            <button
+              type="button"
+              class="evidence-ruler-row ${item.runId === selectedRunId ? "active" : ""}"
+              data-run-id="${escapeHtml(item.runId)}"
+              aria-pressed="${item.runId === selectedRunId}"
+              aria-current="${item.runId === selectedRunId}"
+            >
+              <span
+                class="legend-swatch"
+                data-series-family="${escapeHtml(style.family || "other")}"
+                style="background:${escapeHtml(item.color)}"
+              ></span>
+              <strong>${escapeHtml(shortRunLabel(run || { display_name: item.label }))}</strong>
+              <span class="evidence-ruler-track">
+                ${
+                  position === null
+                    ? `<span class="evidence-ruler-not-reached">Not reached</span>`
+                    : `<span class="evidence-ruler-marker" style="left:${position}%; background:${escapeHtml(item.color)}"></span>`
+                }
+              </span>
+              <span>${escapeHtml(item.value === null ? "Not reached" : formatMetricValue(ruler.metricName, item.value))}</span>
+            </button>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
 
   strip.querySelectorAll("button").forEach((button) => {
     button.addEventListener("click", () => {
-      selectedRunId = button.dataset.runId;
-      renderAll();
+      selectRun(button.dataset.runId);
     });
   });
 }
@@ -1148,134 +1408,77 @@ function downloadBlob(filename, blob) {
   URL.revokeObjectURL(url);
 }
 
-function csvCell(value) {
-  const text = String(value ?? "");
-  if (/[",\n]/.test(text)) return `"${text.replaceAll('"', '""')}"`;
-  return text;
+function chartSelectionHash(runIds) {
+  let hash = 2166136261;
+  for (const character of [...runIds].sort().join("|")) {
+    hash ^= character.codePointAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0").slice(0, 6);
 }
 
-function chartCsv(suite) {
-  const yMetric = curveMetricName(suite);
-  const target = suite.target || {};
-  const filters = [
-    runFilterText.trim() ? `search=${runFilterText.trim()}` : "",
-    runFilterRole !== "all" ? `role=${runFilterRole}` : "",
-    runFilterFamily !== "all" ? `family=${runFilterFamily}` : "",
-    runFilterStatus !== "all" ? `status=${runFilterStatus}` : "",
-    runFilterTarget !== "all" ? `target=${runFilterTarget}` : "",
-    runFilterCurve !== "all" ? `curve=${runFilterCurve}` : "",
-  ].filter(Boolean).join(";");
-  const rows = [[
-    "suite_id",
-    "run_id",
-    "display_name",
-    "rank_label",
-    "role",
-    "status",
-    "optimizer",
-    "source_type",
-    "source_path",
-    "scale_mode",
-    "target_value",
-    "filters",
-    "step",
-    "metric_name",
-    "value",
-  ]];
-  chartVisibleRuns(suite).forEach((run) => {
-    const source = run.source || {};
-    const sourcePath = source.log_path || source.csv_path || source.config_path || source.wandb_url || source.command || "";
-    pointMetrics(run.run_id, yMetric).forEach((point) => {
-      if (chartScaleMode === "tail" && (point.step < TAIL_STEP_MIN || point.step > TAIL_STEP_MAX)) return;
-      rows.push([
-        suite.suite_id,
-        run.run_id,
-        run.display_name,
-        run.leaderboard_meta?.rank_label || "",
-        run.run_role,
-        run.status,
-        run.optimizer?.name || "",
-        source.source_type || "",
-        sourcePath,
-        chartScaleMode,
-        target.metric_name === yMetric ? target.value ?? "" : "",
-        filters,
-        point.step,
-        yMetric,
-        point.value,
-      ]);
-    });
+function buildPublicationFigureModel() {
+  return buildCurrentFigureModel({
+    profile: "presentation",
+    width: 1200,
+    height: 900,
   });
-  return rows.map((row) => row.map(csvCell).join(",")).join("\n") + "\n";
+}
+
+function chartExportFilename(model, extension) {
+  const date = safeFilename(model?.snapshot?.generatedAt || "snapshot");
+  const count = model?.selection?.visibleRunIds?.length || 0;
+  const hash = chartSelectionHash(model?.selection?.visibleRunIds || []);
+  return [
+    safeFilename(model?.figure?.id || activeSuite()?.suite_id),
+    safeFilename(model?.request?.scaleMode || chartScaleMode),
+    `runs${count}`,
+    hash,
+    date,
+  ].filter(Boolean).join("-") + `.${extension}`;
+}
+
+function chartSvgXml(model = buildPublicationFigureModel()) {
+  if (!model) throw new Error("No chart model is available for export.");
+  return globalThis.PortalFigureRuntime.serializeStandaloneSvg(model, model.profile);
 }
 
 function exportCurrentChartCsv() {
-  const suite = activeSuite();
-  const filename = `${safeFilename(suite.suite_id)}-${safeFilename(curveMetricName(suite))}-${chartScaleMode}.csv`;
-  downloadText(filename, chartCsv(suite), "text/csv;charset=utf-8");
-}
-
-function chartExportFilename(suite, extension) {
-  return `${safeFilename(suite.suite_id)}-${safeFilename(curveMetricName(suite))}-${chartScaleMode}.${extension}`;
-}
-
-function chartSvgXml() {
-  const suite = activeSuite();
-  const svg = byId("lossChart");
-  const clone = svg.cloneNode(true);
-  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-  const viewBox = svg.viewBox.baseVal;
-  const width = Math.ceil(viewBox?.width || svg.clientWidth || 1200);
-  const height = Math.ceil(viewBox?.height || svg.clientHeight || 720);
-  clone.setAttribute("width", width);
-  clone.setAttribute("height", height);
-  clone.querySelectorAll(".chart-hover, .chart-tooltip, .chart-hover-capture").forEach((node) => node.remove());
-  const style = svgEl("style");
-  style.textContent = `
-    .axis{stroke:#9da89e;stroke-width:1}
-    .gridline{stroke:#dfe5dc;stroke-width:1}
-    .target-line{stroke:#7e857f;stroke-width:1.5;stroke-dasharray:6 5}
-    .curve{fill:none;stroke-width:2.6}
-    .curve.ours{stroke-width:3.8}
-    .curve.partial{stroke-width:2.2}
-    .curve-point{stroke:#fbfcfa;stroke-width:1.2}
-    .chart-label{fill:#5c625d;font-family:Menlo,Monaco,monospace;font-size:11px}
-  `;
-  clone.insertBefore(style, clone.firstChild);
-  const background = svgEl("rect", { x: 0, y: 0, width, height, fill: "#fbfcfa" });
-  clone.insertBefore(background, style.nextSibling);
-  return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(clone)}\n`;
+  const model = buildPublicationFigureModel();
+  if (!model) return;
+  const csv = globalThis.PortalFigureRuntime.serializeFigureCsv(model);
+  downloadText(chartExportFilename(model, "csv"), csv, "text/csv;charset=utf-8");
 }
 
 function exportCurrentChartSvg() {
-  const suite = activeSuite();
-  const xml = chartSvgXml();
-  downloadText(chartExportFilename(suite, "svg"), xml, "image/svg+xml;charset=utf-8");
+  const model = buildPublicationFigureModel();
+  if (!model) return;
+  downloadText(
+    chartExportFilename(model, "svg"),
+    chartSvgXml(model),
+    "image/svg+xml;charset=utf-8"
+  );
 }
 
 function exportCurrentChartPng() {
-  const suite = activeSuite();
-  const svg = byId("lossChart");
-  const viewBox = svg.viewBox.baseVal;
-  const width = Math.ceil(viewBox?.width || svg.clientWidth || 1200);
-  const height = Math.ceil(viewBox?.height || svg.clientHeight || 720);
-  const xml = chartSvgXml();
+  const model = buildPublicationFigureModel();
+  if (!model) return;
+  const xml = chartSvgXml(model);
   const svgBlob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(svgBlob);
   const image = new Image();
   image.onload = () => {
-    const scale = Math.max(2, Math.ceil(window.devicePixelRatio || 1));
     const canvas = document.createElement("canvas");
-    canvas.width = width * scale;
-    canvas.height = height * scale;
+    canvas.width = 2400;
+    canvas.height = 1800;
     const context = canvas.getContext("2d");
-    context.fillStyle = "#fbfcfa";
+    context.fillStyle = "#ffffff";
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
     URL.revokeObjectURL(url);
     canvas.toBlob((blob) => {
       if (!blob) return;
-      downloadBlob(chartExportFilename(suite, "png"), blob);
+      downloadBlob(chartExportFilename(model, "png"), blob);
     }, "image/png");
   };
   image.onerror = () => URL.revokeObjectURL(url);
@@ -1291,44 +1494,137 @@ function bindChartExportControls() {
   if (csvButton) csvButton.onclick = exportCurrentChartCsv;
 }
 
+function mapFigureValue(value, scale) {
+  const [domainMin, domainMax] = scale.domain;
+  const [rangeMin, rangeMax] = scale.range;
+  const span = domainMax - domainMin;
+  if (!Number.isFinite(value) || !Number.isFinite(span) || span === 0) {
+    return (rangeMin + rangeMax) / 2;
+  }
+  return rangeMin + ((value - domainMin) / span) * (rangeMax - rangeMin);
+}
+
+function interactivePathData(model, segments) {
+  return segments
+    .map((segment) =>
+      segment
+        .map((point, index) => {
+          const x = mapFigureValue(point.step, model.geometry.xScale);
+          const y = mapFigureValue(point.value, model.geometry.yScale);
+          return `${index ? "L" : "M"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+        })
+        .join(" ")
+    )
+    .join(" ");
+}
+
+function appendSeriesMarker(parent, entry, point, attrs = {}) {
+  const marker = entry.style.marker;
+  const radius = entry.focused ? 4.5 : 3.5;
+  const common = {
+    class: `series-endpoint ${entry.status !== "completed" ? "is-partial" : ""}`,
+    fill: entry.status !== "completed" ? "#ffffff" : entry.style.color,
+    stroke: entry.style.color,
+    "data-chart-run-id": entry.runId,
+    "data-default-opacity": entry.focused ? "1" : "0.48",
+    "data-selected-opacity": "1",
+    "aria-current": String(entry.focused),
+    ...attrs,
+  };
+  let element;
+  if (marker === "square") {
+    element = svgEl("rect", {
+      x: point.x - radius,
+      y: point.y - radius,
+      width: radius * 2,
+      height: radius * 2,
+      rx: 1,
+      ...common,
+    });
+  } else if (marker === "triangle") {
+    element = svgEl("path", {
+      d: `M ${point.x} ${point.y - radius - 1} L ${point.x + radius + 1} ${point.y + radius} L ${point.x - radius - 1} ${point.y + radius} Z`,
+      ...common,
+    });
+  } else if (marker === "diamond") {
+    element = svgEl("path", {
+      d: `M ${point.x} ${point.y - radius - 1} L ${point.x + radius + 1} ${point.y} L ${point.x} ${point.y + radius + 1} L ${point.x - radius - 1} ${point.y} Z`,
+      ...common,
+    });
+  } else if (marker === "plus") {
+    element = svgEl("path", {
+      d: `M ${point.x - radius} ${point.y} H ${point.x + radius} M ${point.x} ${point.y - radius} V ${point.x} ${point.y + radius}`,
+      fill: "none",
+      "stroke-width": 2,
+      ...common,
+    });
+  } else {
+    element = svgEl("circle", {
+      cx: point.x,
+      cy: point.y,
+      r: radius,
+      "data-default-radius": radius,
+      "data-selected-radius": 4.5,
+      ...common,
+    });
+  }
+  parent.appendChild(element);
+  return element;
+}
+
+function compactTooltipText(value, maximum = 42) {
+  const text = String(value || "");
+  return text.length <= maximum ? text : `${text.slice(0, maximum - 1)}…`;
+}
+
 function renderChart() {
   const svg = byId("lossChart");
   svg.innerHTML = "";
+  byId("chartLegend").innerHTML = "";
 
   const suite = activeSuite();
-  const figure = figureForSuite(suite);
+  normalizeChartScaleMode(suite);
   const yMetric = curveMetricName(suite);
   const markerMetric = targetMarkerMetric(suite);
-  const target = suite.target || {};
-  const showTargetLine = target.metric_name && target.metric_name === yMetric && target.value !== null && target.value !== undefined;
-  svg.setAttribute("aria-label", `${suite.title} ${metricAriaLabel(yMetric)} curves by step`);
   renderChartModeSwitch();
   bindChartExportControls();
-  const width = svg.clientWidth || 740;
-  const height = svg.clientHeight || 420;
+  const width = Math.max(280, Math.round(svg.clientWidth || 740));
+  const height = Math.max(280, Math.round(svg.clientHeight || 420));
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  currentChartModel = buildCurrentFigureModel({
+    profile: "interactive",
+    width,
+    height,
+  });
 
-  const margin = { top: 22, right: 24, bottom: 42, left: 58 };
-  const chartWidth = width - margin.left - margin.right;
-  const chartHeight = height - margin.top - margin.bottom;
+  const model = currentChartModel;
   const hiddenRuns = hiddenPlottedRuns(suite);
-  const runs = chartVisibleRuns(suite).filter((run) => curveAvailable(run, suite));
-  const allPoints = runs.flatMap((run) => pointMetrics(run.run_id, yMetric));
+  const runs = (model?.series || []).map((entry) => runById(entry.runId)).filter(Boolean);
+  const seriesByRun = new Map((model?.series || []).map((entry) => [entry.runId, entry]));
 
-  byId("chartMeta").textContent = showTargetLine
-    ? `${yMetric} with target ${target.value}`
+  byId("chartMeta").textContent = model
+    ? `${model.axes.y.label} by ${model.axes.x.label}${model.target ? ` · ${model.target.label}` : ""}`
     : `${yMetric} by step`;
 
   byId("chartSelectionChips").innerHTML = runs.length
     ? [
         ...runs
         .map(
-          (run, index) => `
-            <button type="button" class="${run.run_id === selectedRunId ? "active" : ""}" data-run-id="${run.run_id}">
-              <span class="legend-swatch" style="background:${runColor(run, index)}"></span>
-              ${escapeHtml(runChipLabel(run, suite))}
+          (run) => {
+            const entry = seriesByRun.get(run.run_id);
+            return `
+            <button
+              type="button"
+              class="${run.run_id === selectedRunId ? "active" : ""}"
+              data-run-id="${escapeHtml(run.run_id)}"
+              data-series-family="${escapeHtml(entry?.style?.family || "other")}"
+              aria-pressed="${run.run_id === selectedRunId}"
+            >
+              <span class="legend-swatch" style="background:${escapeHtml(entry?.style?.color || runColor(run))}"></span>
+              ${escapeHtml(`${shortRunLabel(run)} · ${summaryMetricText(run.run_id, primaryMetricName(suite))}`)}
             </button>
-          `
+          `;
+          }
         ),
         hiddenFilterChip(hiddenRuns),
       ].join("")
@@ -1337,8 +1633,7 @@ function renderChart() {
       : "<span class=\"muted\">No selected runs have drawable curves.</span>";
   byId("chartSelectionChips").querySelectorAll("button[data-run-id]").forEach((button) => {
     button.addEventListener("click", () => {
-      selectedRunId = button.dataset.runId;
-      renderAll();
+      selectRun(button.dataset.runId);
     });
   });
   byId("chartSelectionChips").querySelectorAll("[data-filter-action]").forEach((button) => {
@@ -1353,161 +1648,352 @@ function renderChart() {
       } else {
         resetRunFilters();
       }
-      renderAll();
+      refreshRunViews({ includeDetail: false });
     });
   });
 
-  renderTargetMarkerStrip(suite, runs, markerMetric);
+  renderTargetMarkerStrip(suite, runs, markerMetric, model);
 
-  if (!allPoints.length) {
+  if (!model?.series?.length || !model.stats.points) {
     byId("chartToolbarMeta").textContent = `${runs.length}/${chartSelectionLimit(suite)} visible · ${hiddenRuns.length} hidden by filters`;
     const empty = svgEl("text", { x: 24, y: 48, class: "chart-label" });
     empty.textContent = "Select a run with an available curve.";
     svg.appendChild(empty);
-    byId("chartLegend").innerHTML = "";
     return;
   }
 
-  const markerValues = markerMetric
-    ? runs
-        .map((run) => summaryMetric(run.run_id, markerMetric)?.value)
-        .filter((value) => Number.isFinite(value))
-    : [];
-  const domain = chartDomain(allPoints, markerValues, target, showTargetLine, figure, yMetric);
-  const { xMin, xMax, minValue, maxValue, configuredYMax } = domain;
-  const clippedRuns = configuredYMax
-    ? runs.filter((run) => pointMetrics(run.run_id, yMetric).some((point) => point.value > maxValue)).length
-    : 0;
   byId("chartToolbarMeta").textContent = [
-    `${runs.length}/${chartSelectionLimit(suite)} visible`,
+    `${model.stats.visibleRuns}/${chartSelectionLimit(suite)} visible`,
     hiddenRuns.length ? `${hiddenRuns.length} hidden by filters` : "",
-    chartScaleMode === "tail" ? `Tail step ${TAIL_STEP_MIN}-${TAIL_STEP_MAX}` : "",
-    configuredYMax ? `Zoom y<=${formatMetricValue(yMetric, maxValue)}` : "",
-    chartScaleMode === "full" ? "Full scale" : "",
-    clippedRuns ? `${clippedRuns} ${clippedRuns === 1 ? "run" : "runs"} clipped` : "",
+    chartScaleMode === "full" ? "Full data range" : "",
+    model.clipping.note,
   ].filter(Boolean).join(" · ");
+  svg.setAttribute(
+    "aria-label",
+    `${model.figure.title}. ${model.figure.subtitle}${model.clipping.note ? `. ${model.clipping.note}` : ""}`
+  );
+  const chartTitle = svgEl("title");
+  chartTitle.textContent = model.figure.title;
+  const chartDescription = svgEl("desc");
+  chartDescription.textContent =
+    `${model.figure.subtitle}${model.clipping.note ? `. ${model.clipping.note}` : ""}`;
+  svg.append(chartTitle, chartDescription);
 
-  const x = (step) => margin.left + ((step - xMin) / Math.max(xMax - xMin, 1)) * chartWidth;
-  const y = (value) => margin.top + ((maxValue - value) / (maxValue - minValue)) * chartHeight;
-  const clipId = `chart-clip-${suite.suite_id.replace(/[^a-z0-9_-]/gi, "-")}`;
+  const plot = model.plotRect;
+  const x = (step) => mapFigureValue(step, model.geometry.xScale);
+  const y = (value) => mapFigureValue(value, model.geometry.yScale);
+  const clipId = `chart-clip-${model.figure.id.replace(/[^a-z0-9_-]/gi, "-")}`;
   const defs = svgEl("defs");
   const clipPath = svgEl("clipPath", { id: clipId });
-  clipPath.appendChild(svgEl("rect", { x: margin.left, y: margin.top, width: chartWidth, height: chartHeight }));
+  clipPath.appendChild(svgEl("rect", {
+    x: plot.left,
+    y: plot.top,
+    width: plot.width,
+    height: plot.height,
+  }));
   defs.appendChild(clipPath);
   svg.appendChild(defs);
 
-  niceTicks(minValue, maxValue, 7)
-    .filter((tick) => tick >= minValue && tick <= maxValue)
+  model.axes.y.ticks
+    .filter((tick) => tick >= model.domain.yMin && tick <= model.domain.yMax)
     .forEach((tick) => {
-    svg.appendChild(svgEl("line", { x1: margin.left, x2: margin.left + chartWidth, y1: y(tick), y2: y(tick), class: "gridline" }));
-    const label = svgEl("text", { x: 8, y: y(tick) + 4, class: "chart-label" });
-    label.textContent = formatMetricValue(yMetric, tick);
-    svg.appendChild(label);
-  });
-
-  if (showTargetLine) {
-    svg.appendChild(svgEl("line", { x1: margin.left, x2: margin.left + chartWidth, y1: y(target.value), y2: y(target.value), class: "target-line" }));
-  }
-
-  niceTicks(xMin, xMax, 6)
-    .filter((tick) => tick >= xMin && tick <= xMax)
-    .forEach((tick) => {
-      const tickX = x(tick);
-      svg.appendChild(svgEl("line", { x1: tickX, x2: tickX, y1: margin.top, y2: margin.top + chartHeight, class: "gridline" }));
-      const label = svgEl("text", { x: tickX - 12, y: height - 13, class: "chart-label" });
-      label.textContent = intFmt.format(tick);
+      const tickY = y(tick);
+      svg.appendChild(svgEl("line", {
+        x1: plot.left,
+        x2: plot.right,
+        y1: tickY,
+        y2: tickY,
+        class: "gridline chart-gridline",
+      }));
+      const label = svgEl("text", {
+        x: plot.left - 9,
+        y: tickY + 3.5,
+        class: "chart-label chart-tick-label",
+        "text-anchor": "end",
+      });
+      label.textContent = formatMetricValue(yMetric, tick);
       svg.appendChild(label);
     });
 
-  svg.appendChild(svgEl("line", { x1: margin.left, x2: margin.left, y1: margin.top, y2: margin.top + chartHeight, class: "axis" }));
-  svg.appendChild(svgEl("line", { x1: margin.left, x2: margin.left + chartWidth, y1: margin.top + chartHeight, y2: margin.top + chartHeight, class: "axis" }));
+  const xTicks = model.axes.x.ticks
+    .filter((tick) => tick >= model.domain.xMin && tick <= model.domain.xMax);
+  xTicks.forEach((tick, index) => {
+      const tickX = x(tick);
+      svg.appendChild(svgEl("line", {
+        x1: tickX,
+        x2: tickX,
+        y1: plot.top,
+        y2: plot.bottom,
+        class: "gridline chart-gridline",
+        opacity: "0.55",
+      }));
+      const label = svgEl("text", {
+        x: tickX,
+        y: plot.bottom + 20,
+        class: "chart-label chart-tick-label",
+        "text-anchor": index === 0 ? "start" : index === xTicks.length - 1 ? "end" : "middle",
+      });
+      label.textContent = intFmt.format(tick);
+      svg.appendChild(label);
+  });
+
+  svg.appendChild(svgEl("line", {
+    x1: plot.left,
+    x2: plot.left,
+    y1: plot.top,
+    y2: plot.bottom,
+    class: "axis chart-axis",
+  }));
+  svg.appendChild(svgEl("line", {
+    x1: plot.left,
+    x2: plot.right,
+    y1: plot.bottom,
+    y2: plot.bottom,
+    class: "axis chart-axis",
+  }));
+  const xTitle = svgEl("text", {
+    x: (plot.left + plot.right) / 2,
+    y: plot.bottom + 43,
+    class: "chart-axis-title",
+    "text-anchor": "middle",
+  });
+  xTitle.textContent = model.axes.x.label;
+  svg.appendChild(xTitle);
+  const yTitle = svgEl("text", {
+    transform: `translate(${plot.left - 43} ${(plot.top + plot.bottom) / 2}) rotate(-90)`,
+    class: "chart-axis-title",
+    "text-anchor": "middle",
+  });
+  yTitle.textContent = model.axes.y.label;
+  svg.appendChild(yTitle);
+
+  if (
+    model.target &&
+    model.target.value >= model.domain.yMin &&
+    model.target.value <= model.domain.yMax
+  ) {
+    const targetY = y(model.target.value);
+    svg.appendChild(svgEl("line", {
+      x1: plot.left,
+      x2: plot.right,
+      y1: targetY,
+      y2: targetY,
+      class: "target-line chart-target",
+    }));
+    const targetLabel = svgEl("text", {
+      x: plot.right - 5,
+      y: targetY - 7,
+      class: "chart-target-label target-line-label",
+      "text-anchor": "end",
+    });
+    targetLabel.textContent = model.target.label;
+    svg.appendChild(targetLabel);
+  }
+
+  if (model.clipping.note) {
+    const note = svgEl("text", {
+      x: plot.right,
+      y: Math.max(12, plot.top - 9),
+      class: "chart-clip-note",
+      "text-anchor": "end",
+    });
+    note.textContent = model.clipping.note;
+    svg.appendChild(note);
+  }
 
   const curveLayer = svgEl("g", { "clip-path": `url(#${clipId})` });
   svg.appendChild(curveLayer);
-  const hoverPoints = [];
+  const hoverSeries = [];
 
-  runs.forEach((run, index) => {
-    const points = pointMetrics(run.run_id, yMetric);
-    if (points.length < 2) return;
-    const d = points
-      .map((point, pointIndex) => `${pointIndex === 0 ? "M" : "L"} ${x(point.step).toFixed(2)} ${y(point.value).toFixed(2)}`)
-      .join(" ");
-    const isPartial = run.status !== "completed";
+  model.series.forEach((entry) => {
+    const run = runById(entry.runId);
+    if (!run || !entry.segments.length) return;
+    const baseStyle = globalThis.PortalFigureRuntime.styleForRun(run);
+    const defaultOpacity = entry.status === "completed" ? "0.34" : "0.26";
+    const defaultStrokeWidth = String(baseStyle.strokeWidth || 2.1);
+    const selectedStrokeWidth = String(Math.max(baseStyle.strokeWidth || 2.1, 2.9));
+    const selected = entry.focused;
     const path = svgEl("path", {
-      d,
-      class: `curve ${run.run_role === "ours" ? "ours" : ""} ${isPartial ? "partial" : ""}`,
-      stroke: runColor(run, index),
-      opacity: run.run_id === selectedRunId ? "1" : isPartial ? "0.36" : "0.68",
-      "stroke-dasharray": isPartial ? "6 6" : "none",
+      d: interactivePathData(model, entry.segments),
+      class: [
+        "curve",
+        "series-path",
+        ...entry.style.classes,
+        entry.role === "ours" ? "ours" : "",
+        entry.status !== "completed" ? "partial" : "",
+        selected ? "is-selected selected" : "is-context",
+      ].filter(Boolean).join(" "),
+      stroke: entry.style.color,
+      opacity: selected ? "1" : defaultOpacity,
+      "stroke-width": selected ? selectedStrokeWidth : defaultStrokeWidth,
+      "stroke-dasharray": entry.style.dash || "none",
+      "data-series-role": entry.role,
+      "data-series-family": entry.style.family,
+      "data-chart-run-id": entry.runId,
+      "data-default-opacity": defaultOpacity,
+      "data-selected-opacity": "1",
+      "data-default-stroke-width": defaultStrokeWidth,
+      "data-selected-stroke-width": selectedStrokeWidth,
+      tabindex: "0",
+      role: "button",
+      "aria-label": `Inspect ${run.display_name}`,
+      "aria-current": String(selected),
     });
     path.addEventListener("click", () => {
-      selectedRunId = run.run_id;
-      renderAll();
+      selectRun(entry.runId);
+    });
+    path.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      selectRun(entry.runId);
     });
     curveLayer.appendChild(path);
 
-    points.forEach((point) => {
-      if (point.step < xMin || point.step > xMax) return;
-      if (point.value < minValue || point.value > maxValue) return;
-      hoverPoints.push({
+    const visiblePoints = entry.plotPoints
+      .filter((point) =>
+        point.step >= model.domain.xMin &&
+        point.step <= model.domain.xMax &&
+        point.value >= model.domain.yMin &&
+        point.value <= model.domain.yMax
+      )
+      .map((point) => ({
+        entry,
         run,
-        color: runColor(run, index),
+        color: entry.style.color,
         step: point.step,
         value: point.value,
         x: x(point.step),
         y: y(point.value),
-      });
-
-      const marker = svgEl("circle", {
-        cx: x(point.step),
-        cy: y(point.value),
-        r: run.run_id === selectedRunId ? (chartScaleMode === "full" ? 3 : 3.4) : (chartScaleMode === "full" ? 2.1 : 2.8),
-        class: "curve-point",
-        fill: runColor(run, index),
-        opacity: run.run_id === selectedRunId ? "1" : isPartial ? "0.4" : "0.82",
-      });
-      marker.addEventListener("click", () => {
-        selectedRunId = run.run_id;
-        renderAll();
-      });
-      curveLayer.appendChild(marker);
-    });
+      }));
+    if (visiblePoints.length) hoverSeries.push(visiblePoints);
   });
 
-  if (hoverPoints.length) {
+  model.directLabels.forEach((label) => {
+    const entry = seriesByRun.get(label.runId);
+    if (!entry) return;
+    const selected = entry.focused;
+    const connector = svgEl("line", {
+      x1: label.connector.x1,
+      y1: label.connector.y1,
+      x2: label.connector.x2,
+      y2: label.connector.y2,
+      class: `series-end-connector ${selected ? "is-selected selected" : ""}`,
+      color: entry.style.color,
+      opacity: selected ? "0.82" : "0.42",
+      "data-chart-run-id": entry.runId,
+      "data-default-opacity": "0.42",
+      "data-selected-opacity": "0.82",
+      "aria-current": String(selected),
+    });
+    svg.appendChild(connector);
+    const endpoint = appendSeriesMarker(svg, entry, label.point, {
+      class: [
+        "series-endpoint",
+        entry.status !== "completed" ? "is-partial" : "",
+        selected ? "is-selected selected" : "",
+      ].filter(Boolean).join(" "),
+      opacity: selected ? "1" : "0.48",
+      "data-default-opacity": "0.48",
+      "data-selected-opacity": "1",
+      "aria-current": String(selected),
+    });
+    endpoint.addEventListener("click", () => selectRun(entry.runId));
+    const text = svgEl("text", {
+      x: label.x,
+      y: label.y,
+      "text-anchor": label.textAnchor || "start",
+      class: `series-end-label ${selected ? "is-selected selected" : ""}`,
+      fill: entry.style.color,
+      opacity: selected ? "1" : "0.76",
+      "data-chart-run-id": entry.runId,
+      "data-default-opacity": "0.76",
+      "data-selected-opacity": "1",
+      "aria-current": String(selected),
+    });
+    text.textContent = label.text;
+    text.addEventListener("click", () => selectRun(entry.runId));
+    svg.appendChild(text);
+  });
+
+  model.clipping.runIds.forEach((runId, index) => {
+    const entry = seriesByRun.get(runId);
+    if (!entry) return;
+    const markerX = plot.left + 10 + index * 14;
+    const selected = entry.focused;
+    svg.appendChild(svgEl("path", {
+      d: `M ${markerX} ${plot.top + 3} l 5 -7 l 5 7 Z`,
+      class: `chart-clip-marker ${selected ? "is-selected selected" : ""}`,
+      fill: entry.style.color,
+      opacity: selected ? "1" : "0.58",
+      "data-chart-run-id": entry.runId,
+      "data-default-opacity": "0.58",
+      "data-selected-opacity": "1",
+      "aria-current": String(selected),
+    }));
+  });
+
+  if (hoverSeries.length) {
     const hoverLayer = svgEl("g", { class: "chart-hover", style: "display:none" });
     const crosshair = svgEl("line", {
-      y1: margin.top,
-      y2: margin.top + chartHeight,
+      y1: plot.top,
+      y2: plot.bottom,
       class: "chart-crosshair",
     });
     const focus = svgEl("circle", { r: 5, class: "chart-focus" });
+    const tooltipWidth = Math.min(286, Math.max(188, plot.width - 20));
+    const tooltipHeight = model.target ? 98 : 84;
     const tooltip = svgEl("g", { class: "chart-tooltip" });
-    const tooltipRect = svgEl("rect", { rx: 7, ry: 7, width: 276, height: 96 });
-    const tooltipTitle = svgEl("text", { x: 10, y: 20, class: "chart-tooltip-title" });
-    const tooltipSource = svgEl("text", { x: 10, y: 40, class: "chart-tooltip-text" });
-    const tooltipStep = svgEl("text", { x: 10, y: 60, class: "chart-tooltip-text" });
-    const tooltipRun = svgEl("text", { x: 10, y: 80, class: "chart-tooltip-text" });
-    tooltip.append(tooltipRect, tooltipTitle, tooltipSource, tooltipStep, tooltipRun);
+    const tooltipRect = svgEl("rect", {
+      rx: 7,
+      ry: 7,
+      width: tooltipWidth,
+      height: tooltipHeight,
+    });
+    const tooltipTitle = svgEl("text", { x: 11, y: 20, class: "chart-tooltip-title" });
+    const tooltipSource = svgEl("text", { x: 11, y: 39, class: "chart-tooltip-text" });
+    const tooltipValue = svgEl("text", { x: 11, y: 59, class: "chart-tooltip-value" });
+    const tooltipContext = svgEl("text", {
+      x: 11,
+      y: model.target ? 79 : 76,
+      class: model.target ? "chart-tooltip-target-gap" : "chart-tooltip-text",
+    });
+    tooltip.append(tooltipRect, tooltipTitle, tooltipSource, tooltipValue, tooltipContext);
     hoverLayer.append(crosshair, focus, tooltip);
     svg.appendChild(hoverLayer);
 
     const overlay = svgEl("rect", {
-      x: margin.left,
-      y: margin.top,
-      width: chartWidth,
-      height: chartHeight,
+      x: plot.left,
+      y: plot.top,
+      width: plot.width,
+      height: plot.height,
       class: "chart-hover-capture",
     });
-    overlay.addEventListener("pointermove", (event) => {
+
+    const nearestPoint = (event) => {
+      const matrix = svg.getScreenCTM();
+      if (!matrix) return null;
       const point = svg.createSVGPoint();
       point.x = event.clientX;
       point.y = event.clientY;
-      const local = point.matrixTransform(svg.getScreenCTM().inverse());
-      const nearest = hoverPoints.reduce((best, candidate) => {
-        const distance = Math.abs(candidate.x - local.x) * 1.6 + Math.abs(candidate.y - local.y);
-        return !best || distance < best.distance ? { ...candidate, distance } : best;
+      const local = point.matrixTransform(matrix.inverse());
+      return hoverSeries.reduce((best, series) => {
+        let low = 0;
+        let high = series.length - 1;
+        while (low < high) {
+          const middle = Math.floor((low + high) / 2);
+          if (series[middle].x < local.x) low = middle + 1;
+          else high = middle;
+        }
+        const candidates = [series[low], series[Math.max(0, low - 1)]].filter(Boolean);
+        return candidates.reduce((seriesBest, candidate) => {
+          const distance = Math.abs(candidate.x - local.x) * 1.6 + Math.abs(candidate.y - local.y);
+          return !seriesBest || distance < seriesBest.distance ? { ...candidate, distance } : seriesBest;
+        }, best);
       }, null);
+    };
+
+    const showNearest = (event) => {
+      const nearest = nearestPoint(event);
       if (!nearest) return;
       hoverLayer.setAttribute("style", "display:block");
       crosshair.setAttribute("x1", nearest.x);
@@ -1516,36 +2002,45 @@ function renderChart() {
       focus.setAttribute("cy", nearest.y);
       focus.setAttribute("fill", nearest.color);
       const rank = nearest.run.leaderboard_meta?.rank_label || roleLabel(nearest.run);
-      tooltipTitle.textContent = `${rank} ${nearest.run.display_name}`;
-      tooltipSource.textContent = `${roleFilterLabel(suite)} ${roleLabel(nearest.run)} · ${nearest.run.status}`;
-      tooltipStep.textContent = `step ${intFmt.format(nearest.step)} · ${yMetric} ${formatMetricValue(yMetric, nearest.value)}`;
-      tooltipRun.textContent = `run_id ${nearest.run.run_id}`;
-      const tooltipX = Math.min(Math.max(nearest.x + 12, margin.left), margin.left + chartWidth - 276);
-      const tooltipY = Math.min(Math.max(nearest.y - 108, margin.top), margin.top + chartHeight - 98);
+      tooltipTitle.textContent = compactTooltipText(`${rank} ${nearest.run.display_name}`, width < 720 ? 32 : 44);
+      tooltipSource.textContent = compactTooltipText(
+        `${roleFilterLabel(suite)} ${roleLabel(nearest.run)} · ${nearest.run.status}`,
+        width < 720 ? 35 : 48
+      );
+      tooltipValue.textContent =
+        `step ${intFmt.format(nearest.step)} · ${yMetric} ${formatMetricValue(yMetric, nearest.value)}`;
+      tooltipContext.textContent = model.target
+        ? `target gap ${nearest.value - model.target.value >= 0 ? "+" : ""}${formatMetricValue(yMetric, nearest.value - model.target.value)}`
+        : compactTooltipText(`run_id ${nearest.run.run_id}`, width < 720 ? 35 : 48);
+      const preferredX = nearest.x + 14 + tooltipWidth <= width - 6
+        ? nearest.x + 14
+        : nearest.x - tooltipWidth - 14;
+      const tooltipX = Math.min(Math.max(preferredX, 4), width - tooltipWidth - 4);
+      const tooltipY = Math.min(
+        Math.max(nearest.y - tooltipHeight / 2, plot.top + 4),
+        plot.bottom - tooltipHeight - 4
+      );
       tooltip.setAttribute("transform", `translate(${tooltipX}, ${tooltipY})`);
+      overlay.dataset.nearestRunId = nearest.entry.runId;
+      return nearest;
+    };
+
+    overlay.addEventListener("pointermove", showNearest);
+    overlay.addEventListener("pointerdown", (event) => {
+      const nearest = showNearest(event);
+      overlay.dataset.pointerDownRunId = nearest?.entry?.runId || "";
+    });
+    overlay.addEventListener("click", (event) => {
+      const nearest = showNearest(event);
+      const runId = nearest?.entry?.runId || overlay.dataset.nearestRunId;
+      if (runId) selectRun(runId);
     });
     overlay.addEventListener("pointerleave", () => {
       hoverLayer.setAttribute("style", "display:none");
+      overlay.dataset.pointerDownRunId = "";
     });
     svg.appendChild(overlay);
   }
-
-  byId("chartLegend").innerHTML = runs
-    .map(
-      (run, index) => `
-        <button type="button" data-run-id="${run.run_id}" aria-label="Inspect ${run.display_name}">
-          <span class="legend-swatch" style="background:${runColor(run, index)}"></span>
-          ${escapeHtml(run.display_name)}${run.status !== "completed" ? " · partial" : ""}
-        </button>
-      `
-    )
-    .join("");
-  byId("chartLegend").querySelectorAll("button").forEach((button) => {
-    button.addEventListener("click", () => {
-      selectedRunId = button.dataset.runId;
-      renderAll();
-    });
-  });
 }
 
 function listRuns(runIds) {
@@ -1583,6 +2078,11 @@ function renderRunDetail() {
   const meta = run.leaderboard_meta || {};
   const primary = primaryMetricName(suite);
   const target = suite.target || {};
+  const primaryDisplay = summary[primary]
+    ? summaryMetricText(run.run_id, primary)
+    : targetStatus({ run, metrics: summary }, suite) === "not_reached"
+      ? "Not reached"
+      : "n/a";
   const targetGap =
     target.metric_name === "val_loss" && summary.final_val_loss && target.value !== null && target.value !== undefined
       ? summary.final_val_loss.value - target.value
@@ -1599,7 +2099,7 @@ function renderRunDetail() {
       ${metricLine("run_id", run.run_id)}
       ${metricLine("role", roleLabel(run))}
       ${metricLine("status", run.status)}
-      ${metricLine("primary_metric", summaryMetricText(run.run_id, primary))}
+      ${metricLine("primary_metric", primaryDisplay)}
       ${meta.rank_label ? metricLine("reference_rank", meta.rank_label) : ""}
       ${meta.evidence ? metricLine("reference_evidence", meta.evidence) : ""}
       ${meta.date ? metricLine("reference_date", meta.date) : ""}
@@ -1640,9 +2140,14 @@ function renderRunDetail() {
   const copy = byId("copySource");
   const sourcePath = source.log_path || source.csv_path || source.config_path || "n/a";
   if (copy) {
+    copy.setAttribute("aria-live", "polite");
     copy.addEventListener("click", async () => {
-      await navigator.clipboard.writeText(sourcePath);
-      copy.textContent = "Copied source path";
+      try {
+        await navigator.clipboard.writeText(sourcePath);
+        copy.textContent = "Copied source path";
+      } catch {
+        copy.textContent = "Copy failed";
+      }
       setTimeout(() => {
         copy.textContent = "Copy source path";
       }, 1200);
@@ -1704,7 +2209,7 @@ function renderDataHealth() {
   });
 
   byId("dataHealthSummary").textContent =
-    `${portalData.runs.length} runs · ${portalData.metrics.length} metrics · ${portalData.figures.length} figures · validation passed`;
+    `${portalData.runs.length} runs · ${portalData.metrics.length} metrics · ${portalData.figures.length} figures · snapshot loaded`;
 
   byId("dataHealth").innerHTML = `
     ${metricLine("generated_at", portalData.meta?.generated_at || "n/a")}
@@ -1716,8 +2221,9 @@ function renderDataHealth() {
   `;
 }
 
-function renderAll() {
+function renderSuiteView() {
   const suite = activeSuite();
+  normalizeChartScaleMode(suite);
   renderOverview();
   renderSuiteCards();
   renderSuiteHeader(suite);
@@ -1739,17 +2245,197 @@ function renderAll() {
   renderPlaceholder(suite);
 }
 
-async function start() {
-  const response = await fetch("data/portal-data.json");
-  portalData = await response.json();
-  selectedSuiteId = portalData.suites.find((suite) => suite.status === "active")?.suite_id || portalData.suites[0]?.suite_id;
-  const suite = activeSuite();
-  initializeChartSelection(suite);
-  selectedRunId = firstChartRun(suite)?.run_id || null;
-  renderAll();
-  window.addEventListener("resize", renderChart);
+function setPortalStatus(message, state) {
+  const pill = document.querySelector(".source-pill");
+  if (!pill) return;
+  pill.dataset.state = state;
+  pill.setAttribute("aria-live", "polite");
+  let label = pill.querySelector(".source-pill-label");
+  if (!label) {
+    label = document.createElement("span");
+    label.className = "source-pill-label";
+    Array.from(pill.childNodes)
+      .filter((node) => node.nodeType === Node.TEXT_NODE)
+      .forEach((node) => node.remove());
+    pill.appendChild(label);
+  }
+  label.textContent = message;
 }
 
-start().catch((error) => {
-  document.body.innerHTML = `<main><h1>Portal failed to load</h1><pre>${error.stack || error}</pre></main>`;
-});
+function setLoadingState(isLoading) {
+  const main = document.querySelector("main");
+  if (main) main.setAttribute("aria-busy", String(isLoading));
+  if (isLoading) {
+    byId("portalLoadError")?.remove();
+    setPortalStatus("Loading curated snapshot", "loading");
+  }
+}
+
+function renderLoadError(error) {
+  const main = document.querySelector("main");
+  if (!main) return;
+  const isLocalFile = window.location.protocol === "file:";
+  setLoadingState(false);
+  setPortalStatus("Snapshot unavailable", "error");
+  let panel = byId("portalLoadError");
+  if (!panel) {
+    panel = document.createElement("section");
+    panel.id = "portalLoadError";
+    panel.className = "panel load-error";
+    panel.setAttribute("role", "alert");
+    main.prepend(panel);
+  }
+  panel.innerHTML = `
+    <p class="panel-kicker">Snapshot error</p>
+    <h2>${isLocalFile ? "The local snapshot bundle could not be loaded." : "The curated results could not be loaded."}</h2>
+    <p class="muted wide-muted">${
+      isLocalFile
+        ? "Rebuild <code>data/portal-data.js</code>, then retry. The canonical JSON has not been changed."
+        : "Check the connection, then retry. Existing source data has not been changed."
+    }</p>
+    <button type="button" id="retryPortalLoad">Retry loading</button>
+    <details>
+      <summary>Technical detail</summary>
+      <pre>${escapeHtml(error?.message || String(error))}</pre>
+    </details>
+  `;
+  byId("retryPortalLoad")?.addEventListener("click", start);
+}
+
+function scheduleChartResize() {
+  if (chartResizeFrame || !portalData || !byId("lossChart") || byId("suiteDataPanel")?.hidden) return;
+  chartResizeFrame = requestAnimationFrame(() => {
+    chartResizeFrame = 0;
+    renderChart();
+  });
+}
+
+function initializeResponsiveChart() {
+  chartResizeObserver?.disconnect();
+  if (typeof ResizeObserver === "function") {
+    chartResizeObserver = new ResizeObserver(scheduleChartResize);
+    const frame = byId("lossChart")?.parentElement;
+    if (frame) chartResizeObserver.observe(frame);
+  }
+  if (!initializeResponsiveChart.windowBound) {
+    window.addEventListener("resize", scheduleChartResize, { passive: true });
+    window.addEventListener("popstate", () => {
+      if (!portalData) return;
+      clearTimeout(runSearchTimer);
+      resetRunFilters();
+      applyUrlState();
+      renderSuiteView();
+    });
+    initializeResponsiveChart.windowBound = true;
+  }
+}
+
+async function loadPortalSnapshot() {
+  if (window.location.protocol === "file:") {
+    if (globalThis.__PORTAL_DATA__) return globalThis.__PORTAL_DATA__;
+
+    await new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "data/portal-data.js";
+      script.onload = () => {
+        script.remove();
+        if (globalThis.__PORTAL_DATA__) {
+          resolve();
+        } else {
+          reject(new Error("data/portal-data.js loaded without defining globalThis.__PORTAL_DATA__"));
+        }
+      };
+      script.onerror = () => {
+        script.remove();
+        reject(
+          new Error(
+            "Local snapshot bundle is missing or invalid. Run `python3 scripts/build_portal_data_bundle.py`."
+          )
+        );
+      };
+      document.head.appendChild(script);
+    });
+
+    return globalThis.__PORTAL_DATA__;
+  }
+
+  const response = await fetch("data/portal-data.json", { cache: "no-cache" });
+  if (!response.ok) throw new Error(`Snapshot request failed with HTTP ${response.status}`);
+  return response.json();
+}
+
+async function start() {
+  setLoadingState(true);
+  try {
+    portalData = await loadPortalSnapshot();
+    buildDataIndex(portalData);
+    selectedSuiteId =
+      portalData.suites.find((suite) => suite.status === "active")?.suite_id ||
+      portalData.suites[0]?.suite_id;
+    applyUrlState();
+    renderSuiteView();
+    initializeResponsiveChart();
+    syncUrlState();
+    setLoadingState(false);
+    setPortalStatus("Curated static snapshot", "ready");
+  } catch (error) {
+    renderLoadError(error);
+  }
+}
+
+function installPortalTestApi() {
+  globalThis.__PORTAL_TEST__ = {
+    setData(data) {
+      portalData = data;
+      buildDataIndex(data);
+      selectedSuiteId =
+        data.suites.find((suite) => suite.status === "active")?.suite_id ||
+        data.suites[0]?.suite_id ||
+        null;
+      chartScaleMode = "full";
+      resetRunFilters();
+      const suite = activeSuite();
+      if (suite) {
+        initializeChartSelection(suite);
+        selectedRunId = firstChartRun(suite)?.run_id || null;
+      }
+      return this.getState();
+    },
+    getLeaderboardRows(suiteId = selectedSuiteId) {
+      const suite = suiteById(suiteId);
+      return suite ? eligibleRows(suite).slice() : [];
+    },
+    selectRun(runId) {
+      const run = runById(runId);
+      if (!run || run.suite_id !== selectedSuiteId) return false;
+      selectedRunId = runId;
+      return true;
+    },
+    getState() {
+      return {
+        selectedSuiteId,
+        selectedRunId,
+        chartScaleMode,
+        selectedChartRunIds: Array.from(selectedChartRunIds),
+      };
+    },
+    diagnostics() {
+      return {
+        suites: dataIndex?.suitesById.size || 0,
+        runs: dataIndex?.runsById.size || 0,
+        metrics: portalData?.metrics?.length || 0,
+        indexedSummaryRuns: dataIndex?.summaryByRun.size || 0,
+        indexedPointRuns: dataIndex?.pointsByRunMetric.size || 0,
+        leaderboardRows: Object.fromEntries(
+          Array.from(dataIndex?.leaderboardRowsBySuite || []).map(([suiteId, rows]) => [suiteId, rows.length])
+        ),
+      };
+    },
+  };
+}
+
+if (globalThis.__PORTAL_TEST_MODE__) {
+  installPortalTestApi();
+} else {
+  start();
+}
