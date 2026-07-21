@@ -1,5 +1,5 @@
 {
-  "delivery_id": "sha256:5d461cfc37e113595c0c05c65c40cd673563983b43390a6ba4fb9b50f91e8572",
+  "delivery_id": "sha256:1704d22953698285eb3ade871f0baaf9e043a95aa775c7b7bbe572cbcd2d8f9d",
   "suite_id": "paper-llama-124m-bs256-2p1b",
   "runs": [
     {
@@ -2047,6 +2047,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/8zox16ll/wandb-summary.json"
     },
     {
+      "metric_id": "m-paper-paper-llama-124m-bs256-2p1b-adamw-last-observed-loss",
+      "run_id": "paper-paper-llama-124m-bs256-2p1b-adamw",
+      "metric_scope": "summary",
+      "step": 16000,
+      "tokens_seen": 2097152000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.418182134628296,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/8zox16ll/wandb-summary.json"
+    },
+    {
       "metric_id": "m-paper-paper-llama-124m-bs256-2p1b-adamw-best-loss",
       "run_id": "paper-paper-llama-124m-bs256-2p1b-adamw",
       "metric_scope": "summary",
@@ -3770,6 +3782,18 @@
       "tokens_seen": 2097152000,
       "wall_time_sec": null,
       "metric_name": "final_val_loss",
+      "value": 5.667832374572754,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/wphtita6/wandb-summary.json"
+    },
+    {
+      "metric_id": "m-paper-paper-llama-124m-bs256-2p1b-adopt-last-observed-loss",
+      "run_id": "paper-paper-llama-124m-bs256-2p1b-adopt",
+      "metric_scope": "summary",
+      "step": 16000,
+      "tokens_seen": 2097152000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
       "value": 5.667832374572754,
       "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/wphtita6/wandb-summary.json"
@@ -5503,6 +5527,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/ezugx63b/wandb-summary.json"
     },
     {
+      "metric_id": "m-paper-paper-llama-124m-bs256-2p1b-ademamix-last-observed-loss",
+      "run_id": "paper-paper-llama-124m-bs256-2p1b-ademamix",
+      "metric_scope": "summary",
+      "step": 16000,
+      "tokens_seen": 2097152000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.374699831008911,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/ezugx63b/wandb-summary.json"
+    },
+    {
       "metric_id": "m-paper-paper-llama-124m-bs256-2p1b-ademamix-best-loss",
       "run_id": "paper-paper-llama-124m-bs256-2p1b-ademamix",
       "metric_scope": "summary",
@@ -7231,6 +7267,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/v1d9yrvu/wandb-summary.json"
     },
     {
+      "metric_id": "m-paper-paper-llama-124m-bs256-2p1b-prodigy-last-observed-loss",
+      "run_id": "paper-paper-llama-124m-bs256-2p1b-prodigy",
+      "metric_scope": "summary",
+      "step": 16000,
+      "tokens_seen": 2097152000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.3980274200439453,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/v1d9yrvu/wandb-summary.json"
+    },
+    {
       "metric_id": "m-paper-paper-llama-124m-bs256-2p1b-prodigy-best-loss",
       "run_id": "paper-paper-llama-124m-bs256-2p1b-prodigy",
       "metric_scope": "summary",
@@ -8954,6 +9002,18 @@
       "tokens_seen": 2097152000,
       "wall_time_sec": null,
       "metric_name": "final_val_loss",
+      "value": 3.3882784843444824,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/okjt7cve/wandb-summary.json"
+    },
+    {
+      "metric_id": "m-paper-paper-llama-124m-bs256-2p1b-mars-last-observed-loss",
+      "run_id": "paper-paper-llama-124m-bs256-2p1b-mars",
+      "metric_scope": "summary",
+      "step": 16000,
+      "tokens_seen": 2097152000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
       "value": 3.3882784843444824,
       "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/okjt7cve/wandb-summary.json"

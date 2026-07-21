@@ -1,4 +1,33 @@
 const SEARCH_DEBOUNCE_MS = 140;
+const BENCHMARK_DRAWER_OPEN_INTENT_MS = 100;
+const BENCHMARK_DRAWER_CLOSE_GRACE_MS = 160;
+const PAGE_VIEW_HOME_HASH = "#home";
+const PAGE_VIEW_WORKSPACE_HASH = "#workspace-start";
+const PAGE_VIEW_DETAIL_HASH = "#detailBand";
+
+const portalI18n = globalThis.PortalI18n || {
+  getLocale: () => "en",
+  resolveLocale: () => "en",
+  t: (key) => key,
+  setLocale: () => false,
+  applyStatic: () => {},
+  subscribe: () => () => {},
+};
+
+function uiText(key, variables = {}) {
+  return portalI18n.t(key, variables);
+}
+
+function localizedSuiteStatus(status) {
+  const normalized = String(status || "").trim().toLowerCase();
+  const key = {
+    active: "status.active",
+    partial: "status.partial",
+    planned: "status.planned",
+    view: "status.view",
+  }[normalized];
+  return key ? uiText(key) : status;
+}
 
 let portalData;
 let portalCatalog;
@@ -7,16 +36,12 @@ let dataIndex;
 let selectedSuiteId;
 let selectedRunId;
 let selectedChartRunIds = new Set();
-let referenceHistoryOpen = {};
+let rankedRunGroupState = {};
 let chartSelectionNotice = "";
 let chartScaleMode = "full";
-let focusedChartRunId = null;
+let focusedChartRunIds = new Set();
+let chartLabelMode = "none";
 let runFilterText = "";
-let runFilterRole = "all";
-let runFilterFamily = "all";
-let runFilterStatus = "all";
-let runFilterTarget = "all";
-let runFilterCurve = "all";
 let runSearchTimer = 0;
 let chartResizeFrame = 0;
 let chartResizeObserver;
@@ -25,6 +50,23 @@ let activeSuiteShardId = null;
 let pendingSuiteId = null;
 let protocolSwitchError = "";
 let suiteLoadGeneration = 0;
+let revealControllerInstalled = false;
+let entryControllerInstalled = false;
+let initialEntryResolved = false;
+let benchmarkDrawerOpen = false;
+let benchmarkDrawerOpenTimer = 0;
+let benchmarkDrawerCloseTimer = 0;
+let benchmarkDrawerTrigger = null;
+let benchmarkDrawerControllerInstalled = false;
+let benchmarkDrawerPointerInside = false;
+let benchmarkDrawerPointerDownInside = false;
+let benchmarkDrawerKeyboardFocusInside = false;
+let benchmarkDrawerLoadingHold = 0;
+let benchmarkDrawerSuiteActivationHold = false;
+let localeControllerInstalled = false;
+let pageViewSyncFrame = 0;
+let pageViewUrlSyncEnabled = false;
+let pendingPageViewHash = "";
 
 const suiteShardCache = new Map();
 const suiteShardRequests = new Map();
@@ -32,8 +74,836 @@ const suiteShardRequests = new Map();
 const fmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 5 });
 const intFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
+function normalizedPageViewHash(hash) {
+  const value = String(hash || "");
+  if (value === "#suiteLandingAnchor") return PAGE_VIEW_WORKSPACE_HASH;
+  if ([PAGE_VIEW_HOME_HASH, PAGE_VIEW_WORKSPACE_HASH, PAGE_VIEW_DETAIL_HASH].includes(value)) {
+    return value;
+  }
+  if (value.length > 1) return value;
+  return "";
+}
+
+const initialDeepLinkState = (() => {
+  if (!globalThis.location) {
+    return {
+      suite: false,
+      hash: "",
+      pageHash: "",
+    };
+  }
+  try {
+    const params = new URLSearchParams(globalThis.location.search || "");
+    const suite = params.has("suite");
+    const hash = globalThis.location.hash || "";
+    return {
+      suite,
+      hash,
+      pageHash: normalizedPageViewHash(hash),
+    };
+  } catch {
+    return {
+      suite: false,
+      hash: "",
+      pageHash: "",
+    };
+  }
+})();
+let activePageViewHash = initialDeepLinkState.pageHash;
+let benchmarkWorkspaceEngaged = Boolean(
+  activePageViewHash && activePageViewHash !== PAGE_VIEW_HOME_HASH
+);
+
 function byId(id) {
   return document.getElementById(id);
+}
+
+function prefersReducedMotion() {
+  return Boolean(
+    globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
+  );
+}
+
+function pageViewHashFromViewport() {
+  if (!globalThis.document) {
+    return activePageViewHash || PAGE_VIEW_HOME_HASH;
+  }
+  const topbarHeight =
+    globalThis.document.querySelector(".topbar")?.getBoundingClientRect?.().height || 0;
+  const viewportHeight = Math.max(0, Number(globalThis.innerHeight) || 0);
+  const probeLine = topbarHeight + Math.min(220, Math.max(96, viewportHeight * 0.25));
+  const detail = byId("detailBand");
+  if (
+    detail &&
+    !detail.hidden &&
+    (detail.getBoundingClientRect?.().top ?? Number.POSITIVE_INFINITY) <= probeLine
+  ) {
+    return PAGE_VIEW_DETAIL_HASH;
+  }
+  const workspace = byId("workspace-start");
+  if (
+    workspace &&
+    (workspace.getBoundingClientRect?.().top ?? Number.POSITIVE_INFINITY) <= probeLine
+  ) {
+    return PAGE_VIEW_WORKSPACE_HASH;
+  }
+  return PAGE_VIEW_HOME_HASH;
+}
+
+function writePageViewHash(hash, { push = false } = {}) {
+  const normalized = normalizedPageViewHash(hash);
+  if (!normalized) return false;
+  activePageViewHash = normalized;
+  if (!globalThis.location || !globalThis.history?.replaceState) return false;
+  const url = new URL(globalThis.location.href);
+  if (url.hash === normalized) return false;
+  url.hash = normalized;
+  const nextLocation = `${url.pathname}${url.search}${url.hash}`;
+  if (push && typeof globalThis.history.pushState === "function") {
+    globalThis.history.pushState(globalThis.history.state, "", nextLocation);
+  } else {
+    globalThis.history.replaceState(globalThis.history.state, "", nextLocation);
+  }
+  return true;
+}
+
+function syncPageViewHashFromViewport() {
+  if (!pageViewUrlSyncEnabled) return false;
+  const nextHash = pageViewHashFromViewport();
+  if (pendingPageViewHash && nextHash !== pendingPageViewHash) return false;
+  if (pendingPageViewHash === nextHash) pendingPageViewHash = "";
+  return writePageViewHash(nextHash);
+}
+
+function schedulePageViewHashSync() {
+  if (!pageViewUrlSyncEnabled || pageViewSyncFrame) return;
+  const sync = () => {
+    pageViewSyncFrame = 0;
+    syncPageViewHashFromViewport();
+  };
+  if (typeof globalThis.requestAnimationFrame === "function") {
+    pageViewSyncFrame = globalThis.requestAnimationFrame(sync);
+  } else {
+    sync();
+  }
+}
+
+function cancelPendingPageViewNavigation() {
+  pendingPageViewHash = "";
+  schedulePageViewHashSync();
+}
+
+function revealDeepLinkTargets(elements) {
+  const targets = new Set();
+  const addClosestReveal = (element) => {
+    const revealElement = element?.closest?.("[data-reveal]");
+    if (revealElement && elements.includes(revealElement)) targets.add(revealElement);
+  };
+
+  if (initialDeepLinkState.hash.length > 1) {
+    try {
+      addClosestReveal(byId(decodeURIComponent(initialDeepLinkState.hash.slice(1))));
+    } catch {
+      // An invalid fragment should not prevent the rest of the portal from revealing.
+    }
+  }
+  if (initialDeepLinkState.suite && initialDeepLinkState.hash !== "#home") {
+    addClosestReveal(byId("suite-title"));
+  }
+  return targets;
+}
+
+function installRevealController() {
+  if (revealControllerInstalled) return;
+  revealControllerInstalled = true;
+
+  const root = document.documentElement;
+  const elements = Array.from(document.querySelectorAll("[data-reveal]"));
+  const reveal = (element) => element.classList.add("is-revealed");
+
+  if (!elements.length) {
+    root.classList.add("reveal-ready");
+    return;
+  }
+
+  if (
+    prefersReducedMotion() ||
+    typeof globalThis.IntersectionObserver !== "function"
+  ) {
+    elements.forEach(reveal);
+    root.classList.add("reveal-ready");
+    return;
+  }
+
+  const immediateTargets = revealDeepLinkTargets(elements);
+  immediateTargets.forEach(reveal);
+
+  const observer = new globalThis.IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        reveal(entry.target);
+        observer.unobserve(entry.target);
+      });
+    },
+    {
+      rootMargin: "0px 0px -8% 0px",
+      threshold: 0.08,
+    }
+  );
+
+  elements.forEach((element) => {
+    if (!immediateTargets.has(element)) observer.observe(element);
+  });
+  root.classList.add("reveal-ready");
+}
+
+function desktopBenchmarkDock() {
+  return Boolean(globalThis.matchMedia?.("(min-width: 1120px)")?.matches);
+}
+
+function clearBenchmarkDrawerTimers() {
+  clearTimeout(benchmarkDrawerOpenTimer);
+  clearTimeout(benchmarkDrawerCloseTimer);
+  benchmarkDrawerOpenTimer = 0;
+  benchmarkDrawerCloseTimer = 0;
+}
+
+function setBenchmarkDrawerOpen(open, { restoreFocus = false } = {}) {
+  const dock = byId("benchmarkDock");
+  const toggle = byId("benchmarkDrawerToggle");
+  const nextOpen = Boolean(open && desktopBenchmarkDock());
+  const wasOpen = benchmarkDrawerOpen;
+  benchmarkDrawerOpen = nextOpen;
+  document.documentElement.classList.toggle("benchmark-drawer-open", nextOpen);
+  dock?.setAttribute("data-drawer-open", String(nextOpen));
+  toggle?.setAttribute("aria-expanded", String(nextOpen));
+  toggle?.setAttribute(
+    "aria-label",
+    nextOpen
+      ? uiText("a11y.collapse_benchmarks")
+      : uiText("a11y.expand_benchmarks")
+  );
+
+  if (nextOpen) {
+    clearBenchmarkDrawerTimers();
+    if (!wasOpen) {
+      const selected = dock?.querySelector(".suite-card[aria-pressed=\"true\"]");
+      selected?.scrollIntoView({ behavior: "auto", block: "nearest", inline: "nearest" });
+    }
+    return;
+  }
+
+  if (restoreFocus) {
+    const focusTarget =
+      benchmarkDrawerTrigger?.isConnected ? benchmarkDrawerTrigger : toggle;
+    focusTarget?.focus({ preventScroll: true });
+  }
+}
+
+function benchmarkPointerInsideDockBounds(event, dock = byId("benchmarkDock")) {
+  if (!dock) return false;
+  const clientX = Number(event?.clientX);
+  const clientY = Number(event?.clientY);
+  if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) {
+    return dock.contains(event?.target);
+  }
+  const rect = dock.getBoundingClientRect();
+  return (
+    clientX >= rect.left &&
+    clientX <= rect.right &&
+    clientY >= rect.top &&
+    clientY <= rect.bottom
+  );
+}
+
+function syncBenchmarkDrawerAvailability(available) {
+  const dock = byId("benchmarkDock");
+  if (!dock) return;
+  const nextAvailable = Boolean(available);
+  if (typeof dock.toggleAttribute === "function") {
+    dock.toggleAttribute("inert", !nextAvailable);
+  } else if (nextAvailable) {
+    dock.removeAttribute?.("inert");
+  } else {
+    dock.setAttribute("inert", "");
+  }
+  dock.setAttribute("aria-hidden", String(!nextAvailable));
+  if (nextAvailable) return;
+
+  benchmarkDrawerPointerInside = false;
+  benchmarkDrawerPointerDownInside = false;
+  benchmarkDrawerSuiteActivationHold = false;
+  benchmarkDrawerKeyboardFocusInside = false;
+  benchmarkDrawerLoadingHold = 0;
+  clearBenchmarkDrawerTimers();
+  setBenchmarkDrawerOpen(false);
+}
+
+function benchmarkDrawerCloseBlocked() {
+  return Boolean(
+    benchmarkDrawerLoadingHold ||
+      benchmarkDrawerSuiteActivationHold ||
+      benchmarkDrawerPointerInside ||
+      benchmarkDrawerKeyboardFocusInside
+  );
+}
+
+function scheduleBenchmarkDrawerClose() {
+  clearTimeout(benchmarkDrawerCloseTimer);
+  benchmarkDrawerCloseTimer = 0;
+  if (benchmarkDrawerCloseBlocked()) return;
+  benchmarkDrawerCloseTimer = globalThis.setTimeout(() => {
+    benchmarkDrawerCloseTimer = 0;
+    if (benchmarkDrawerCloseBlocked()) return;
+    setBenchmarkDrawerOpen(false);
+  }, BENCHMARK_DRAWER_CLOSE_GRACE_MS);
+}
+
+function scheduleBenchmarkDrawerOpen() {
+  clearTimeout(benchmarkDrawerOpenTimer);
+  benchmarkDrawerOpenTimer = 0;
+  if (benchmarkDrawerOpen || !desktopBenchmarkDock()) return;
+  benchmarkDrawerOpenTimer = globalThis.setTimeout(() => {
+    benchmarkDrawerOpenTimer = 0;
+    if (benchmarkDrawerPointerInside || benchmarkDrawerLoadingHold) {
+      setBenchmarkDrawerOpen(true);
+    }
+  }, BENCHMARK_DRAWER_OPEN_INTENT_MS);
+}
+
+function holdBenchmarkDrawerForSuiteLoad(generation) {
+  if (!desktopBenchmarkDock()) return;
+  benchmarkDrawerLoadingHold = generation;
+  setBenchmarkDrawerOpen(true);
+}
+
+function releaseBenchmarkDrawerSuiteLoad(generation, { failed = false } = {}) {
+  if (benchmarkDrawerLoadingHold !== generation) return;
+  benchmarkDrawerLoadingHold = 0;
+  if (failed) {
+    setBenchmarkDrawerOpen(true);
+    return;
+  }
+  if (!benchmarkDrawerCloseBlocked()) {
+    scheduleBenchmarkDrawerClose();
+  }
+}
+
+function installBenchmarkDrawerController() {
+  if (benchmarkDrawerControllerInstalled) return;
+  benchmarkDrawerControllerInstalled = true;
+  const dock = byId("benchmarkDock");
+  const toggle = byId("benchmarkDrawerToggle");
+  if (!dock || !toggle) return;
+
+  toggle.addEventListener("click", () => {
+    benchmarkDrawerTrigger = toggle;
+    if (benchmarkDrawerOpen) benchmarkDrawerSuiteActivationHold = false;
+    clearBenchmarkDrawerTimers();
+    setBenchmarkDrawerOpen(!benchmarkDrawerOpen);
+  });
+  dock.addEventListener("pointerenter", () => {
+    benchmarkDrawerPointerInside = true;
+    clearTimeout(benchmarkDrawerCloseTimer);
+    benchmarkDrawerCloseTimer = 0;
+    scheduleBenchmarkDrawerOpen();
+  });
+  dock.addEventListener("pointerleave", (event) => {
+    if (benchmarkPointerInsideDockBounds(event, dock)) {
+      benchmarkDrawerPointerInside = true;
+      return;
+    }
+    // Replacing the selected suite card can synthesize pointerleave even though
+    // the physical pointer never left the fixed drawer.  A suite-card
+    // activation therefore owns the open state until document-level
+    // pointermove confirms a real coordinate outside the stable dock bounds.
+    if (benchmarkDrawerSuiteActivationHold) return;
+    benchmarkDrawerPointerInside = false;
+    clearTimeout(benchmarkDrawerOpenTimer);
+    benchmarkDrawerOpenTimer = 0;
+    if (benchmarkDrawerOpen) scheduleBenchmarkDrawerClose();
+  });
+  dock.addEventListener("pointerdown", (event) => {
+    benchmarkDrawerPointerDownInside = true;
+    benchmarkDrawerKeyboardFocusInside = false;
+    if (event.target.closest(".suite-card")) {
+      benchmarkDrawerSuiteActivationHold = true;
+      clearBenchmarkDrawerTimers();
+      setBenchmarkDrawerOpen(true);
+    }
+  });
+  const releasePointerDown = () => {
+    if (!benchmarkDrawerPointerDownInside) return;
+    globalThis.setTimeout(() => {
+      benchmarkDrawerPointerDownInside = false;
+    }, 0);
+  };
+  document.addEventListener("pointerup", releasePointerDown);
+  document.addEventListener("pointercancel", releasePointerDown);
+  document.addEventListener("pointermove", (event) => {
+    if (!benchmarkDrawerSuiteActivationHold) return;
+    if (benchmarkPointerInsideDockBounds(event, dock)) {
+      benchmarkDrawerPointerInside = true;
+      return;
+    }
+    benchmarkDrawerPointerInside = false;
+    benchmarkDrawerSuiteActivationHold = false;
+    if (benchmarkDrawerOpen) scheduleBenchmarkDrawerClose();
+  });
+  dock.addEventListener("focusin", () => {
+    if (benchmarkDrawerPointerDownInside) return;
+    benchmarkDrawerKeyboardFocusInside = true;
+    clearBenchmarkDrawerTimers();
+    setBenchmarkDrawerOpen(true);
+  });
+  dock.addEventListener("focusout", (event) => {
+    if (dock.contains(event.relatedTarget)) return;
+    const pointerOrigin = benchmarkDrawerPointerDownInside;
+    globalThis.setTimeout(() => {
+      benchmarkDrawerKeyboardFocusInside =
+        !pointerOrigin &&
+        !benchmarkDrawerPointerDownInside &&
+        dock.contains(document.activeElement);
+      if (!benchmarkDrawerKeyboardFocusInside && benchmarkDrawerOpen) {
+        scheduleBenchmarkDrawerClose();
+      }
+    }, 0);
+  });
+  dock.addEventListener("keydown", (event) => {
+    benchmarkDrawerPointerDownInside = false;
+    if (event.key === "Escape" && benchmarkDrawerOpen) {
+      event.preventDefault();
+      benchmarkDrawerSuiteActivationHold = false;
+      benchmarkDrawerKeyboardFocusInside = false;
+      clearBenchmarkDrawerTimers();
+      setBenchmarkDrawerOpen(false, { restoreFocus: true });
+      return;
+    }
+    benchmarkDrawerKeyboardFocusInside = true;
+    clearBenchmarkDrawerTimers();
+    setBenchmarkDrawerOpen(true);
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (!benchmarkDrawerOpen || dock.contains(event.target)) return;
+    benchmarkDrawerPointerDownInside = false;
+    benchmarkDrawerSuiteActivationHold = false;
+    benchmarkDrawerKeyboardFocusInside = false;
+    clearBenchmarkDrawerTimers();
+    setBenchmarkDrawerOpen(false);
+  });
+  globalThis.matchMedia?.("(min-width: 1120px)")?.addEventListener?.("change", () => {
+    benchmarkDrawerPointerInside = false;
+    benchmarkDrawerPointerDownInside = false;
+    benchmarkDrawerSuiteActivationHold = false;
+    benchmarkDrawerKeyboardFocusInside = false;
+    benchmarkDrawerLoadingHold = 0;
+    clearBenchmarkDrawerTimers();
+    setBenchmarkDrawerOpen(false);
+  });
+}
+
+function renderLocalizedInterface() {
+  const pageScroll = {
+    left: Number(globalThis.scrollX) || 0,
+    top: Number(globalThis.scrollY) || 0,
+  };
+  const focusState = captureFocusState();
+  captureRankedRunGroupScroll();
+  const listScroll = captureRunListScroll();
+
+  portalI18n.applyStatic(document);
+  if (portalData) {
+    const suite = activeSuite();
+    renderOverview();
+    renderSuiteCards();
+    renderSuiteHeader(suite);
+    renderProtocolContext(suite);
+    renderDataHealth();
+    if (suiteHasDetail(suite)) {
+      renderLeaderboard();
+      renderChartModeSwitch();
+      renderChartEmphasisSwitch();
+      renderRunDetail();
+      renderClaims();
+      restoreRunListScroll(listScroll);
+      restoreRankedRunGroupScroll(suite.suite_id);
+    } else {
+      renderPlaceholder(suite);
+    }
+    const statusState = document.querySelector(".source-pill")?.dataset.state;
+    if (pendingSuiteId) {
+      setPortalStatus(
+        uiText("loading.suite", {
+          title: catalogSuiteById(pendingSuiteId)?.title || pendingSuiteId,
+        }),
+        "loading"
+      );
+    } else if (statusState !== "error") {
+      setPortalStatus(
+        portalLoadMode === "catalog"
+          ? uiText("status.catalog_loaded")
+          : uiText("status.static_snapshot"),
+        "ready"
+      );
+    }
+  }
+  portalI18n.applyStatic(document);
+  restoreFocusState(focusState);
+  if (typeof globalThis.scrollTo === "function") {
+    globalThis.scrollTo({ ...pageScroll, behavior: "auto" });
+  }
+  updateTopbarState();
+}
+
+function installLocaleController() {
+  if (localeControllerInstalled) return;
+  localeControllerInstalled = true;
+  document.querySelectorAll("[data-locale-option]").forEach((button) => {
+    button.addEventListener("click", () => {
+      portalI18n.setLocale(button.dataset.localeOption);
+    });
+  });
+  portalI18n.subscribe(() => renderLocalizedInterface());
+  portalI18n.applyStatic(document);
+}
+
+function updateTopbarState() {
+  const root = document.documentElement;
+  const isScrolled = globalThis.scrollY > 24;
+  root.classList.toggle("topbar-scrolled", isScrolled);
+  const topbar = document.querySelector(".topbar");
+  topbar?.classList.toggle("is-scrolled", isScrolled);
+  const workspace = byId("workspace-start");
+  if (!workspace) return;
+  const workspaceTop = workspace.getBoundingClientRect().top;
+  const workspaceVisible = workspaceTop < globalThis.innerHeight * 0.82;
+  root.classList.toggle("workspace-visible", workspaceVisible);
+  const workspaceMode =
+    workspaceTop <= (topbar?.getBoundingClientRect().height || 82) + 12;
+  const workspaceEnteredFromHero = workspaceVisible && isScrolled;
+  if (workspaceMode || workspaceEnteredFromHero) {
+    benchmarkWorkspaceEngaged = true;
+  }
+  const workspaceContextActive =
+    workspaceMode || (benchmarkWorkspaceEngaged && workspaceEnteredFromHero);
+  const benchmarkNavigationActive = Boolean(
+    benchmarkDrawerLoadingHold || pendingSuiteId
+  );
+  const benchmarkDockAvailable =
+    benchmarkWorkspaceEngaged && (workspaceVisible || benchmarkNavigationActive);
+  root.classList.toggle("workspace-mode", workspaceContextActive);
+  root.classList.toggle("benchmark-dock-available", benchmarkDockAvailable);
+  syncBenchmarkDrawerAvailability(benchmarkDockAvailable);
+  const identity = document.querySelector(".topbar-identity");
+  identity?.setAttribute(
+    "aria-label",
+    workspaceContextActive
+      ? uiText("a11y.return_home", {
+          workspace:
+            byId("workspaceTopbarTitle")?.textContent || "benchmark workspace",
+        })
+      : uiText("a11y.home")
+  );
+}
+
+function installEntryController() {
+  if (entryControllerInstalled) return;
+  entryControllerInstalled = true;
+
+  document.querySelectorAll('a[href="#workspace-start"]').forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      void navigateToPageView(PAGE_VIEW_WORKSPACE_HASH, {
+        push: true,
+        behavior: prefersReducedMotion() ? "auto" : "smooth",
+      });
+    });
+  });
+
+  document.querySelectorAll('a[href="#home"]').forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      void navigateToPageView(PAGE_VIEW_HOME_HASH, {
+        push: true,
+        behavior: prefersReducedMotion() ? "auto" : "smooth",
+      });
+    });
+  });
+
+  document.querySelectorAll('a[href="#detailBand"]').forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      void navigateToPageView(PAGE_VIEW_DETAIL_HASH, {
+        push: true,
+        behavior: prefersReducedMotion() ? "auto" : "smooth",
+      });
+    });
+  });
+
+  globalThis.addEventListener?.("scroll", () => {
+    updateTopbarState();
+    schedulePageViewHashSync();
+  }, { passive: true });
+  globalThis.addEventListener?.("wheel", cancelPendingPageViewNavigation, {
+    passive: true,
+  });
+  globalThis.addEventListener?.("touchstart", cancelPendingPageViewNavigation, {
+    passive: true,
+  });
+  installLocaleController();
+  installBenchmarkDrawerController();
+  updateTopbarState();
+}
+
+function suiteLandingOffset() {
+  const topbarHeight =
+    document.querySelector(".topbar")?.getBoundingClientRect?.().height || 0;
+  const benchmarkDock = byId("benchmarkDock");
+  const mobilePickerHeight =
+    !desktopBenchmarkDock() && benchmarkDock
+      ? benchmarkDock.getBoundingClientRect?.().height || 0
+      : 0;
+  return Math.ceil(topbarHeight + mobilePickerHeight + 12);
+}
+
+function scrollToPortalHome({ behavior = "auto" } = {}) {
+  benchmarkWorkspaceEngaged = false;
+  document.documentElement.classList.remove("benchmark-dock-available");
+  syncBenchmarkDrawerAvailability(false);
+
+  return new Promise((resolve) => {
+    const scroll = () => {
+      if (typeof globalThis.scrollTo === "function") {
+        globalThis.scrollTo({ left: 0, top: 0, behavior });
+      } else {
+        byId("home")?.scrollIntoView?.({ behavior, block: "start" });
+      }
+      updateTopbarState();
+      resolve(true);
+    };
+
+    if (typeof globalThis.requestAnimationFrame === "function") {
+      globalThis.requestAnimationFrame(() => {
+        globalThis.requestAnimationFrame(scroll);
+      });
+    } else {
+      scroll();
+    }
+  });
+}
+
+function scrollToSuiteLanding(
+  { generation = suiteLoadGeneration, behavior = "auto" } = {}
+) {
+  return new Promise((resolve) => {
+    const scroll = () => {
+      if (generation !== suiteLoadGeneration) {
+        resolve(false);
+        return;
+      }
+      const target =
+        byId("protocolContext") ||
+        byId("suiteLandingAnchor") ||
+        byId("workspace-start");
+      if (!target) {
+        resolve(false);
+        return;
+      }
+      const top =
+        (Number(globalThis.scrollY) || 0) +
+        (target.getBoundingClientRect?.().top || 0) -
+        suiteLandingOffset();
+      if (typeof globalThis.scrollTo === "function") {
+        globalThis.scrollTo({ top: Math.max(0, top), behavior });
+      } else {
+        target.scrollIntoView?.({ behavior, block: "start" });
+      }
+      if (globalThis.document?.documentElement) updateTopbarState();
+      resolve(true);
+    };
+
+    if (typeof globalThis.requestAnimationFrame === "function") {
+      globalThis.requestAnimationFrame(() => {
+        globalThis.requestAnimationFrame(scroll);
+      });
+    } else {
+      scroll();
+    }
+  });
+}
+
+function scrollToDetailLanding(
+  { generation = suiteLoadGeneration, behavior = "auto" } = {}
+) {
+  return new Promise((resolve) => {
+    const scroll = () => {
+      if (generation !== suiteLoadGeneration) {
+        resolve(false);
+        return;
+      }
+      const target = byId("detailBand");
+      if (!target || target.hidden) {
+        resolve(false);
+        return;
+      }
+      target.scrollIntoView?.({ behavior, block: "start" });
+      updateTopbarState();
+      resolve(true);
+    };
+
+    if (typeof globalThis.requestAnimationFrame === "function") {
+      globalThis.requestAnimationFrame(() => {
+        globalThis.requestAnimationFrame(scroll);
+      });
+    } else {
+      scroll();
+    }
+  });
+}
+
+async function navigateToPageView(
+  hash,
+  {
+    push = false,
+    behavior = "auto",
+    generation = suiteLoadGeneration,
+  } = {}
+) {
+  const targetHash = normalizedPageViewHash(hash);
+  if (!targetHash) {
+    return resolveUnspecifiedPageView({ generation });
+  }
+  pendingPageViewHash = targetHash;
+  writePageViewHash(targetHash, { push });
+
+  let landed = false;
+  if (targetHash === PAGE_VIEW_HOME_HASH) {
+    landed = await scrollToPortalHome({ behavior });
+  } else if (targetHash === PAGE_VIEW_WORKSPACE_HASH) {
+    benchmarkWorkspaceEngaged = true;
+    updateTopbarState();
+    landed = await scrollToSuiteLanding({ generation, behavior });
+  } else if (targetHash === PAGE_VIEW_DETAIL_HASH) {
+    benchmarkWorkspaceEngaged = true;
+    updateTopbarState();
+    landed = await scrollToDetailLanding({ generation, behavior });
+  } else {
+    const target = byId(targetHash.slice(1));
+    target?.scrollIntoView?.({ behavior, block: "start" });
+    landed = Boolean(target);
+  }
+
+  pageViewUrlSyncEnabled = true;
+  schedulePageViewHashSync();
+  return landed;
+}
+
+function resolveUnspecifiedPageView({ generation = suiteLoadGeneration } = {}) {
+  return new Promise((resolve) => {
+    const resolveFromViewport = () => {
+      if (generation !== suiteLoadGeneration) {
+        resolve(false);
+        return;
+      }
+      const restoredPageHash = pageViewHashFromViewport();
+      pendingPageViewHash = "";
+      writePageViewHash(restoredPageHash);
+      benchmarkWorkspaceEngaged = restoredPageHash !== PAGE_VIEW_HOME_HASH;
+      pageViewUrlSyncEnabled = true;
+      if (globalThis.document) updateTopbarState();
+      resolve(true);
+    };
+
+    if (typeof globalThis.requestAnimationFrame === "function") {
+      globalThis.requestAnimationFrame(() => {
+        globalThis.requestAnimationFrame(resolveFromViewport);
+      });
+    } else {
+      resolveFromViewport();
+    }
+  });
+}
+
+function restoreViewportScroll(
+  scrollState,
+  { generation = suiteLoadGeneration } = {}
+) {
+  if (!scrollState) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const restore = () => {
+      if (generation !== suiteLoadGeneration) {
+        resolve(false);
+        return;
+      }
+      if (typeof globalThis.scrollTo === "function") {
+        globalThis.scrollTo({
+          left: Math.max(0, Number(scrollState.left) || 0),
+          top: Math.max(0, Number(scrollState.top) || 0),
+          behavior: "auto",
+        });
+      }
+      if (globalThis.document?.documentElement) updateTopbarState();
+      resolve(true);
+    };
+
+    if (typeof globalThis.requestAnimationFrame === "function") {
+      globalThis.requestAnimationFrame(restore);
+    } else {
+      restore();
+    }
+  });
+}
+
+function resolveInitialEntry() {
+  if (initialEntryResolved) return;
+  initialEntryResolved = true;
+  void navigateToPageView(initialDeepLinkState.pageHash, {
+    behavior: "auto",
+  });
+}
+
+async function commitSuiteViewUpdate(
+  commit,
+  { generation, initial = false } = {}
+) {
+  const transitionDocument = globalThis.document;
+  const startViewTransition = transitionDocument?.startViewTransition;
+  let callbackStarted = false;
+  let committed = false;
+  const guardedCommit = () => {
+    callbackStarted = true;
+    if (generation !== suiteLoadGeneration) return;
+    commit();
+    committed = true;
+  };
+
+  if (
+    initial ||
+    prefersReducedMotion() ||
+    typeof startViewTransition !== "function"
+  ) {
+    guardedCommit();
+    return committed;
+  }
+
+  let transition;
+  try {
+    transition = startViewTransition.call(transitionDocument, guardedCommit);
+  } catch {
+    guardedCommit();
+    return committed;
+  }
+
+  try {
+    await transition.updateCallbackDone;
+    return committed;
+  } catch {
+    if (!callbackStarted && generation === suiteLoadGeneration) {
+      guardedCommit();
+    }
+    return committed;
+  }
 }
 
 function buildDataIndex(data) {
@@ -371,6 +1241,28 @@ function navigationEntryTitle(entry) {
   );
 }
 
+function navigationDrawerTitle(entry) {
+  const title = navigationEntryTitle(entry);
+  if (/modded-nanogpt.*track\s*3/iu.test(title)) return "TRACK3";
+  return title;
+}
+
+function navigationShortLabel(entry) {
+  const title = navigationEntryTitle(entry);
+  if (/modded-nanogpt.*track\s*3/iu.test(title)) return "Track3";
+  if (/memory\s*\/\s*speed/iu.test(title)) return "M·S";
+  if (/mup\s+scaling/iu.test(title)) return "μP";
+  const size = title.match(/\b(\d+(?:\.\d+)?\s*[mb])\b/iu);
+  if (size) return size[1].replace(/\s+/gu, "").toUpperCase();
+  return title
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .split(/\s+/u)
+    .slice(0, 2)
+    .map((part) => part.slice(0, 3))
+    .join("·") || "View";
+}
+
 function navigationEntryStatus(entry) {
   if (entry.record?.status) return entry.record.status;
   if (entry.suites.some((suite) => suite.status === "active")) return "active";
@@ -507,10 +1399,6 @@ function chartSelectionLimit(suite) {
   return figureForSuite(suite)?.selection_limit || 8;
 }
 
-function targetMarkerMetric(suite) {
-  return figureForSuite(suite)?.target_marker_metric || null;
-}
-
 function defaultChartRunIds(suite) {
   const figure = figureForSuite(suite);
   return figure?.run_ids?.length ? figure.run_ids : suiteRuns(suite.suite_id).map((run) => run.run_id);
@@ -518,17 +1406,13 @@ function defaultChartRunIds(suite) {
 
 function initializeChartSelection(suite) {
   selectedChartRunIds = new Set(defaultChartRunIds(suite));
-  focusedChartRunId = null;
+  focusedChartRunIds = new Set();
+  chartLabelMode = "none";
   chartSelectionNotice = "";
 }
 
 function resetRunFilters() {
   runFilterText = "";
-  runFilterRole = "all";
-  runFilterFamily = "all";
-  runFilterStatus = "all";
-  runFilterTarget = "all";
-  runFilterCurve = "all";
 }
 
 function tailStepDomain(suite, figure = figureForSuite(suite)) {
@@ -546,19 +1430,16 @@ function normalizeChartScaleMode(suite) {
   if (!allowed.has(chartScaleMode)) chartScaleMode = "full";
 }
 
-function chartFocusRunId() {
+function chartFocusRunIds() {
   const suite = activeSuite();
-  const run = runById(focusedChartRunId);
-  if (
-    !suite ||
-    !run ||
-    run.suite_id !== suite.suite_id ||
-    !selectedChartRunIds.has(run.run_id)
-  ) {
-    return null;
-  }
+  if (!suite) return [];
   const visibleRunIds = new Set(chartVisibleRuns(suite).map((entry) => entry.run_id));
-  return visibleRunIds.has(run.run_id) ? run.run_id : null;
+  return Array.from(focusedChartRunIds).filter((runId) => {
+    const run = runById(runId);
+    return run?.suite_id === suite.suite_id &&
+      selectedChartRunIds.has(runId) &&
+      visibleRunIds.has(runId);
+  });
 }
 
 function curveAvailable(run, suite) {
@@ -580,18 +1461,14 @@ function formatMetricValue(metricName, value) {
   return fmt.format(value);
 }
 
-function metricAriaLabel(metricName) {
-  return String(metricName || "metric").replaceAll("_", " ");
-}
-
 function summaryMetricText(runId, metricName) {
   const metric = summaryMetric(runId, metricName);
   return metric ? formatMetricValue(metricName, metric.value) : "n/a";
 }
 
 function roleLabel(run) {
-  if (run.run_role === "ours") return "ours";
-  if (run.run_role === "official_reference") return "official ref";
+  if (run.run_role === "ours") return uiText("role.ours");
+  if (run.run_role === "official_reference") return uiText("role.official");
   return run.run_role.replaceAll("_", " ");
 }
 
@@ -654,10 +1531,6 @@ function unrankedRows(suite) {
     });
 }
 
-function allRunRows(suite) {
-  return suiteRuns(suite.suite_id).map((run) => rowFromRun(suite, run));
-}
-
 function leaderboardOrderMap(suite) {
   return dataIndex?.leaderboardOrderBySuite.get(suite.suite_id) || new Map();
 }
@@ -682,26 +1555,11 @@ function selectedChartRuns(suite) {
 }
 
 function chartVisibleRuns(suite) {
-  const visibleIds = new Set(
-    filteredRows(allRunRows(suite), suite).map((row) => row.run.run_id)
-  );
-  return selectedChartRuns(suite).filter((run) => visibleIds.has(run.run_id));
-}
-
-function hiddenPlottedRuns(suite) {
-  const visibleIds = new Set(chartVisibleRuns(suite).map((run) => run.run_id));
-  return selectedChartRuns(suite).filter((run) => !visibleIds.has(run.run_id));
+  return selectedChartRuns(suite);
 }
 
 function chartFilterSummary() {
-  return [
-    runFilterText.trim() ? `search=${runFilterText.trim()}` : "",
-    runFilterRole !== "all" ? `role=${runFilterRole}` : "",
-    runFilterFamily !== "all" ? `family=${runFilterFamily}` : "",
-    runFilterStatus !== "all" ? `status=${runFilterStatus}` : "",
-    runFilterTarget !== "all" ? `target=${runFilterTarget}` : "",
-    runFilterCurve !== "all" ? `curve=${runFilterCurve}` : "",
-  ].filter(Boolean).join(";");
+  return "";
 }
 
 function buildCurrentFigureModel({
@@ -721,7 +1579,8 @@ function buildCurrentFigureModel({
     figureId: figure.figure_id,
     selectedRunIds,
     visibleRunIds,
-    focusRunId: chartFocusRunId(),
+    focusRunIds: chartFocusRunIds(),
+    labelMode: chartLabelMode,
     scaleMode: chartScaleMode,
     profile,
     width,
@@ -753,7 +1612,10 @@ function setChartSelection(suite, runIds, notice = "") {
     .slice(0, limit)
     .map((run) => run.run_id);
   selectedChartRunIds = new Set(accepted);
-  if (!selectedChartRunIds.has(focusedChartRunId)) focusedChartRunId = null;
+  focusedChartRunIds = new Set(
+    Array.from(focusedChartRunIds).filter((runId) => selectedChartRunIds.has(runId))
+  );
+  if (!focusedChartRunIds.size && chartLabelMode === "focused") chartLabelMode = "none";
   chartSelectionNotice = notice;
   selectedRunId = firstChartRun(suite)?.run_id || null;
 }
@@ -787,7 +1649,10 @@ function seriesKeyHtml(style, role) {
 }
 
 function runChipLabel(run, suite) {
-  const prefix = run.leaderboard_meta?.rank_label ? `${run.leaderboard_meta.rank_label} ` : "";
+  const rankLabel = run.leaderboard_meta?.rank_label;
+  const prefix = rankLabel && !/^R\d+\b/iu.test(run.display_name)
+    ? `${rankLabel} `
+    : "";
   return `${prefix}${run.display_name} · ${summaryMetricText(run.run_id, primaryMetricName(suite))}`;
 }
 
@@ -810,37 +1675,7 @@ function rowSearchText(row) {
 }
 
 function roleFilterLabel(suite) {
-  return suite.family === "track3" ? "Source" : "Run type";
-}
-
-function roleOptionLabel(value) {
-  const labels = {
-    official_reference: "Official ref",
-    ours: "Ours",
-    baseline: "Baseline",
-    ablation: "Ablation",
-    failed_probe: "Failed probe",
-  };
-  return labels[value] || String(value).replaceAll("_", " ");
-}
-
-function familyOptionLabel(value) {
-  if (value === "optimizer") return "other optimizer";
-  return String(value || "unknown").replaceAll("_", " ");
-}
-
-function curveState(row, suite) {
-  if (selectedChartRunIds.has(row.run.run_id)) return "plotted";
-  return curveAvailable(row.run, suite) ? "available" : "unavailable";
-}
-
-function curveStateLabel(value) {
-  const labels = {
-    plotted: "Plotted",
-    available: "Available",
-    unavailable: "Curve unavailable",
-  };
-  return labels[value] || value;
+  return uiText(suite.family === "track3" ? "table.source" : "table.run_type");
 }
 
 function targetStatus(row, suite) {
@@ -849,43 +1684,30 @@ function targetStatus(row, suite) {
   return row.metrics[primary] ? "reached" : "not_reached";
 }
 
-function targetStatusLabel(value) {
-  const labels = {
-    reached: "Reached",
-    not_reached: "Not reached",
-  };
-  return labels[value] || value;
-}
-
-function filteredRows(rows, suite) {
+function filteredRows(rows) {
   const needle = runFilterText.trim().toLowerCase();
-  return rows.filter((row) => {
-    const run = row.run;
-    if (needle && !rowSearchText(row).includes(needle)) return false;
-    if (runFilterRole !== "all" && run.run_role !== runFilterRole) return false;
-    if (runFilterStatus !== "all" && run.status !== runFilterStatus) return false;
-    const family = run.optimizer?.family || run.optimizer?.name || "unknown";
-    if (runFilterFamily !== "all" && family !== runFilterFamily) return false;
-    if (runFilterTarget !== "all" && targetStatus(row, suite) !== runFilterTarget) return false;
-    if (runFilterCurve !== "all" && curveState(row, suite) !== runFilterCurve) return false;
-    return true;
-  });
+  if (!needle) return rows;
+  return rows.filter((row) => rowSearchText(row).includes(needle));
 }
 
 function sortedUnique(values) {
   return Array.from(new Set(values.filter(Boolean))).sort((left, right) => left.localeCompare(right));
 }
 
-function filterSelect(id, label, value, options, labeler = (option) => option.replaceAll("_", " ")) {
-  return `
-    <label class="run-filter-select">
-      <span>${escapeHtml(label)}</span>
-      <select id="${id}">
-        <option value="all">all</option>
-        ${options.map((option) => `<option value="${escapeHtml(option)}" ${option === value ? "selected" : ""}>${escapeHtml(labeler(option))}</option>`).join("")}
-      </select>
-    </label>
-  `;
+function unrankedEvidenceHelper(rows) {
+  const priority = new Map([
+    ["partial", 0],
+    ["diverged", 1],
+    ["stopped", 2],
+  ]);
+  const statuses = Array.from(new Set(rows.map((row) => row.run.status).filter(Boolean)))
+    .sort((left, right) => {
+      const leftPriority = priority.get(left) ?? Number.MAX_SAFE_INTEGER;
+      const rightPriority = priority.get(right) ?? Number.MAX_SAFE_INTEGER;
+      return leftPriority - rightPriority || left.localeCompare(right);
+    })
+    .map((status) => status.replaceAll("_", " "));
+  return [...statuses, uiText("runs.excluded")].join(" · ");
 }
 
 function toggleChartRun(runId, shouldSelect) {
@@ -897,7 +1719,7 @@ function toggleChartRun(runId, shouldSelect) {
   chartSelectionNotice = "";
   if (shouldSelect) {
     if (!selectedChartRunIds.has(runId) && chartSelectionCount(suite) >= limit) {
-      chartSelectionNotice = `Chart is capped at ${limit} runs. Remove one selected run before adding another.`;
+      chartSelectionNotice = uiText("runs.chart_limit", { limit });
       return;
     }
     selectedChartRunIds.add(runId);
@@ -905,7 +1727,8 @@ function toggleChartRun(runId, shouldSelect) {
   }
 
   selectedChartRunIds.delete(runId);
-  if (focusedChartRunId === runId) focusedChartRunId = null;
+  focusedChartRunIds.delete(runId);
+  if (!focusedChartRunIds.size && chartLabelMode === "focused") chartLabelMode = "none";
   if (selectedRunId === runId) {
     selectedRunId = firstChartRun(suite)?.run_id || null;
   }
@@ -965,7 +1788,8 @@ function restoreFocusState(state) {
 }
 
 function updateSelectedRunVisuals() {
-  const focusedRunId = chartFocusRunId();
+  const focusedIds = new Set(chartFocusRunIds());
+  const hasFocusedRuns = focusedIds.size > 0;
   const detailSelectors = [
     "#leaderboardContent tr[data-run-id]",
     "#leaderboardContent .selected-run-pill[data-run-id]",
@@ -982,23 +1806,21 @@ function updateSelectedRunVisuals() {
 
   const chartSelectors = [
     "#chartSelectionChips button[data-run-id]",
-    "#targetStepStrip button[data-run-id]",
-    "#chartLegend button[data-run-id]",
   ];
   document.querySelectorAll(chartSelectors.join(",")).forEach((element) => {
-    const focused = element.dataset.runId === focusedRunId;
+    const focused = focusedIds.has(element.dataset.runId);
     element.classList.toggle("active", focused);
     element.setAttribute("aria-pressed", String(focused));
-    if (element.closest("#targetStepStrip")) {
-      element.setAttribute("aria-current", String(focused));
-    }
   });
 
   document.querySelectorAll("#lossChart [data-chart-run-id]").forEach((element) => {
-    const focused = element.dataset.chartRunId === focusedRunId;
+    const runId = element.dataset.chartRunId;
+    const focused = focusedIds.has(runId);
+    const labeled = chartLabelMode === "all" ||
+      (chartLabelMode === "focused" && focused);
     const opacity = focused
       ? element.dataset.focusOpacity
-      : focusedRunId
+      : hasFocusedRuns
         ? element.dataset.contextOpacity
         : element.dataset.neutralOpacity;
     const strokeWidth = focused
@@ -1008,25 +1830,56 @@ function updateSelectedRunVisuals() {
     if (strokeWidth) element.setAttribute("stroke-width", strokeWidth);
     element.classList.toggle("selected", focused);
     element.classList.toggle("is-selected", focused);
-    element.classList.toggle("is-context", Boolean(focusedRunId) && !focused);
+    element.classList.toggle("is-context", hasFocusedRuns && !focused);
+    if (element.classList.contains("series-end-label") || element.classList.contains("series-end-connector")) {
+      element.classList.toggle("is-label-hidden", !labeled);
+      element.setAttribute("visibility", labeled ? "visible" : "hidden");
+      element.setAttribute("aria-hidden", String(!labeled));
+    }
     element.setAttribute("aria-current", String(focused));
   });
 
   const curveLayer = document.querySelector("#lossChart [data-curve-layer=\"series\"]");
-  if (curveLayer && focusedRunId) {
+  if (curveLayer && hasFocusedRuns) {
     Array.from(curveLayer.children)
-      .filter((element) => element.dataset.chartRunId === focusedRunId)
+      .filter((element) => focusedIds.has(element.dataset.chartRunId))
       .forEach((element) => curveLayer.appendChild(element));
   }
 }
 
 function clearChartFocus({ updateUrl = true } = {}) {
-  const changed = focusedChartRunId !== null;
-  focusedChartRunId = null;
+  const changed = focusedChartRunIds.size > 0 || chartLabelMode !== "none";
+  focusedChartRunIds = new Set();
+  chartLabelMode = "none";
   if (byId("chartEmphasisSwitch")) renderChartEmphasisSwitch();
   updateSelectedRunVisuals();
   if (updateUrl) syncUrlState();
   return changed;
+}
+
+function showAllChartLabels({ updateUrl = true } = {}) {
+  const changed = focusedChartRunIds.size > 0 || chartLabelMode !== "all";
+  focusedChartRunIds = new Set();
+  chartLabelMode = "all";
+  if (byId("chartEmphasisSwitch")) renderChartEmphasisSwitch();
+  updateSelectedRunVisuals();
+  if (updateUrl) syncUrlState();
+  return changed;
+}
+
+function toggleChartFocus(runId, { updateUrl = true } = {}) {
+  const suite = activeSuite();
+  const run = runById(runId);
+  if (!run || !suite || run.suite_id !== suite.suite_id || !selectedChartRunIds.has(runId)) {
+    return false;
+  }
+  if (focusedChartRunIds.has(runId)) focusedChartRunIds.delete(runId);
+  else focusedChartRunIds.add(runId);
+  chartLabelMode = focusedChartRunIds.size ? "focused" : "none";
+  if (byId("chartEmphasisSwitch")) renderChartEmphasisSwitch();
+  updateSelectedRunVisuals();
+  if (updateUrl) syncUrlState();
+  return true;
 }
 
 function selectRun(runId, { updateUrl = true, focusChart = false } = {}) {
@@ -1035,8 +1888,7 @@ function selectRun(runId, { updateUrl = true, focusChart = false } = {}) {
   if (!run || !suite || run.suite_id !== suite.suite_id) return false;
   selectedRunId = run.run_id;
   if (focusChart && selectedChartRunIds.has(run.run_id)) {
-    focusedChartRunId = run.run_id;
-    if (byId("chartEmphasisSwitch")) renderChartEmphasisSwitch();
+    toggleChartFocus(run.run_id, { updateUrl: false });
   }
   if (byId("runDetail")) {
     updateSelectedRunVisuals();
@@ -1064,37 +1916,24 @@ function applyUrlState() {
   if (requestedScale) chartScaleMode = requestedScale;
   normalizeChartScaleMode(suite);
   initializeChartSelection(suite);
-  const rows = allRunRows(suite);
-  const readFilter = (name, values) => {
-    const value = params.get(name);
-    return value && values.has(value) ? value : "all";
-  };
   runFilterText = params.get("q") || "";
-  runFilterRole = readFilter("role", new Set(rows.map((row) => row.run.run_role)));
-  runFilterFamily = readFilter(
-    "family",
-    new Set(rows.map((row) => row.run.optimizer?.family || row.run.optimizer?.name || "unknown"))
-  );
-  runFilterStatus = readFilter("status", new Set(rows.map((row) => row.run.status)));
-  runFilterTarget = readFilter(
-    "target",
-    new Set(rows.map((row) => targetStatus(row, suite)).filter(Boolean))
-  );
-  runFilterCurve = readFilter("curve", new Set(rows.map((row) => curveState(row, suite))));
   const requestedRun = runById(params.get("run"));
   selectedRunId = requestedRun?.suite_id === suite.suite_id
     ? requestedRun.run_id
     : firstChartRun(suite)?.run_id || null;
-  const requestedFocus = runById(params.get("focus"));
-  focusedChartRunId =
-    requestedFocus?.suite_id === suite.suite_id &&
-    selectedChartRunIds.has(requestedFocus.run_id)
-      ? requestedFocus.run_id
-      : params.get("emphasis") === "selected" &&
-          selectedRunId &&
-          selectedChartRunIds.has(selectedRunId)
-        ? selectedRunId
-        : null;
+  const requestedFocusIds = params.getAll("focus").filter((runId) => {
+    const run = runById(runId);
+    return run?.suite_id === suite.suite_id && selectedChartRunIds.has(runId);
+  });
+  if (!requestedFocusIds.length && params.get("emphasis") === "selected" && selectedRunId) {
+    requestedFocusIds.push(selectedRunId);
+  }
+  focusedChartRunIds = new Set(requestedFocusIds);
+  chartLabelMode = focusedChartRunIds.size
+    ? "focused"
+    : params.get("labels") === "all"
+      ? "all"
+      : "none";
 }
 
 function syncUrlState({ push = false } = {}) {
@@ -1104,22 +1943,20 @@ function syncUrlState({ push = false } = {}) {
   if (selectedRunId) url.searchParams.set("run", selectedRunId);
   else url.searchParams.delete("run");
   url.searchParams.set("scale", chartScaleMode);
-  const focusedRunId = chartFocusRunId();
-  if (focusedRunId) url.searchParams.set("focus", focusedRunId);
-  else url.searchParams.delete("focus");
+  url.searchParams.delete("focus");
+  chartFocusRunIds().forEach((runId) => url.searchParams.append("focus", runId));
+  if (chartLabelMode === "all") url.searchParams.set("labels", "all");
+  else url.searchParams.delete("labels");
   url.searchParams.delete("emphasis");
-  const filters = {
-    q: runFilterText.trim(),
-    role: runFilterRole === "all" ? "" : runFilterRole,
-    family: runFilterFamily === "all" ? "" : runFilterFamily,
-    status: runFilterStatus === "all" ? "" : runFilterStatus,
-    target: runFilterTarget === "all" ? "" : runFilterTarget,
-    curve: runFilterCurve === "all" ? "" : runFilterCurve,
-  };
-  Object.entries(filters).forEach(([name, value]) => {
-    if (value) url.searchParams.set(name, value);
-    else url.searchParams.delete(name);
+  const search = runFilterText.trim();
+  if (search) url.searchParams.set("q", search);
+  else url.searchParams.delete("q");
+  ["role", "family", "status", "target", "curve"].forEach((name) => {
+    url.searchParams.delete(name);
   });
+  if (portalI18n.getLocale() === "zh") url.searchParams.set("lang", "zh");
+  else url.searchParams.delete("lang");
+  if (activePageViewHash) url.hash = activePageViewHash;
   const nextLocation = `${url.pathname}${url.search}${url.hash}`;
   if (push && typeof globalThis.history.pushState === "function") {
     globalThis.history.pushState(null, "", nextLocation);
@@ -1147,67 +1984,77 @@ function renderOverview() {
     (portalLoadMode === "aggregate" ? portalData.claims.length : summedEvidence.claims);
 
   byId("overviewMetrics").innerHTML = [
-    [String(totalSuites), "benchmark groups and standalone views"],
-    [String(activeSuites), "active workspaces with curated detail"],
-    [String(curatedRuns), "curated runs with source trace"],
-    [String(claimCards), "manual claim cards"],
+    [String(totalSuites), uiText("overview.groups")],
+    [String(activeSuites), uiText("overview.active")],
+    [String(curatedRuns), uiText("overview.runs")],
+    [String(claimCards), uiText("overview.claims")],
   ]
     .map(([value, label]) => `<div class="stat"><strong>${value}</strong><span>${label}</span></div>`)
     .join("");
 }
 
+function updateWorkspaceTopbar(suite) {
+  const entry = navigationEntryForSuite(suite.suite_id);
+  const title = entry?.kind === "group" ? navigationEntryTitle(entry) : suite.title;
+  const isTrack3 = suite.suite_id === "track3";
+  const source = protocolSourceCoordinate(suite);
+  const batch = protocolBatchCoordinate(suite);
+  const budget = protocolBudgetCoordinate(suite);
+  const evidence = suiteEvidenceSummary(suite);
+  const expected = evidence.expected ?? evidence.mapped;
+  const track3Coordinate = isTrack3 ? track3ProtocolCoordinate(suite) : null;
+  const coordinates = isTrack3
+    ? [
+        "FineWeb10B",
+        track3Coordinate
+          ? `${track3Coordinate.globalBatchSequences} × ${track3Coordinate.sequenceLength}`
+          : uiText("protocol.metadata_unavailable"),
+        "Target ≤ 3.28",
+      ]
+    : [
+        source.dataset,
+        batch.label === "Not specified" ? "" : batch.label,
+        budget.label === "Not specified" ? "" : budget.label,
+      ].filter(Boolean);
+
+  byId("workspaceTopbarKicker").textContent = uiText(
+    "workspace.active_benchmark",
+    {
+      status: localizedSuiteStatus(suite.status),
+      source: isTrack3 ? "Official Track 3" : source.label,
+    }
+  );
+  byId("workspaceTopbarTitle").textContent =
+    isTrack3
+      ? "Track 3 Benchmark"
+      : /\bbenchmark\b/iu.test(title)
+        ? title
+        : `${title} Benchmark`;
+  byId("workspaceTopbarCoordinate").textContent = coordinates.join(" · ");
+  byId("workspaceTopbarEvidence").innerHTML = `
+    <strong>${escapeHtml(`${evidence.mapped}/${expected}`)}</strong>
+    <span>${escapeHtml(uiText("workspace.mapped_curves", { count: evidence.drawable }))}</span>
+  `;
+}
+
 function renderSuiteHeader(suite) {
-  const runs = suiteRuns(suite.suite_id);
   const navigationEntry = navigationEntryForSuite(suite.suite_id);
   const evidence = suiteEvidenceSummary(suite);
   const completed = evidence.complete;
   const mapped = evidence.mapped;
   const drawable = evidence.drawable;
-  const target = suite.target || {};
-  const constraints = suite.comparability_constraints || {};
-  const figure = figureForSuite(suite);
-  const yMetric = figure?.y_metric || primaryMetricName(suite);
-  const targetText =
-    target.metric_name && target.value !== null && target.metric_name === yMetric
-      ? `${target.metric_name} ${target.direction === "below" ? "<=" : ">="} ${target.value}`
-      : "no chart target";
 
   byId("suite-title").textContent =
     navigationEntry?.kind === "group"
       ? navigationEntryTitle(navigationEntry)
       : suite.title;
+  updateWorkspaceTopbar(suite);
   byId("targetBox").innerHTML = `
-    <span class="target-box-label">Evidence coverage</span>
-    <strong>${completed}/${mapped} runs complete</strong>
-    <span class="target-box-value">${drawable} curves</span>
-    <span class="target-box-meta">${suite.status} · ${suite.family} · static snapshot</span>
+    <span class="target-box-label">${escapeHtml(uiText("coverage.label"))}</span>
+    <strong>${escapeHtml(uiText("coverage.complete", { complete: completed, mapped }))}</strong>
+    <span class="target-box-value">${escapeHtml(uiText("coverage.curves", { count: drawable }))}</span>
+    <span class="target-box-meta">${escapeHtml(localizedSuiteStatus(suite.status))} · ${escapeHtml(suite.family)} · static snapshot</span>
   `;
-
-  const rankDirection = suite.leaderboard_rule?.direction === "desc" ? "higher first" : "lower first";
-  const railItems = [
-    ["Model", constraints.model || "Not specified"],
-    ["Dataset", constraints.dataset || "Not specified"],
-    ["Token budget", constraints.token_budget || "Not specified"],
-    [
-      "Rank metric",
-      `${suite.leaderboard_rule?.formal_rank_metric || suite.leaderboard_rule?.sort_by || primaryMetricName(suite)} · ${rankDirection}`,
-    ],
-    ["Target", targetText === "no chart target" ? "No target declared" : targetText],
-    ["Hardware scope", constraints.hardware_scope || "Not specified"],
-  ];
-  const protocolRail = byId("protocolRail");
-  protocolRail.dataset.status = suite.status;
-  protocolRail.innerHTML = railItems
-    .map(
-      ([label, value], index) => `
-        <div class="protocol-node">
-          <span class="protocol-index">${String(index + 1).padStart(2, "0")}</span>
-          <span class="protocol-label">${escapeHtml(label)}</span>
-          <strong>${escapeHtml(value)}</strong>
-        </div>
-      `
-    )
-    .join("");
 }
 
 function renderSuiteCards() {
@@ -1224,29 +2071,53 @@ function renderSuiteCards() {
       const targetSuiteId = isSelected ? selected.suite_id : suite?.suite_id;
       const isPending = entry.suites.some((candidate) => candidate.suite_id === pendingSuiteId);
       const protocolCount = entry.suites.filter((candidate) => candidate.protocol).length;
+      const stackDepth = protocolCount > 1 ? Math.min(protocolCount, 3) : 0;
+      const stackAttributes =
+        stackDepth > 0
+          ? ` data-stack-depth="${stackDepth}" data-protocol-count="${protocolCount}"`
+          : "";
+      const protocolCountLabel = protocolCount
+        ? uiText(protocolCount === 1 ? "dock.protocol" : "dock.protocols", {
+            count: protocolCount,
+          })
+        : uiText("dock.single_view");
       return `
-        <button class="suite-card suite-status-${escapeHtml(status)} ${isSelected ? "selected" : ""} ${isPending ? "pending" : ""} ${status === "view" ? "view-card" : ""}" type="button" data-suite-id="${escapeHtml(targetSuiteId)}" data-benchmark-group-id="${escapeHtml(entry.id)}" data-suite-status="${escapeHtml(status)}" aria-pressed="${isSelected}" aria-busy="${isPending}">
-          <span class="suite-card-topline">
-            <span class="suite-status">${escapeHtml(card.status_label || status)}</span>
-            <span>${escapeHtml(`${evidence.mapped || 0} runs${protocolCount > 1 ? ` · ${protocolCount} protocols` : ""}`)}</span>
+        <button class="suite-card suite-rail-item ${stackDepth > 0 ? "suite-card-stacked" : ""} suite-status-${escapeHtml(status)} ${isSelected ? "selected" : ""} ${isPending ? "pending" : ""} ${status === "view" ? "view-card" : ""}" type="button" data-suite-id="${escapeHtml(targetSuiteId)}" data-benchmark-group-id="${escapeHtml(entry.id)}" data-suite-status="${escapeHtml(status)}"${stackAttributes} aria-label="${escapeHtml(navigationDrawerTitle(entry))}" aria-pressed="${isSelected}" aria-busy="${isPending}">
+          <span class="benchmark-rail-abbr" aria-hidden="true">${escapeHtml(navigationShortLabel(entry))}</span>
+          <span class="suite-rail-status" aria-hidden="true"></span>
+          <span class="suite-rail-copy">
+            <strong>${escapeHtml(navigationDrawerTitle(entry))}</strong>
+            <span class="suite-rail-meta">
+              <span>${escapeHtml(protocolCountLabel)}</span>
+              <span>${escapeHtml(uiText("dock.runs", { count: evidence.mapped || 0 }))}</span>
+            </span>
           </span>
-          <strong>${escapeHtml(navigationEntryTitle(entry))}</strong>
-          <span class="suite-metric">${escapeHtml(card.metric_label || primaryMetricName(suite))}</span>
-          <span class="suite-headline">${escapeHtml(card.headline || suite?.notes || "Curated evidence will be attached later.")}</span>
         </button>
       `;
     })
     .join("");
 
   byId("suiteCards").querySelectorAll("button").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async (event) => {
+      const benchmarkGroupId = button.dataset.benchmarkGroupId;
+      const pointerActivated = event.detail > 0 || benchmarkDrawerPointerDownInside;
+      if (desktopBenchmarkDock()) {
+        benchmarkDrawerTrigger = button;
+        setBenchmarkDrawerOpen(true);
+      }
       if (button.getAttribute("aria-pressed") === "true" && !pendingSuiteId) {
-        button.focus({ preventScroll: true });
+        if (!pointerActivated) button.focus({ preventScroll: true });
+        void navigateToPageView(PAGE_VIEW_WORKSPACE_HASH, {
+          push: true,
+          behavior: prefersReducedMotion() ? "auto" : "smooth",
+        });
         return;
       }
-      void requestSuiteChange(button.dataset.suiteId, {
+      await requestSuiteChange(button.dataset.suiteId, {
         push: true,
-        focusGroupId: button.dataset.benchmarkGroupId,
+        focusGroupId: benchmarkGroupId,
+        navigationIntent: "benchmark",
+        restoreNavigationFocus: !pointerActivated,
       });
     });
   });
@@ -1255,71 +2126,167 @@ function renderSuiteCards() {
 function protocolEvidenceText(summary) {
   const coverage =
     summary.expected === null
-      ? `${summary.mapped} mapped`
-      : `${summary.mapped}/${summary.expected} mapped`;
+      ? uiText("evidence.mapped", { count: summary.mapped })
+      : uiText("evidence.mapped_expected", {
+          mapped: summary.mapped,
+          expected: summary.expected,
+        });
   return {
     coverage,
-    status: `${summary.complete} complete · ${summary.partial} partial`,
+    status: uiText("evidence.complete_partial", {
+      complete: summary.complete,
+      partial: summary.partial,
+    }),
     caveat:
       summary.nonfinite || summary.unresolved
-        ? `${summary.nonfinite} nonfinite · ${summary.unresolved} unresolved`
-        : `${summary.drawable} drawable curves`,
+        ? uiText("evidence.nonfinite", {
+            nonfinite: summary.nonfinite,
+            unresolved: summary.unresolved,
+          })
+        : uiText("evidence.drawable", { count: summary.drawable }),
   };
 }
 
-function renderProtocolSelector(suite) {
+function track3ProtocolCoordinate(suite) {
+  const runs = suiteRuns(suite?.suite_id);
+  if (!runs.length) return null;
+
+  const coordinates = runs.map((run) => ({
+    globalBatchTokens: Number(run?.training?.global_batch_tokens),
+    sequenceLength: Number(run?.training?.sequence_length),
+  }));
+  const complete = coordinates.every(
+    ({ globalBatchTokens, sequenceLength }) =>
+      Number.isFinite(globalBatchTokens) &&
+      globalBatchTokens > 0 &&
+      Number.isFinite(sequenceLength) &&
+      sequenceLength > 0
+  );
+  if (!complete) return null;
+
+  const [{ globalBatchTokens, sequenceLength }] = coordinates;
+  const consistent = coordinates.every(
+    (coordinate) =>
+      coordinate.globalBatchTokens === globalBatchTokens &&
+      coordinate.sequenceLength === sequenceLength
+  );
+  const globalBatchSequences = globalBatchTokens / sequenceLength;
+  if (!consistent || !Number.isInteger(globalBatchSequences) || globalBatchSequences <= 0) {
+    return null;
+  }
+
+  return {
+    globalBatchSequences,
+    globalBatchTokens,
+    sequenceLength,
+  };
+}
+
+function renderProtocolEvidence(evidenceText) {
+  return protocolSwitchError
+    ? `<strong class="protocol-inline-error">${escapeHtml(uiText("protocol.unchanged"))}</strong>
+       <small class="protocol-inline-error-detail" title="${escapeHtml(protocolSwitchError)}">${escapeHtml(protocolSwitchError)}</small>`
+    : `<strong>${escapeHtml(evidenceText.coverage)}</strong>
+       <small>${escapeHtml(evidenceText.status)}</small>
+       <small>${escapeHtml(evidenceText.caveat)}</small>`;
+}
+
+function renderTrack3ProtocolContext(suite, evidenceText) {
+  const coordinate = track3ProtocolCoordinate(suite);
+  const batchValue = coordinate
+    ? `${coordinate.globalBatchSequences} × ${coordinate.sequenceLength}`
+    : uiText("protocol.metadata_unavailable");
+  const batchDetail = coordinate
+    ? uiText("protocol.tokens_step", {
+        count: intFmt.format(coordinate.globalBatchTokens),
+      })
+    : uiText("protocol.metadata_inconsistent");
+
+  return `
+    <div class="protocol-ledger-grid protocol-ledger-grid-track3">
+      <div class="protocol-ledger-cell protocol-model-cell">
+        <span class="protocol-ledger-label">${escapeHtml(uiText("protocol.model"))}</span>
+        <span class="protocol-static-value" title="GPT-2 style · 124M">GPT-2 style · 124M</span>
+        <small>${escapeHtml(uiText("protocol.fixed_architecture"))}</small>
+      </div>
+      <div class="protocol-ledger-cell protocol-source-cell">
+        <span class="protocol-ledger-label">${escapeHtml(uiText("protocol.source"))}</span>
+        <span class="protocol-static-value" title="Official Track 3 · FineWeb10B">Official Track 3 · FineWeb10B</span>
+        <small>GPT-2 tokenizer</small>
+      </div>
+      <div class="protocol-ledger-cell protocol-batch-cell">
+        <span class="protocol-ledger-label">${escapeHtml(uiText("protocol.global_batch"))}</span>
+        <span class="protocol-static-value" title="${escapeHtml(batchValue)}">${escapeHtml(batchValue)}</span>
+        <small title="${escapeHtml(batchDetail)}">${escapeHtml(batchDetail)}</small>
+      </div>
+      <div class="protocol-ledger-cell protocol-target-cell">
+        <span class="protocol-ledger-label">${escapeHtml(uiText("protocol.target"))}</span>
+        <span class="protocol-static-value" title="Validation loss ≤ 3.28">Validation loss ≤ 3.28</span>
+        <small>${escapeHtml(uiText("protocol.rank_target"))}</small>
+      </div>
+      <div class="protocol-ledger-cell protocol-evidence-cell" ${protocolSwitchError ? 'role="alert"' : 'aria-live="polite"'}>
+        <span class="protocol-ledger-label">${escapeHtml(uiText("protocol.evidence"))}</span>
+        ${renderProtocolEvidence(evidenceText)}
+      </div>
+    </div>
+  `;
+}
+
+function renderProtocolContext(suite) {
   const mount = byId("protocolSelector");
   if (!mount) return;
   const entry = navigationEntryForSuite(suite?.suite_id);
   const protocolSuites = sortedProtocolSuites(entry?.suites || []);
-
-  if (!suite?.protocol || !entry || !protocolSuites.length) {
-    if (!protocolSwitchError) {
-      mount.hidden = true;
-      mount.innerHTML = "";
-      return;
-    }
-    mount.hidden = false;
-    mount.innerHTML = `
-      <div class="protocol-ledger-error" role="alert">
-        <strong>Protocol unchanged.</strong>
-        <span>${escapeHtml(protocolSwitchError)}</span>
-      </div>
-    `;
-    return;
-  }
+  const hasProtocolControls = Boolean(suite?.protocol && entry && protocolSuites.length);
 
   const currentSource = protocolSourceCoordinate(suite);
   const currentBatch = protocolBatchCoordinate(suite);
   const currentBudget = protocolBudgetCoordinate(suite);
-  const sources = Array.from(
-    new Map(
-      protocolSuites.map((candidate) => {
-        const coordinate = protocolSourceCoordinate(candidate);
-        return [coordinate.key, coordinate];
-      })
-    ).values()
-  );
-  const sourceSuites = protocolSuites.filter(
-    (candidate) => protocolSourceCoordinate(candidate).key === currentSource.key
-  );
-  const batches = Array.from(
-    new Map(
-      sourceSuites.map((candidate) => {
-        const coordinate = protocolBatchCoordinate(candidate);
-        return [coordinate.key, coordinate];
-      })
-    ).values()
-  );
-  const budgetSuites = sourceSuites.filter(
-    (candidate) => protocolBatchCoordinate(candidate).key === currentBatch.key
-  );
+  const sources = hasProtocolControls
+    ? Array.from(
+        new Map(
+          protocolSuites.map((candidate) => {
+            const coordinate = protocolSourceCoordinate(candidate);
+            return [coordinate.key, coordinate];
+          })
+        ).values()
+      )
+    : [];
+  const sourceSuites = hasProtocolControls
+    ? protocolSuites.filter(
+        (candidate) => protocolSourceCoordinate(candidate).key === currentSource.key
+      )
+    : [];
+  const batches = hasProtocolControls
+    ? Array.from(
+        new Map(
+          sourceSuites.map((candidate) => {
+            const coordinate = protocolBatchCoordinate(candidate);
+            return [coordinate.key, coordinate];
+          })
+        ).values()
+      )
+    : [];
+  const budgetSuites = hasProtocolControls
+    ? sourceSuites.filter(
+        (candidate) => protocolBatchCoordinate(candidate).key === currentBatch.key
+      )
+    : [];
   const evidence = suiteEvidenceSummary(suite);
   const evidenceText = protocolEvidenceText(evidence);
 
+  mount.hidden = false;
+  mount.dataset.loading = pendingSuiteId ? "true" : "false";
+  if (suite?.suite_id === "track3") {
+    mount.innerHTML = renderTrack3ProtocolContext(suite, evidenceText);
+    return;
+  }
+
   const sourceControl =
-    sources.length > 1
-      ? `<div class="protocol-choice-row" role="group" aria-label="Protocol source">
+    !hasProtocolControls
+      ? `<span class="protocol-static-value" title="${escapeHtml(uiText("protocol.single"))}">${escapeHtml(uiText("protocol.single"))}</span>`
+      : sources.length > 1
+      ? `<div class="protocol-choice-row" role="group" aria-label="${escapeHtml(uiText("protocol.source"))}">
           ${sources
             .map((source) => {
               const target = chooseProtocolSuite(protocolSuites, {
@@ -1336,11 +2303,11 @@ function renderProtocolSelector(suite) {
             })
             .join("")}
         </div>`
-      : `<span class="protocol-static-value">${escapeHtml(currentSource.label)}</span>`;
+      : `<span class="protocol-static-value" title="${escapeHtml(currentSource.label)}">${escapeHtml(currentSource.label)}</span>`;
 
   const batchControl =
     batches.length > 1
-      ? `<div class="protocol-choice-row" role="group" aria-label="Global batch and sequence length">
+      ? `<div class="protocol-choice-row" role="group" aria-label="${escapeHtml(uiText("protocol.global_batch"))}">
           ${batches
             .map((batch) => {
               const target = chooseProtocolSuite(protocolSuites, {
@@ -1358,87 +2325,77 @@ function renderProtocolSelector(suite) {
             })
             .join("")}
         </div>`
-      : `<span class="protocol-static-value">${escapeHtml(currentBatch.label)}</span>`;
+      : `<span class="protocol-static-value" title="${escapeHtml(currentBatch.label)}">${escapeHtml(currentBatch.label)}</span>`;
 
-  const budgetControl = `
-    <div class="protocol-budget-row" role="group" aria-label="Token budget">
-      ${budgetSuites
-        .map((candidate) => {
-          const coordinate = protocolBudgetCoordinate(candidate);
-          const selectable = protocolSelectable(candidate);
-          const active = candidate.suite_id === suite.suite_id;
-          const loading = candidate.suite_id === pendingSuiteId;
-          const detail = [
-            coordinate.steps === null ? "" : `${intFmt.format(coordinate.steps)} steps`,
-            coordinate.plannedTokens === null ? "" : `${intFmt.format(coordinate.plannedTokens)} tokens`,
-          ]
-            .filter(Boolean)
-            .join(" · ");
-          return `
-            <button
-              type="button"
-              class="protocol-budget-chip ${active ? "active" : ""} ${loading ? "loading" : ""}"
-              data-target-suite-id="${escapeHtml(candidate.suite_id)}"
-              aria-pressed="${active}"
-              aria-busy="${loading}"
-              title="${escapeHtml(detail || coordinate.label)}"
-              ${selectable || active ? "" : "disabled"}
-            >
-              ${escapeHtml(coordinate.label)}
-            </button>
-          `;
-        })
-        .join("")}
-    </div>
-  `;
+  const budgetControl =
+    budgetSuites.length > 1
+      ? `<div class="protocol-budget-row" role="group" aria-label="${escapeHtml(uiText("protocol.budget"))}">
+          ${budgetSuites
+            .map((candidate) => {
+              const coordinate = protocolBudgetCoordinate(candidate);
+              const selectable = protocolSelectable(candidate);
+              const active = candidate.suite_id === suite.suite_id;
+              const loading = candidate.suite_id === pendingSuiteId;
+              const detail = [
+                coordinate.steps === null ? "" : `${intFmt.format(coordinate.steps)} steps`,
+                coordinate.plannedTokens === null ? "" : `${intFmt.format(coordinate.plannedTokens)} tokens`,
+              ]
+                .filter(Boolean)
+                .join(" · ");
+              return `
+                <button
+                  type="button"
+                  class="protocol-budget-chip ${active ? "active" : ""} ${loading ? "loading" : ""}"
+                  data-target-suite-id="${escapeHtml(candidate.suite_id)}"
+                  aria-pressed="${active}"
+                  aria-busy="${loading}"
+                  title="${escapeHtml(detail || coordinate.label)}"
+                  ${selectable || active ? "" : "disabled"}
+                >
+                  ${escapeHtml(coordinate.label)}
+                </button>
+              `;
+            })
+            .join("")}
+        </div>`
+      : `<span class="protocol-static-value" title="${escapeHtml(currentBudget.label)}">${escapeHtml(currentBudget.label)}</span>`;
 
   const tokensPerStep =
     currentBatch.tokensPerStep === null
-      ? "Tokens per step not specified"
-      : `${intFmt.format(currentBatch.tokensPerStep)} tokens / step`;
-  const paper = suite.protocol.paper;
+      ? uiText("protocol.metadata_unavailable")
+      : uiText("protocol.tokens_step", {
+          count: intFmt.format(currentBatch.tokensPerStep),
+        });
+  const paper = suite?.protocol?.paper;
   const sourceNote = paper?.arxiv_id
     ? `${paper.arxiv_id}${paper.section ? ` · ${paper.section}` : ""}`
-    : suite.protocol.source_kind === "current_curated"
+    : suite?.protocol?.source_kind === "current_curated"
       ? "Local curated benchmark"
-      : "Curated static source";
+      : hasProtocolControls
+        ? "Curated static source"
+        : "Single suite protocol";
 
-  mount.hidden = false;
-  mount.dataset.loading = pendingSuiteId ? "true" : "false";
   mount.innerHTML = `
-    <div class="protocol-ledger-head">
-      <div>
-        <p class="panel-kicker">Comparable experiment coordinate</p>
-        <h3 id="protocol-selector-title">Protocol selector</h3>
-      </div>
-      <p>${escapeHtml(sourceNote)}</p>
-    </div>
     <div class="protocol-ledger-grid">
-      <div class="protocol-ledger-cell protocol-source-cell">
-        <span class="protocol-ledger-label">Source / dataset</span>
+      <div class="protocol-ledger-cell protocol-source-cell" title="${escapeHtml(sourceNote)}">
+        <span class="protocol-ledger-label">${escapeHtml(uiText("protocol.source"))}</span>
         ${sourceControl}
-        <small>${escapeHtml(currentSource.dataset)}</small>
+        <small title="${escapeHtml(currentSource.dataset)}">${escapeHtml(currentSource.dataset)}</small>
       </div>
       <div class="protocol-ledger-cell protocol-batch-cell">
-        <span class="protocol-ledger-label">Batch × sequence</span>
+        <span class="protocol-ledger-label">${escapeHtml(uiText("protocol.batch"))}</span>
         ${batchControl}
-        <small>${escapeHtml(tokensPerStep)}</small>
+        <small title="${escapeHtml(tokensPerStep)}">${escapeHtml(tokensPerStep)}</small>
       </div>
       <div class="protocol-ledger-cell protocol-budget-cell">
-        <span class="protocol-ledger-label">Token budget</span>
+        <span class="protocol-ledger-label">${escapeHtml(uiText("protocol.budget"))}</span>
         ${budgetControl}
-        <small>Each budget is an isolated leaderboard and figure.</small>
+        <small title="${escapeHtml(uiText("protocol.isolated"))}">${escapeHtml(uiText("protocol.isolated"))}</small>
       </div>
-      <div class="protocol-ledger-cell protocol-evidence-cell" aria-live="polite">
-        <span class="protocol-ledger-label">Evidence</span>
-        <strong>${escapeHtml(evidenceText.coverage)}</strong>
-        <small>${escapeHtml(evidenceText.status)}</small>
-        <small>${escapeHtml(evidenceText.caveat)}</small>
+      <div class="protocol-ledger-cell protocol-evidence-cell" ${protocolSwitchError ? 'role="alert"' : 'aria-live="polite"'}>
+        <span class="protocol-ledger-label">${escapeHtml(uiText("protocol.evidence"))}</span>
+        ${renderProtocolEvidence(evidenceText)}
       </div>
-    </div>
-    <div class="protocol-ledger-error" role="alert" ${protocolSwitchError ? "" : "hidden"}>
-      <strong>Protocol unchanged.</strong>
-      <span>${escapeHtml(protocolSwitchError)}</span>
     </div>
   `;
 
@@ -1456,6 +2413,7 @@ function renderProtocolSelector(suite) {
       void requestSuiteChange(targetSuiteId, {
         push: true,
         focusProtocolSuiteId: targetSuiteId,
+        navigationIntent: "protocol",
       });
     });
   });
@@ -1467,11 +2425,11 @@ function renderPlaceholder(suite) {
   byId("suitePlaceholder").hidden = false;
   byId("placeholder-kicker").textContent = suite.status === "view" ? "Cross-suite view" : "Suite placeholder";
   byId("placeholder-title").textContent = suite.status === "view" ? "Resource view is waiting for comparable inputs" : "Curated data not attached yet";
-  byId("placeholder-status").textContent = suite.card?.status_label || suite.status;
+  byId("placeholder-status").textContent = localizedSuiteStatus(suite.status);
   byId("placeholderBody").innerHTML = `
     <div class="placeholder-grid">
       ${metricLine("suite_id", suite.suite_id)}
-      ${metricLine("status", suite.card?.status_label || suite.status)}
+      ${metricLine("status", localizedSuiteStatus(suite.status))}
       ${metricLine("primary_metric", primaryMetricName(suite))}
       ${metricLine("expected_view", suite.card?.metric_label || primaryMetricName(suite))}
       ${metricLine("curated_runs", String(suiteRuns(suite.suite_id).length))}
@@ -1493,18 +2451,20 @@ function showDetailPanels() {
 function renderSelectedChartRows(suite) {
   const selected = selectedChartRuns(suite);
   if (!selected.length) {
-    return `<p class="muted wide-muted">No runs selected for the chart. Pick rows from the tables below.</p>`;
+    return `<p class="muted wide-muted">${escapeHtml(uiText("runs.none_selected"))}</p>`;
   }
   return `
     <div class="selected-run-list">
       ${selected
         .map(
-          (run, index) => `
-            <button class="selected-run-pill ${run.run_id === selectedRunId ? "active" : ""}" type="button" data-run-id="${escapeHtml(run.run_id)}" aria-pressed="${run.run_id === selectedRunId}">
-              <span class="legend-swatch" style="background:${runColor(run, index)}"></span>
-              ${escapeHtml(runChipLabel(run, suite))}
-            </button>
-            <button class="remove-run" type="button" data-remove-run-id="${escapeHtml(run.run_id)}" aria-label="Remove ${escapeHtml(run.display_name)} from chart">×</button>
+          (run) => `
+            <div class="selected-run-item">
+              <button class="selected-run-pill ${run.run_id === selectedRunId ? "active" : ""}" type="button" data-run-id="${escapeHtml(run.run_id)}" aria-pressed="${run.run_id === selectedRunId}" title="${escapeHtml(runChipLabel(run, suite))}">
+                <span class="legend-swatch" style="background:${runColor(run)}"></span>
+                <span class="selected-run-label">${escapeHtml(runChipLabel(run, suite))}</span>
+              </button>
+              <button class="remove-run" type="button" data-remove-run-id="${escapeHtml(run.run_id)}" aria-label="${escapeHtml(uiText("runs.remove", { name: run.display_name }))}">×</button>
+            </div>
           `
         )
         .join("")}
@@ -1515,11 +2475,14 @@ function renderSelectedChartRows(suite) {
 function plotCell(run, suite) {
   const checked = selectedChartRunIds.has(run.run_id);
   const disabled = !curveAvailable(run, suite);
-  const reason = disabled ? "curve unavailable" : "Toggle this run in the chart";
+  const reason = disabled ? uiText("runs.curve_unavailable") : uiText("runs.toggle_curve");
+  const action = checked
+    ? uiText("runs.remove", { name: run.display_name })
+    : `${uiText("runs.plot")} ${run.display_name}`;
   return `
     <label class="plot-toggle ${disabled ? "disabled" : ""}" title="${escapeHtml(reason)}">
-      <input type="checkbox" data-run-id="${escapeHtml(run.run_id)}" aria-label="${escapeHtml(`${checked ? "Remove" : "Plot"} ${run.display_name}${disabled ? ", curve unavailable" : ""}`)}" ${checked ? "checked" : ""} ${disabled ? "disabled" : ""} />
-      <span>${checked ? "on" : "plot"}</span>
+      <input type="checkbox" data-run-id="${escapeHtml(run.run_id)}" aria-label="${escapeHtml(`${action}${disabled ? `, ${uiText("runs.curve_unavailable")}` : ""}`)}" ${checked ? "checked" : ""} ${disabled ? "disabled" : ""} />
+      <span>${escapeHtml(uiText(checked ? "runs.on" : "runs.plot"))}</span>
     </label>
   `;
 }
@@ -1534,6 +2497,7 @@ function primaryColumnLabel(suite) {
   const primary = primaryMetricName(suite);
   if (primary.includes("steps_to_target")) return "Steps to target";
   if (primary === "final_val_loss") return "Primary";
+  if (primary === "last_observed_val_loss") return uiText("table.last_observed");
   return primary.replaceAll("_", " ");
 }
 
@@ -1545,21 +2509,18 @@ function metricValueWithOptionalStep(metricName, metric) {
 
 function tableColumnsForRows(suite, rows) {
   const isTrack3 = suite.suite_id === "track3";
+  const primary = primaryMetricName(suite);
   const allowedStatuses = new Set(suite.leaderboard_eligibility?.allowed_status || []);
   const roles = sortedUnique(rows.map((row) => row.run.run_role));
-  const statuses = sortedUnique(rows.map((row) => row.run.status));
-  const columns = ["plot", "rank", "run"];
-  if (roles.length > 1) columns.push("role");
-  columns.push("primary");
+  const columns = ["plot", "rank", "run", "primary"];
   if (isTrack3) {
     columns.push("curve");
   } else {
-    columns.push("best", "final");
+    columns.push("best");
+    if (primary !== "last_observed_val_loss") columns.push("final");
   }
-  if (
-    statuses.length > 1 ||
-    rows.some((row) => !allowedStatuses.has(row.run.status))
-  ) {
+  if (roles.length > 1) columns.push("role");
+  if (rows.some((row) => !allowedStatuses.has(row.run.status))) {
     columns.push("status");
   }
   return columns;
@@ -1567,15 +2528,15 @@ function tableColumnsForRows(suite, rows) {
 
 function tableHeader(column, suite) {
   const labels = {
-    plot: "Plot",
-    rank: suite.suite_id === "track3" ? "Track #" : "Rank",
-    run: "Run",
+    plot: uiText("table.plot"),
+    rank: uiText(suite.suite_id === "track3" ? "table.track_rank" : "table.rank"),
+    run: uiText("table.run"),
     role: roleFilterLabel(suite),
     primary: primaryColumnLabel(suite),
-    best: "Best val loss",
-    final: "Final val loss",
-    status: "Status",
-    curve: "Curve",
+    best: uiText("table.best"),
+    final: uiText("table.final"),
+    status: uiText("table.status"),
+    curve: uiText("table.curve"),
   };
   return labels[column] || column;
 }
@@ -1608,9 +2569,10 @@ function tableCell(column, suite, row, rankLabel) {
 
 function leaderboardTable(suite, rows, startingRank, tableClass = "") {
   const columns = tableColumnsForRows(suite, rows);
+  const track3TableClass = suite.suite_id === "track3" ? "track3-table-wrap" : "";
   return `
-    <div class="table-wrap ${tableClass}">
-      <table aria-label="${escapeHtml(`${suite.title} run results`)}">
+    <div class="table-wrap ${tableClass} ${track3TableClass}">
+      <table class="run-results-table ${suite.suite_id === "track3" ? "track3-run-results-table" : ""}" aria-label="${escapeHtml(uiText("runs.table", { title: suite.title }))}">
         <thead>
           <tr>
             ${columns.map((column) => `<th scope="col">${escapeHtml(tableHeader(column, suite))}</th>`).join("")}
@@ -1622,7 +2584,7 @@ function leaderboardTable(suite, rows, startingRank, tableClass = "") {
               const run = row.run;
               const rankLabel = run.leaderboard_meta?.rank_label || row.displayRank || String(startingRank + index);
               return `
-                <tr class="${run.run_id === selectedRunId ? "selected" : ""}" data-run-id="${escapeHtml(run.run_id)}" tabindex="0" aria-selected="${run.run_id === selectedRunId}" aria-label="Inspect ${escapeHtml(run.display_name)}">
+                <tr class="${run.run_id === selectedRunId ? "selected" : ""}" data-run-id="${escapeHtml(run.run_id)}" tabindex="0" aria-selected="${run.run_id === selectedRunId}" aria-label="${escapeHtml(uiText("runs.inspect", { name: run.display_name }))}">
                   ${columns.map((column) => `<td>${tableCell(column, suite, row, rankLabel)}</td>`).join("")}
                 </tr>
               `;
@@ -1637,61 +2599,21 @@ function leaderboardTable(suite, rows, startingRank, tableClass = "") {
 function renderSelectionActions(suite) {
   return `
     <div class="selection-actions">
-      <button type="button" data-chart-action="default">Restore curated</button>
-      <button type="button" data-chart-action="best">Top ${Math.min(chartSelectionLimit(suite), selectableChartRuns(suite).length)} by suite metric</button>
-      <button type="button" data-chart-action="clear">Clear</button>
+      <button type="button" data-chart-action="default">${escapeHtml(uiText("runs.curated"))}</button>
+      <button type="button" data-chart-action="best">${escapeHtml(uiText("runs.top", { count: Math.min(chartSelectionLimit(suite), selectableChartRuns(suite).length) }))}</button>
+      <button type="button" data-chart-action="clear">${escapeHtml(uiText("runs.clear"))}</button>
     </div>
   `;
 }
 
-function activeFilterCount() {
-  return [
-    runFilterText.trim() ? "search" : "",
-    runFilterRole !== "all" ? "role" : "",
-    runFilterFamily !== "all" ? "family" : "",
-    runFilterStatus !== "all" ? "status" : "",
-    runFilterTarget !== "all" ? "target" : "",
-    runFilterCurve !== "all" ? "curve" : "",
-  ].filter(Boolean).length;
-}
-
-function renderRunFilters(rows, suite, visibleCount) {
-  const roles = sortedUnique(rows.map((row) => row.run.run_role));
-  const families = sortedUnique(rows.map((row) => row.run.optimizer?.family || row.run.optimizer?.name || "unknown"));
-  const statuses = sortedUnique(rows.map((row) => row.run.status));
-  const targetStatuses = sortedUnique(rows.map((row) => targetStatus(row, suite)).filter(Boolean));
-  const curveStates = sortedUnique(rows.map((row) => curveState(row, suite)));
-  const visibleCurveOptions = ["plotted", "available", "unavailable"].filter(
-    (state) => curveStates.includes(state) || runFilterCurve === state
-  );
-
-  const controls = [
-    roles.length > 1 || runFilterRole !== "all"
-      ? filterSelect("roleFilter", roleFilterLabel(suite), runFilterRole, roles, roleOptionLabel)
-      : "",
-    families.length > 1 || runFilterFamily !== "all"
-      ? filterSelect("familyFilter", "Optimizer family", runFilterFamily, families, familyOptionLabel)
-      : "",
-    targetStatuses.length > 1 || runFilterTarget !== "all"
-      ? filterSelect("targetFilter", "Target status", runFilterTarget, targetStatuses, targetStatusLabel)
-      : "",
-    visibleCurveOptions.length > 1 || runFilterCurve !== "all"
-      ? filterSelect("curveFilter", "Curve state", runFilterCurve, visibleCurveOptions, curveStateLabel)
-      : "",
-    statuses.length > 1 || runFilterStatus !== "all"
-      ? filterSelect("statusFilter", "Status", runFilterStatus, statuses)
-      : "",
-  ].filter(Boolean);
-
+function renderRunFilters(rows, visibleCount) {
   return `
-    <div class="run-filters" aria-label="Run table filters">
+    <div class="run-filters run-search-only" aria-label="${escapeHtml(uiText("runs.search"))}">
       <label class="run-search">
-        <span>Search</span>
-        <input id="runSearch" type="search" value="${escapeHtml(runFilterText)}" placeholder="optimizer, rank, run id" autocomplete="off" />
+        <span>${escapeHtml(uiText("runs.search"))}</span>
+        <input id="runSearch" type="search" value="${escapeHtml(runFilterText)}" placeholder="${escapeHtml(uiText("runs.search_placeholder"))}" autocomplete="off" />
       </label>
-      ${controls.join("")}
-      <span class="filter-summary" aria-live="polite">Showing ${visibleCount}/${rows.length}${activeFilterCount() ? ` · ${activeFilterCount()} active` : ""}</span>
-      <button type="button" id="clearRunFilters">Reset filters</button>
+      <span class="filter-summary" aria-live="polite">${escapeHtml(uiText("runs.showing", { visible: visibleCount, total: rows.length }))}</span>
     </div>
   `;
 }
@@ -1751,11 +2673,11 @@ function bindLeaderboardInteractions() {
       const suite = activeSuite();
       const action = button.dataset.chartAction;
       if (action === "default") {
-        setChartSelection(suite, defaultChartRunIds(suite), "Curated chart set restored.");
+        setChartSelection(suite, defaultChartRunIds(suite), uiText("runs.restore_notice"));
       } else if (action === "best") {
-        setChartSelection(suite, bestChartRunIds(suite), "Top drawable runs selected by the suite leaderboard metric.");
+        setChartSelection(suite, bestChartRunIds(suite), uiText("runs.best_notice"));
       } else if (action === "clear") {
-        setChartSelection(suite, [], "Chart cleared. Pick rows from the tables below.");
+        setChartSelection(suite, [], uiText("runs.clear_notice"));
       }
       refreshRunViews();
     });
@@ -1763,6 +2685,11 @@ function bindLeaderboardInteractions() {
 
   const search = byId("runSearch");
   if (search) {
+    const refreshSearchResults = (focusState) => {
+      renderLeaderboard({ preserveScroll: false });
+      restoreFocusState(focusState);
+      syncUrlState();
+    };
     search.addEventListener("input", () => {
       runFilterText = search.value;
       const focusState = {
@@ -1772,111 +2699,195 @@ function bindLeaderboardInteractions() {
       };
       clearTimeout(runSearchTimer);
       runSearchTimer = setTimeout(() => {
-        refreshRunViews({ focusState, includeDetail: false });
+        refreshSearchResults(focusState);
       }, SEARCH_DEBOUNCE_MS);
     });
     search.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        clearTimeout(runSearchTimer);
+        runFilterText = "";
+        search.value = "";
+        refreshSearchResults({
+          id: "runSearch",
+          selectionStart: 0,
+          selectionEnd: 0,
+        });
+        return;
+      }
       if (event.key !== "Enter") return;
       clearTimeout(runSearchTimer);
-      refreshRunViews();
-    });
-  }
-
-  const role = byId("roleFilter");
-  if (role) {
-    role.addEventListener("change", () => {
-      runFilterRole = role.value;
-      refreshRunViews({ includeDetail: false });
-    });
-  }
-
-  const family = byId("familyFilter");
-  if (family) {
-    family.addEventListener("change", () => {
-      runFilterFamily = family.value;
-      refreshRunViews({ includeDetail: false });
-    });
-  }
-
-  const status = byId("statusFilter");
-  if (status) {
-    status.addEventListener("change", () => {
-      runFilterStatus = status.value;
-      refreshRunViews({ includeDetail: false });
-    });
-  }
-
-  const target = byId("targetFilter");
-  if (target) {
-    target.addEventListener("change", () => {
-      runFilterTarget = target.value;
-      refreshRunViews({ includeDetail: false });
-    });
-  }
-
-  const curve = byId("curveFilter");
-  if (curve) {
-    curve.addEventListener("change", () => {
-      runFilterCurve = curve.value;
-      refreshRunViews({ includeDetail: false });
-    });
-  }
-
-  const clearFilters = byId("clearRunFilters");
-  if (clearFilters) {
-    clearFilters.addEventListener("click", () => {
-      resetRunFilters();
-      refreshRunViews({ includeDetail: false });
+      refreshSearchResults({
+        id: "runSearch",
+        selectionStart: search.selectionStart,
+        selectionEnd: search.selectionEnd,
+      });
     });
   }
 }
 
-function renderLeaderboard() {
+function captureRunListScroll() {
+  const viewport = byId("leaderboardContent")?.querySelector(".run-list-viewport");
+  return viewport
+    ? { top: viewport.scrollTop, left: viewport.scrollLeft }
+    : null;
+}
+
+function restoreRunListScroll(scrollState) {
+  if (!scrollState) return;
+  const viewport = byId("leaderboardContent")?.querySelector(".run-list-viewport");
+  if (!viewport) return;
+  viewport.scrollTop = scrollState.top;
+  viewport.scrollLeft = scrollState.left;
+}
+
+function rankedRunGroupStateForSuite(suiteId, initialActive = "local") {
+  if (!rankedRunGroupState[suiteId]) {
+    rankedRunGroupState[suiteId] = {
+      active: initialActive,
+      scroll: {
+        official: { top: 0, left: 0 },
+        local: { top: 0, left: 0 },
+        unranked: { top: 0, left: 0 },
+      },
+    };
+  }
+  return rankedRunGroupState[suiteId];
+}
+
+function captureRankedRunGroupScroll() {
+  const viewport = byId("leaderboardContent")?.querySelector(
+    ".ranked-run-group-body-viewport[data-run-group]"
+  );
+  const stack = viewport?.closest?.(".ranked-run-group-stack[data-suite-id]");
+  const group = viewport?.dataset.runGroup;
+  const suiteId = stack?.dataset.suiteId;
+  if (!viewport || !suiteId || !["official", "local", "unranked"].includes(group)) return;
+  const state = rankedRunGroupStateForSuite(suiteId);
+  state.scroll[group] = {
+    top: viewport.scrollTop,
+    left: viewport.scrollLeft,
+  };
+}
+
+function restoreRankedRunGroupScroll(suiteId) {
+  const state = rankedRunGroupStateForSuite(suiteId);
+  const viewport = byId("leaderboardContent")?.querySelector(
+    `.ranked-run-group-body-viewport[data-run-group="${state.active}"]`
+  );
+  if (!viewport) return;
+  const scroll = state.scroll[state.active] || { top: 0, left: 0 };
+  viewport.scrollTop = scroll.top;
+  viewport.scrollLeft = scroll.left;
+}
+
+function rankedRunGroupCount(visibleCount, totalCount) {
+  return runFilterText.trim()
+    ? `${visibleCount}/${totalCount}`
+    : String(totalCount);
+}
+
+function renderRankedRunGroup({ suite, group, label, helper, rows, totalCount, active }) {
+  const toggleId = `ranked-run-group-${group}-toggle`;
+  const panelId = `ranked-run-group-${group}-panel`;
+  const emptyMessage = uiText(
+    group === "official"
+      ? "runs.no_reference"
+      : group === "unranked"
+        ? "runs.no_unranked"
+        : "runs.no_comparison"
+  );
+  return `
+    <section class="ranked-run-group-section ${active ? "is-active" : "is-inactive"}" data-run-group-section="${group}">
+      <button
+        id="${toggleId}"
+        class="ranked-run-group-toggle"
+        type="button"
+        data-ranked-run-group="${group}"
+        aria-expanded="${active}"
+        aria-controls="${panelId}"
+      >
+        <span>${escapeHtml(label)} (${rankedRunGroupCount(rows.length, totalCount)})</span>
+        <span class="muted">${escapeHtml(helper)}</span>
+        <span class="ranked-run-group-indicator" aria-hidden="true">${active ? "−" : "+"}</span>
+      </button>
+      <div
+        id="${panelId}"
+        class="ranked-run-group-panel"
+        role="region"
+        aria-labelledby="${toggleId}"
+        ${active ? "" : "hidden"}
+      >
+        ${active ? `
+          <div class="ranked-run-group-body-viewport" data-run-group="${group}" tabindex="0">
+            ${rows.length
+              ? leaderboardTable(suite, rows, 1, "compact-table scroll-table")
+              : `<p class="empty-table-note">${escapeHtml(emptyMessage)}</p>`}
+          </div>
+        ` : ""}
+      </div>
+    </section>
+  `;
+}
+
+function referenceRunForSuite(suite, run) {
+  if (run.run_role === "official_reference") return true;
+  return suite?.protocol?.source_kind === "paper_main_benchmark" &&
+    run.run_role === "baseline" &&
+    run.source?.source_type === "wandb_archive";
+}
+
+function renderLeaderboard({ preserveScroll = true } = {}) {
+  if (preserveScroll) captureRankedRunGroupScroll();
+  const previousScroll = preserveScroll ? captureRunListScroll() : null;
   const suite = activeSuite();
   const rows = eligibleRows(suite).map((row, index) => ({
     ...row,
     displayRank: row.primaryMetric ? String(index + 1) : "—",
   }));
-  const unranked = unrankedRows(suite);
+  const unranked = unrankedRows(suite).map((row) => ({
+    ...row,
+    displayRank: "—",
+  }));
   const filterableRows = [...rows, ...unranked];
-  const visibleRows = filteredRows(rows, suite);
-  const visibleUnranked = filteredRows(unranked, suite);
-  const referenceRows = visibleRows.filter((row) => row.run.run_role === "official_reference");
-  const localRows = visibleRows.filter((row) => row.run.run_role !== "official_reference");
+  const visibleRows = filteredRows(rows);
+  const visibleUnranked = filteredRows(unranked);
+  const referenceRows = visibleRows.filter((row) => referenceRunForSuite(suite, row.run));
+  const localRows = visibleRows.filter((row) => !referenceRunForSuite(suite, row.run));
   const hasReferenceAndLocal =
-    rows.some((row) => row.run.run_role === "official_reference") &&
-    rows.some((row) => row.run.run_role !== "official_reference");
+    rows.some((row) => referenceRunForSuite(suite, row.run)) &&
+    rows.some((row) => !referenceRunForSuite(suite, row.run));
 
   if (!selectedRunId && rows.length) selectedRunId = rows[0].run.run_id;
 
-  byId("leaderboard-title").textContent = suite.leaderboard_rule?.display_name || "Suite leaderboard";
-  byId("leaderboardNote").textContent = "Click a row or chart chip to inspect provenance.";
+  const navigationEntry = navigationEntryForSuite(suite.suite_id);
+  byId("leaderboard-title").textContent = uiText("runs.title");
+  byId("leaderboardNote").textContent = uiText("runs.rank_note", {
+    title: navigationEntryTitle(navigationEntry),
+    metric: primaryColumnLabel(suite),
+  });
 
   const selectionBlock = `
     <div class="selected-chart-box">
       <div class="mini-heading">
         <div>
-          <strong>Selected for chart</strong>
-          <span>${chartSelectionCount(suite)}/${chartSelectionLimit(suite)} plotted</span>
+          <strong>${escapeHtml(uiText("runs.chart_selection"))}</strong>
+          <span>${escapeHtml(uiText("runs.plotted", { count: chartSelectionCount(suite), limit: chartSelectionLimit(suite) }))}</span>
         </div>
-        <span class="muted">The chart is suite-local and selection is independent from rank order.</span>
+        <span class="muted">${escapeHtml(uiText("runs.inspect_remove"))}</span>
       </div>
       ${renderSelectedChartRows(suite)}
       ${renderSelectionActions(suite)}
-      <p class="selection-notice ${chartSelectionNotice ? "" : "empty"}">${escapeHtml(chartSelectionNotice || "Use the checkboxes below to add or remove plotted curves.")}</p>
+      ${chartSelectionNotice ? `<p class="selection-notice">${escapeHtml(chartSelectionNotice)}</p>` : ""}
     </div>
-    ${renderRunFilters(
-      filterableRows,
-      suite,
-      visibleRows.length + visibleUnranked.length
-    )}
+    ${renderRunFilters(filterableRows, visibleRows.length + visibleUnranked.length)}
   `;
   const unrankedBlock = unranked.length
     ? `
       <details class="history-details unranked-evidence section-callout">
         <summary>
-          <span>Unranked evidence (${visibleUnranked.length}/${unranked.length})</span>
-          <span class="muted">partial, stopped, or non-finite · excluded from rank</span>
+          <span>${escapeHtml(uiText("runs.unranked"))} (${visibleUnranked.length}/${unranked.length})</span>
+          <span class="muted">${escapeHtml(unrankedEvidenceHelper(unranked))}</span>
         </summary>
         ${
           visibleUnranked.length
@@ -1886,82 +2897,127 @@ function renderLeaderboard() {
                 1,
                 "compact-table scroll-table unranked-table"
               )
-            : "<p class=\"empty-table-note\">No unranked evidence matches the current filters.</p>"
+            : `<p class="empty-table-note">${escapeHtml(uiText("runs.no_unranked"))}</p>`
         }
       </details>
     `
     : "";
 
   if (hasReferenceAndLocal) {
-    const isOpen = Boolean(referenceHistoryOpen[suite.suite_id]);
-    const open = isOpen ? "open" : "";
-    const referenceLabel = suite.suite_id === "track3" ? "Official Track 3 history" : "Reference history";
-    const localLabel = suite.suite_id === "track3" ? "Our representative runs" : "Local or comparison runs";
+    const referenceLabel = uiText(
+      suite.suite_id === "track3" ? "runs.track3_official" : "runs.reference"
+    );
+    const localLabel = uiText(
+      suite.suite_id === "track3" ? "runs.track3_ours" : "runs.comparison"
+    );
+    const referenceHelper = uiText("runs.official_helper");
+    const localHelper = uiText("runs.comparison_helper");
+    const hasPlottedUnranked = unranked.some((row) =>
+      selectedChartRunIds.has(row.run.run_id)
+    );
+    const state = rankedRunGroupStateForSuite(
+      suite.suite_id,
+      hasPlottedUnranked ? "unranked" : "local"
+    );
+    if (!preserveScroll) {
+      state.scroll[state.active] = { top: 0, left: 0 };
+    }
+    const allReferenceRows = rows.filter((row) => referenceRunForSuite(suite, row.run));
+    const allLocalRows = rows.filter((row) => !referenceRunForSuite(suite, row.run));
     byId("leaderboardContent").innerHTML = `
       ${selectionBlock}
-      <details class="history-details section-callout ${suite.suite_id === "track3" ? "track3-history-callout" : ""}" ${open}>
-        <summary>
-          <span>${escapeHtml(referenceLabel)} (${referenceRows.length})</span>
-          <span class="muted">${suite.suite_id === "track3" ? "click to expand · sorted by steps" : "curated source-backed rows"}</span>
-        </summary>
-        <div class="history-table-slot" data-mounted="${isOpen}">
-          ${isOpen
-            ? referenceRows.length
-              ? leaderboardTable(suite, referenceRows, 1, "compact-table scroll-table")
-              : "<p class=\"empty-table-note\">No reference rows match the current filters.</p>"
+      <div class="run-list-viewport ranked-run-list-viewport" role="region" aria-label="${escapeHtml(uiText("runs.table", { title: navigationEntryTitle(navigationEntry) }))}">
+        <div class="ranked-run-group-stack" data-suite-id="${escapeHtml(suite.suite_id)}">
+          ${renderRankedRunGroup({
+            suite,
+            group: "official",
+            label: referenceLabel,
+            helper: referenceHelper,
+            rows: referenceRows,
+            totalCount: allReferenceRows.length,
+            active: state.active === "official",
+          })}
+          ${renderRankedRunGroup({
+            suite,
+            group: "local",
+            label: localLabel,
+            helper: localHelper,
+            rows: localRows,
+            totalCount: allLocalRows.length,
+            active: state.active === "local",
+          })}
+          ${unranked.length
+            ? renderRankedRunGroup({
+                suite,
+                group: "unranked",
+                label: uiText("runs.unranked"),
+                helper: unrankedEvidenceHelper(unranked),
+                rows: visibleUnranked,
+                totalCount: unranked.length,
+                active: state.active === "unranked",
+              })
             : ""}
         </div>
-      </details>
-      <div class="local-runs-block section-callout">
-        <div class="mini-heading">
-          <strong>${escapeHtml(localLabel)}</strong>
-          <span>${localRows.length} rows</span>
-        </div>
-        ${localRows.length ? leaderboardTable(suite, localRows, 1, "compact-table scroll-table") : "<p class=\"empty-table-note\">No local rows match the current filters.</p>"}
       </div>
-      ${unrankedBlock}
     `;
-    const details = byId("leaderboardContent").querySelector(".history-details");
-    if (details) {
-      details.addEventListener("toggle", () => {
-        referenceHistoryOpen[suite.suite_id] = details.open;
-        const slot = details.querySelector(".history-table-slot");
-        if (!slot) return;
-        if (!details.open) {
-          slot.replaceChildren();
-          slot.dataset.mounted = "false";
-          return;
-        }
-        if (slot.dataset.mounted === "true") return;
-        slot.innerHTML = referenceRows.length
-          ? leaderboardTable(suite, referenceRows, 1, "compact-table scroll-table")
-          : "<p class=\"empty-table-note\">No reference rows match the current filters.</p>";
-        slot.dataset.mounted = "true";
-        bindRowInteractions(slot);
+    byId("leaderboardContent")
+      .querySelectorAll("[data-ranked-run-group]")
+      .forEach((button) => {
+        button.addEventListener("click", () => {
+          const nextGroup = button.dataset.rankedRunGroup;
+          const currentState = rankedRunGroupStateForSuite(suite.suite_id);
+          if (nextGroup === currentState.active) return;
+          captureRankedRunGroupScroll();
+          currentState.active = nextGroup;
+          const focusState = { id: `ranked-run-group-${nextGroup}-toggle` };
+          renderLeaderboard();
+          restoreFocusState(focusState);
+        });
       });
-    }
     bindLeaderboardInteractions();
+    restoreRankedRunGroupScroll(suite.suite_id);
     return;
   }
 
   byId("leaderboardContent").innerHTML = `
     ${selectionBlock}
-    <details class="history-details optimizer-details section-callout" open>
-      <summary>
-        <span>Optimizer runs (${visibleRows.length}/${rows.length})</span>
-        <span class="muted">ranked by ${escapeHtml(primaryMetricName(suite))}</span>
-      </summary>
-      ${visibleRows.length ? leaderboardTable(suite, visibleRows, 1, "compact-table scroll-table") : "<p class=\"empty-table-note\">No rows match the current filters.</p>"}
-    </details>
-    ${unrankedBlock}
+    <div class="run-list-viewport" role="region" aria-label="${escapeHtml(uiText("runs.table", { title: navigationEntryTitle(navigationEntry) }))}" tabindex="0">
+      <details class="history-details optimizer-details section-callout" open>
+        <summary>
+          <span>${escapeHtml(uiText("runs.title"))} (${visibleRows.length}/${rows.length})</span>
+          <span class="muted">${escapeHtml(uiText("runs.rank_note", { title: "", metric: primaryColumnLabel(suite) }).replace(/^\s*·\s*/u, ""))}</span>
+        </summary>
+        ${visibleRows.length ? leaderboardTable(suite, visibleRows, 1, "compact-table scroll-table") : `<p class="empty-table-note">${escapeHtml(uiText("runs.no_rows"))}</p>`}
+      </details>
+      ${unrankedBlock}
+    </div>
   `;
   bindLeaderboardInteractions();
+  restoreRunListScroll(previousScroll);
 }
 
 function svgEl(name, attrs = {}) {
   const element = document.createElementNS("http://www.w3.org/2000/svg", name);
   Object.entries(attrs).forEach(([key, value]) => element.setAttribute(key, value));
   return element;
+}
+
+function applySvgAttributes(element, attrs = {}) {
+  Object.entries(attrs).forEach(([key, value]) => element.setAttribute(key, value));
+  return element;
+}
+
+function bindChartPathInteractions(path) {
+  if (path.dataset.chartInteractionBound === "true") return;
+  path.dataset.chartInteractionBound = "true";
+  path.addEventListener("click", () => {
+    selectRun(path.dataset.chartRunId, { focusChart: true });
+  });
+  path.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    selectRun(path.dataset.chartRunId, { focusChart: true });
+  });
 }
 
 function shortRunLabel(run) {
@@ -1977,23 +3033,32 @@ function shortRunLabel(run) {
   return labels[run.run_id] || run.leaderboard_meta?.rank_label || run.display_name.split(/\s+/).slice(0, 2).join(" ");
 }
 
+function chartRunChipLabel(run, suite) {
+  if (suite?.suite_id !== "track3") return shortRunLabel(run);
+  const rank = run.leaderboard_meta?.official_rank;
+  const label = Number.isInteger(rank)
+    ? `R${String(rank).padStart(2, "0")} ${run.optimizer?.name || run.display_name}`
+    : run.display_name;
+  return compactTooltipText(label, 24);
+}
+
 function renderChartModeSwitch() {
   const modeSwitch = byId("chartModeSwitch");
   const tailDomain = tailStepDomain(activeSuite());
   modeSwitch.innerHTML = `
-    <span class="chart-mode-label">Scale</span>
+    <span class="chart-mode-label">${escapeHtml(uiText("chart.scale"))}</span>
     <button type="button" class="${chartScaleMode === "full" ? "active" : ""}" data-scale-mode="full" aria-pressed="${chartScaleMode === "full"}">
       <span class="mode-icon">F</span>
-      <span>Full</span>
+      <span>${escapeHtml(uiText("chart.full"))}</span>
     </button>
     <button type="button" class="${chartScaleMode === "zoom" ? "active" : ""}" data-scale-mode="zoom" aria-pressed="${chartScaleMode === "zoom"}">
       <span class="mode-icon"><=5</span>
-      <span>Zoom</span>
+      <span>${escapeHtml(uiText("chart.zoom"))}</span>
     </button>
     ${tailDomain ? `
       <button type="button" class="${chartScaleMode === "tail" ? "active" : ""}" data-scale-mode="tail" aria-pressed="${chartScaleMode === "tail"}">
         <span class="mode-icon">${escapeHtml(tailDomain.min)}</span>
-        <span>Tail</span>
+        <span>${escapeHtml(uiText("chart.tail"))}</span>
       </button>
     ` : ""}
   `;
@@ -2010,109 +3075,37 @@ function renderChartModeSwitch() {
 
 function renderChartEmphasisSwitch() {
   const emphasisSwitch = byId("chartEmphasisSwitch");
-  const focusedRunId = chartFocusRunId();
   emphasisSwitch.innerHTML = `
-    <span class="chart-mode-label">Emphasis</span>
+    <span class="chart-mode-label">${escapeHtml(uiText("chart.emphasis"))}</span>
     <button
       type="button"
-      class="${focusedRunId ? "" : "active"}"
-      data-chart-focus-action="clear"
-      aria-pressed="${!focusedRunId}"
-      title="Give every visible curve equal visual weight"
+      class="${chartLabelMode === "all" ? "active" : ""}"
+      data-chart-focus-action="all"
+      aria-pressed="${chartLabelMode === "all"}"
+      title="${escapeHtml(uiText("chart.equal_title"))}"
     >
-      <span>All</span>
+      <span>${escapeHtml(uiText("chart.all"))}</span>
+    </button>
+    <button
+      type="button"
+      class="${chartLabelMode === "none" ? "active" : ""}"
+      data-chart-focus-action="clear"
+      aria-pressed="${chartLabelMode === "none"}"
+      title="${escapeHtml(uiText("chart.clear_title"))}"
+    >
+      <span>${escapeHtml(uiText("chart.clear"))}</span>
     </button>
   `;
+  emphasisSwitch.querySelector("[data-chart-focus-action=\"all\"]")?.addEventListener("click", () => {
+    const focusState = captureFocusState();
+    showAllChartLabels();
+    restoreFocusState(focusState);
+  });
   emphasisSwitch.querySelector("[data-chart-focus-action=\"clear\"]")?.addEventListener("click", () => {
-    if (!focusedChartRunId) return;
     const focusState = captureFocusState();
     clearChartFocus();
     restoreFocusState(focusState);
   });
-}
-
-function renderTargetMarkerStrip(suite, runs, metricName, model = currentChartModel) {
-  const strip = byId("targetStepStrip");
-  const ruler = model?.evidenceRuler;
-  const focusedRunId = chartFocusRunId();
-  if (!ruler?.items?.length) {
-    strip.hidden = true;
-    strip.classList.remove("target-ranking-panel");
-    strip.classList.remove("evidence-ruler");
-    strip.setAttribute("aria-label", "Selected run evidence ruler");
-    strip.innerHTML = "";
-    return;
-  }
-
-  strip.hidden = false;
-  strip.classList.add("target-ranking-panel", "evidence-ruler");
-  strip.setAttribute("aria-label", `Selected run ${metricAriaLabel(ruler.metricName)} evidence ruler`);
-  const [domainMin, domainMax] = ruler.domain;
-  const span = Math.max(domainMax - domainMin, Number.EPSILON);
-  const directionText = ruler.direction === "lower" ? "lower is better" : "higher is better";
-  strip.innerHTML = `
-    <div class="evidence-ruler-head">
-      <span>${escapeHtml(ruler.label)}</span>
-      <small>${escapeHtml(directionText)} · formal summary metric</small>
-    </div>
-    <div class="evidence-ruler-scale" aria-hidden="true">
-      <span>${escapeHtml(formatMetricValue(ruler.metricName, domainMin))}</span>
-      <span>${escapeHtml(formatMetricValue(ruler.metricName, domainMax))}</span>
-    </div>
-    <div class="evidence-ruler-rows">
-      ${ruler.items
-        .map((item) => {
-          const run = runById(item.runId);
-          const position = item.value === null
-            ? null
-            : Math.max(0, Math.min(100, ((item.value - domainMin) / span) * 100));
-          return `
-            <button
-              type="button"
-              class="evidence-ruler-row ${item.runId === focusedRunId ? "active" : ""}"
-              data-run-id="${escapeHtml(item.runId)}"
-              aria-pressed="${item.runId === focusedRunId}"
-              aria-current="${item.runId === focusedRunId}"
-            >
-              ${seriesKeyHtml(
-                {
-                  color: item.color,
-                  marker: item.marker,
-                },
-                item.role
-              )}
-              <strong>${escapeHtml(shortRunLabel(run || { display_name: item.label }))}</strong>
-              <span class="evidence-ruler-track">
-                ${
-                  position === null
-                    ? `<span class="evidence-ruler-not-reached">Not reached</span>`
-                    : `<span class="evidence-ruler-marker" style="left:${position}%; color:${escapeHtml(item.color)}" aria-hidden="true"></span>`
-                }
-              </span>
-              <span>${escapeHtml(item.value === null ? "Not reached" : formatMetricValue(ruler.metricName, item.value))}</span>
-            </button>
-          `;
-        })
-        .join("")}
-    </div>
-  `;
-
-  strip.querySelectorAll("button").forEach((button) => {
-    button.addEventListener("click", () => {
-      selectRun(button.dataset.runId, { focusChart: true });
-    });
-  });
-}
-
-function hiddenFilterChip(hiddenRuns) {
-  if (!hiddenRuns.length) return "";
-  return `
-    <span class="hidden-filter-chip">
-      ${hiddenRuns.length} plotted ${hiddenRuns.length === 1 ? "run is" : "runs are"} hidden by filters
-      <button type="button" data-filter-action="show-plotted">Show plotted</button>
-      <button type="button" data-filter-action="clear-filters">Clear filters</button>
-    </span>
-  `;
 }
 
 function safeFilename(value) {
@@ -2163,7 +3156,9 @@ function chartExportFilename(model, extension) {
   return [
     safeFilename(model?.figure?.id || activeSuite()?.suite_id),
     safeFilename(model?.request?.scaleMode || chartScaleMode),
-    model?.selection?.focusRunId ? "selected-focus" : "equal-emphasis",
+    model?.selection?.focusRunIds?.length
+      ? `focused-${model.selection.focusRunIds.length}`
+      : `labels-${model?.selection?.labelMode || "none"}`,
     `runs${count}`,
     hash,
     date,
@@ -2273,10 +3268,12 @@ function closestPointOnSegment(point, start, end) {
 function nearestCurveObservation(
   seriesList,
   pointer,
-  { maxDistance = 24, preferredRunId = null } = {}
+  { maxDistance = 24, preferredRunId = null, preferredRunIds = [] } = {}
 ) {
   let best = null;
   const tieTolerance = 0.25;
+  const preferredIds = new Set(preferredRunIds);
+  if (preferredRunId) preferredIds.add(preferredRunId);
 
   seriesList.forEach((series) => {
     (series.segments || []).forEach((segment) => {
@@ -2309,8 +3306,8 @@ function nearestCurveObservation(
         curveY: curvePoint.y,
         distance,
       };
-      const candidatePreferred = series.entry?.runId === preferredRunId;
-      const bestPreferred = best?.entry?.runId === preferredRunId;
+      const candidatePreferred = preferredIds.has(series.entry?.runId);
+      const bestPreferred = preferredIds.has(best?.entry?.runId);
       if (
         !best ||
         distance < best.distance - tieTolerance ||
@@ -2328,13 +3325,15 @@ function nearestCurveObservation(
 
 function renderChart() {
   const svg = byId("lossChart");
+  const reusableSeriesPaths = new Map(
+    Array.from(svg.querySelectorAll("path.series-path[data-chart-run-id]"))
+      .map((path) => [path.dataset.chartRunId, path])
+  );
   svg.innerHTML = "";
-  byId("chartLegend").innerHTML = "";
 
   const suite = activeSuite();
   normalizeChartScaleMode(suite);
   const yMetric = curveMetricName(suite);
-  const markerMetric = targetMarkerMetric(suite);
   renderChartModeSwitch();
   renderChartEmphasisSwitch();
   bindChartExportControls();
@@ -2348,66 +3347,51 @@ function renderChart() {
   });
 
   const model = currentChartModel;
-  const hiddenRuns = hiddenPlottedRuns(suite);
   const runs = (model?.series || []).map((entry) => runById(entry.runId)).filter(Boolean);
   const seriesByRun = new Map((model?.series || []).map((entry) => [entry.runId, entry]));
-  const focusedRunId = chartFocusRunId();
+  const focusedRunIds = new Set(chartFocusRunIds());
+  const hasFocusedRuns = focusedRunIds.size > 0;
 
   byId("chartMeta").textContent = model
     ? `${model.axes.y.label} by ${model.axes.x.label}${model.target ? ` · ${model.target.label}` : ""}`
     : `${yMetric} by step`;
 
   byId("chartSelectionChips").innerHTML = runs.length
-    ? [
-        ...runs
+    ? runs
         .map(
           (run) => {
             const entry = seriesByRun.get(run.run_id);
+            const metricText = summaryMetricText(run.run_id, primaryMetricName(suite));
+            const chipLabel = chartRunChipLabel(run, suite);
+            const accessibleLabel = `${run.display_name} · ${metricText}`;
             return `
             <button
               type="button"
-              class="${run.run_id === focusedRunId ? "active" : ""}"
+              class="${focusedRunIds.has(run.run_id) ? "active" : ""}"
               data-run-id="${escapeHtml(run.run_id)}"
               data-series-family="${escapeHtml(entry?.style?.family || "other")}"
               data-series-method-group="${escapeHtml(entry?.methodGroup || "unknown")}"
-              aria-pressed="${run.run_id === focusedRunId}"
+              title="${escapeHtml(accessibleLabel)}"
+              aria-label="${escapeHtml(accessibleLabel)}"
+              aria-pressed="${focusedRunIds.has(run.run_id)}"
             >
               ${seriesKeyHtml(entry?.style, entry?.role)}
-              ${escapeHtml(`${shortRunLabel(run)} · ${summaryMetricText(run.run_id, primaryMetricName(suite))}`)}
+              <span class="chart-chip-name">${escapeHtml(chipLabel)}</span>
+              <span class="chart-chip-metric">· ${escapeHtml(metricText)}</span>
             </button>
           `;
           }
-        ),
-        hiddenFilterChip(hiddenRuns),
-      ].join("")
-    : hiddenRuns.length
-      ? hiddenFilterChip(hiddenRuns)
-      : "<span class=\"muted\">No selected runs have drawable curves.</span>";
+        )
+        .join("")
+    : "<span class=\"muted\">No selected runs have drawable curves.</span>";
   byId("chartSelectionChips").querySelectorAll("button[data-run-id]").forEach((button) => {
     button.addEventListener("click", () => {
       selectRun(button.dataset.runId, { focusChart: true });
     });
   });
-  byId("chartSelectionChips").querySelectorAll("[data-filter-action]").forEach((button) => {
-    button.addEventListener("click", () => {
-      if (button.dataset.filterAction === "show-plotted") {
-        runFilterText = "";
-        runFilterRole = "all";
-        runFilterFamily = "all";
-        runFilterStatus = "all";
-        runFilterTarget = "all";
-        runFilterCurve = "plotted";
-      } else {
-        resetRunFilters();
-      }
-      refreshRunViews({ includeDetail: false });
-    });
-  });
-
-  renderTargetMarkerStrip(suite, runs, markerMetric, model);
 
   if (!model?.series?.length || !model.stats.points) {
-    byId("chartToolbarMeta").textContent = `${runs.length}/${chartSelectionLimit(suite)} visible · ${hiddenRuns.length} hidden by filters`;
+    byId("chartToolbarMeta").textContent = `${runs.length}/${chartSelectionLimit(suite)} visible`;
     const empty = svgEl("text", { x: 24, y: 48, class: "chart-label" });
     empty.textContent = "Select a run with an available curve.";
     svg.appendChild(empty);
@@ -2416,7 +3400,6 @@ function renderChart() {
 
   byId("chartToolbarMeta").textContent = [
     `${model.stats.visibleRuns}/${chartSelectionLimit(suite)} visible`,
-    hiddenRuns.length ? `${hiddenRuns.length} hidden by filters` : "",
     chartScaleMode === "full" ? "Full data range" : "",
     model.clipping.note,
     ...model.warnings,
@@ -2571,7 +3554,8 @@ function renderChart() {
     const defaultStrokeWidth = String(entry.style.contextStrokeWidth || 2.1);
     const selectedStrokeWidth = String(entry.style.focusStrokeWidth || 2.9);
     const selected = entry.focused;
-    const path = svgEl("path", {
+    const path = reusableSeriesPaths.get(entry.runId) || svgEl("path");
+    applySvgAttributes(path, {
       d: interactivePathData(model, entry.segments),
       class: [
         "curve",
@@ -2579,10 +3563,10 @@ function renderChart() {
         ...entry.style.classes,
         entry.role === "ours" ? "ours" : "",
         entry.status !== "completed" ? "partial" : "",
-        selected ? "is-selected selected" : focusedRunId ? "is-context" : "",
+        selected ? "is-selected selected" : hasFocusedRuns ? "is-context" : "",
       ].filter(Boolean).join(" "),
       stroke: entry.style.color,
-      opacity: selected ? "1" : focusedRunId ? defaultOpacity : neutralOpacity,
+      opacity: selected ? "1" : hasFocusedRuns ? defaultOpacity : neutralOpacity,
       "stroke-width": selected ? selectedStrokeWidth : defaultStrokeWidth,
       "stroke-dasharray": entry.style.dash || "none",
       "data-series-role": entry.role,
@@ -2599,14 +3583,7 @@ function renderChart() {
       "aria-label": `Inspect ${run.display_name}`,
       "aria-current": String(selected),
     });
-    path.addEventListener("click", () => {
-      selectRun(entry.runId, { focusChart: true });
-    });
-    path.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      selectRun(entry.runId, { focusChart: true });
-    });
+    bindChartPathInteractions(path);
     curveLayer.appendChild(path);
 
     const visibleSegments = entry.segments
@@ -2634,14 +3611,16 @@ function renderChart() {
     const entry = seriesByRun.get(label.runId);
     if (!entry) return;
     const selected = entry.focused;
+    const labeled = label.visible;
     const connector = svgEl("line", {
       x1: label.connector.x1,
       y1: label.connector.y1,
       x2: label.connector.x2,
       y2: label.connector.y2,
-      class: `series-end-connector ${selected ? "is-selected selected" : ""}`,
+      class: `series-end-connector ${selected ? "is-selected selected" : ""} ${labeled ? "" : "is-label-hidden"}`,
       color: entry.style.color,
-      opacity: selected ? "0.82" : focusedRunId ? "0.42" : "0.7",
+      opacity: selected ? "0.82" : hasFocusedRuns ? "0.42" : "0.7",
+      visibility: labeled ? "visible" : "hidden",
       "data-chart-run-id": entry.runId,
       "data-context-opacity": "0.42",
       "data-neutral-opacity": "0.7",
@@ -2653,9 +3632,10 @@ function renderChart() {
       x: label.x,
       y: label.y,
       "text-anchor": label.textAnchor || "start",
-      class: `series-end-label ${selected ? "is-selected selected" : ""}`,
+      class: `series-end-label ${selected ? "is-selected selected" : ""} ${labeled ? "" : "is-label-hidden"}`,
       fill: entry.style.color,
-      opacity: selected ? "1" : focusedRunId ? "0.76" : "0.9",
+      opacity: selected ? "1" : hasFocusedRuns ? "0.76" : "0.9",
+      visibility: labeled ? "visible" : "hidden",
       "data-chart-run-id": entry.runId,
       "data-context-opacity": "0.76",
       "data-neutral-opacity": "0.9",
@@ -2665,24 +3645,6 @@ function renderChart() {
     text.textContent = label.text;
     text.addEventListener("click", () => selectRun(entry.runId, { focusChart: true }));
     svg.appendChild(text);
-  });
-
-  model.clipping.runIds.forEach((runId, index) => {
-    const entry = seriesByRun.get(runId);
-    if (!entry) return;
-    const markerX = plot.left + 10 + index * 14;
-    const selected = entry.focused;
-    svg.appendChild(svgEl("path", {
-      d: `M ${markerX} ${plot.top + 3} l 5 -7 l 5 7 Z`,
-      class: `chart-clip-marker ${selected ? "is-selected selected" : ""}`,
-      fill: entry.style.color,
-      opacity: selected ? "1" : focusedRunId ? "0.58" : "0.82",
-      "data-chart-run-id": entry.runId,
-      "data-context-opacity": "0.58",
-      "data-neutral-opacity": "0.82",
-      "data-focus-opacity": "1",
-      "aria-current": String(selected),
-    }));
   });
 
   if (hoverSeries.length) {
@@ -2731,7 +3693,7 @@ function renderChart() {
       const local = point.matrixTransform(matrix.inverse());
       return nearestCurveObservation(hoverSeries, local, {
         maxDistance: event.pointerType === "touch" ? 34 : 24,
-        preferredRunId: chartFocusRunId(),
+        preferredRunIds: chartFocusRunIds(),
       });
     };
 
@@ -2802,8 +3764,18 @@ function listRuns(runIds) {
 }
 
 function sourceList(links) {
-  if (!links?.length) return "<li>n/a</li>";
-  return links.map((link) => `<li><code>${escapeHtml(link)}</code></li>`).join("");
+  const safeLinks = (links || [])
+    .map((link) => safeExternalUrl(link))
+    .filter(Boolean);
+  if (!safeLinks.length) {
+    return `<li><span class="source-retained">${escapeHtml(uiText("detail.local_artifact"))}</span></li>`;
+  }
+  return safeLinks
+    .map(
+      (link, index) =>
+        `<li><a href="${escapeHtml(link)}" target="_blank" rel="noreferrer">${escapeHtml(uiText("detail.open_source"))}${safeLinks.length > 1 ? ` ${index + 1}` : ""}</a></li>`
+    )
+    .join("");
 }
 
 function renderRunDetail() {
@@ -2812,8 +3784,8 @@ function renderRunDetail() {
   const run = runById(selectedRunId) || rows[0]?.run || suiteRuns(suite.suite_id)[0];
 
   if (!run) {
-    byId("detail-title").textContent = "No run selected";
-    byId("runDetail").innerHTML = "<p class=\"muted wide-muted\">No curated run is available for this suite yet.</p>";
+    byId("detail-title").textContent = uiText("detail.no_run");
+    byId("runDetail").innerHTML = `<p class="muted wide-muted">${escapeHtml(uiText("detail.no_run_body"))}</p>`;
     return;
   }
 
@@ -2875,33 +3847,17 @@ function renderRunDetail() {
       ${metricLine("hardware", `${hardware.gpu_type || "n/a"}${hardware.num_gpus ? ` · ${hardware.num_gpus} GPU` : ""}`)}
       ${extraSummary.map((metric) => metricLine(metric.metric_name, formatMetricValue(metric.metric_name, metric.value))).join("")}
       ${metricLine("source_type", displayValue(source.source_type))}
-      ${metricLine("source_path", source.log_path || source.csv_path || source.config_path || "n/a")}
-      ${source.command ? metricLine("command", source.command) : ""}
-      ${source.wandb_url ? metricLine("wandb_url", source.wandb_url) : ""}
+      ${metricLine("source_access", wandbUrl ? uiText("detail.public_link") : uiText("detail.local_artifact"))}
       ${meta.description ? metricLine("description", meta.description) : ""}
     </div>
     <div class="source-actions">
-      ${wandbUrl ? `<a href="${escapeHtml(wandbUrl)}" target="_blank" rel="noreferrer">Open WandB</a>` : ""}
-      <button type="button" id="copySource">Copy source path</button>
+      ${
+        wandbUrl
+          ? `<a href="${escapeHtml(wandbUrl)}" target="_blank" rel="noreferrer">${escapeHtml(uiText("detail.open_wandb"))}</a>`
+          : `<span class="source-retained">${escapeHtml(uiText("detail.local_artifact"))}</span>`
+      }
     </div>
   `;
-
-  const copy = byId("copySource");
-  const sourcePath = source.log_path || source.csv_path || source.config_path || "n/a";
-  if (copy) {
-    copy.setAttribute("aria-live", "polite");
-    copy.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(sourcePath);
-        copy.textContent = "Copied source path";
-      } catch {
-        copy.textContent = "Copy failed";
-      }
-      setTimeout(() => {
-        copy.textContent = "Copy source path";
-      }, 1200);
-    });
-  }
 }
 
 function renderClaims() {
@@ -2920,24 +3876,24 @@ function renderClaims() {
                 <span class="tag">delta ${claim.comparison.delta_value > 0 ? "+" : ""}${escapeHtml(fmt.format(claim.comparison.delta_value))}</span>
               </div>
               <dl class="claim-facts">
-                <div><dt>method</dt><dd>${escapeHtml(claim.comparison.method_label || "n/a")}</dd></div>
-                <div><dt>baseline</dt><dd>${escapeHtml(claim.comparison.baseline_label || "n/a")}</dd></div>
-                <div><dt>supporting runs</dt><dd>${escapeHtml(listRuns(claim.supporting_run_ids))}</dd></div>
-                <div><dt>baseline runs</dt><dd>${escapeHtml(listRuns(claim.baseline_run_ids))}</dd></div>
+                <div><dt>${escapeHtml(uiText("claims.method"))}</dt><dd>${escapeHtml(claim.comparison.method_label || "n/a")}</dd></div>
+                <div><dt>${escapeHtml(uiText("claims.baseline"))}</dt><dd>${escapeHtml(claim.comparison.baseline_label || "n/a")}</dd></div>
+                <div><dt>${escapeHtml(uiText("claims.supporting_runs"))}</dt><dd>${escapeHtml(listRuns(claim.supporting_run_ids))}</dd></div>
+                <div><dt>${escapeHtml(uiText("claims.baseline_runs"))}</dt><dd>${escapeHtml(listRuns(claim.baseline_run_ids))}</dd></div>
               </dl>
               <div class="claim-notes">
-                <strong>Caveats</strong>
+                <strong>${escapeHtml(uiText("claims.caveats"))}</strong>
                 <ul>${(claim.caveats || []).map((caveat) => `<li>${escapeHtml(caveat)}</li>`).join("") || "<li>n/a</li>"}</ul>
               </div>
               <details class="claim-sources">
-                <summary>Source links</summary>
+                <summary>${escapeHtml(uiText("claims.sources"))}</summary>
                 <ul>${sourceList(claim.source_links)}</ul>
               </details>
             </article>
           `
         )
         .join("")
-    : "<p class=\"muted wide-muted\">No claim cards have been curated for this suite yet.</p>";
+    : `<p class="muted wide-muted">${escapeHtml(uiText("claims.empty"))}</p>`;
 }
 
 function renderDataHealth() {
@@ -2993,7 +3949,7 @@ function renderSuiteView() {
   renderOverview();
   renderSuiteCards();
   renderSuiteHeader(suite);
-  renderProtocolSelector(suite);
+  renderProtocolContext(suite);
   renderDataHealth();
 
   if (suiteHasDetail(suite)) {
@@ -3026,6 +3982,7 @@ function setPortalStatus(message, state) {
       .forEach((node) => node.remove());
     pill.appendChild(label);
   }
+  label.removeAttribute("data-i18n");
   label.textContent = message;
 }
 
@@ -3034,7 +3991,7 @@ function setLoadingState(isLoading) {
   if (main) main.setAttribute("aria-busy", String(isLoading));
   if (isLoading) {
     byId("portalLoadError")?.remove();
-    setPortalStatus("Loading curated snapshot", "loading");
+    setPortalStatus(uiText("loading.snapshot"), "loading");
   }
 }
 
@@ -3088,6 +4045,10 @@ function initializeResponsiveChart() {
     window.addEventListener("resize", scheduleChartResize, { passive: true });
     window.addEventListener("popstate", () => {
       if (!portalData) return;
+      portalI18n.setLocale(portalI18n.resolveLocale(), {
+        persist: true,
+        syncUrl: false,
+      });
       clearTimeout(runSearchTimer);
       void restoreSuiteFromLocation();
     });
@@ -3316,13 +4277,20 @@ function resetSuiteInteractionState(suite) {
   clearTimeout(runSearchTimer);
   resetRunFilters();
   chartScaleMode = "full";
-  focusedChartRunId = null;
+  focusedChartRunIds = new Set();
+  chartLabelMode = "none";
   currentChartModel = null;
   initializeChartSelection(suite);
   selectedRunId = firstChartRun(suite)?.run_id || null;
 }
 
-function focusSuiteChangeControl({ focusGroupId = "", focusProtocolSuiteId = "" } = {}) {
+function focusSuiteChangeControl({
+  focusGroupId = "",
+  focusProtocolSuiteId = "",
+  revealInRail = false,
+  restoreFocus = true,
+} = {}) {
+  if (!restoreFocus) return;
   let control = null;
   if (focusProtocolSuiteId) {
     control = Array.from(
@@ -3334,6 +4302,17 @@ function focusSuiteChangeControl({ focusGroupId = "", focusProtocolSuiteId = "" 
       byId("suiteCards")?.querySelectorAll("[data-benchmark-group-id]") || []
     ).find((candidate) => candidate.dataset.benchmarkGroupId === focusGroupId);
   }
+  if (revealInRail) {
+    const selectedEntry = navigationEntryForSuite(selectedSuiteId);
+    const activeRailItem = Array.from(
+      byId("suiteCards")?.querySelectorAll("[data-benchmark-group-id]") || []
+    ).find((candidate) => candidate.dataset.benchmarkGroupId === selectedEntry?.id);
+    activeRailItem?.scrollIntoView({
+      behavior: "auto",
+      block: "nearest",
+      inline: "nearest",
+    });
+  }
   control?.focus({ preventScroll: true });
 }
 
@@ -3343,13 +4322,31 @@ async function requestSuiteChange(
     push = false,
     restoreUrl = false,
     initial = false,
+    navigationIntent = "protocol",
     focusGroupId = "",
     focusProtocolSuiteId = "",
+    restoreNavigationFocus = true,
   } = {}
 ) {
   const targetCatalogSuite = catalogSuiteById(targetSuiteId);
   if (!targetCatalogSuite) return false;
   const generation = ++suiteLoadGeneration;
+  const shouldLandAfterCommit = navigationIntent === "benchmark";
+  if (shouldLandAfterCommit) {
+    activePageViewHash = PAGE_VIEW_WORKSPACE_HASH;
+    pendingPageViewHash = PAGE_VIEW_WORKSPACE_HASH;
+    holdBenchmarkDrawerForSuiteLoad(generation);
+  } else if (benchmarkDrawerLoadingHold) {
+    benchmarkDrawerLoadingHold = 0;
+    scheduleBenchmarkDrawerClose();
+  }
+  const preservedProtocolScroll =
+    navigationIntent === "protocol"
+      ? {
+          left: Number(globalThis.scrollX) || 0,
+          top: Number(globalThis.scrollY) || 0,
+        }
+      : null;
 
   if (
     targetSuiteId === selectedSuiteId &&
@@ -3360,17 +4357,36 @@ async function requestSuiteChange(
     pendingSuiteId = null;
     protocolSwitchError = "";
     if (restoreUrl) {
-      applyUrlState();
-      renderSuiteView();
+      const committed = await commitSuiteViewUpdate(
+        () => {
+          applyUrlState();
+          renderSuiteView();
+        },
+        { generation, initial }
+      );
+      if (!committed || generation !== suiteLoadGeneration) return false;
     } else if (portalData) {
       renderSuiteCards();
-      renderProtocolSelector(activeSuite());
+      renderProtocolContext(activeSuite());
       setPortalStatus(
-        portalLoadMode === "catalog" ? "Curated catalog · suite loaded" : "Curated static snapshot",
+        portalLoadMode === "catalog"
+          ? uiText("status.catalog_loaded")
+          : uiText("status.static_snapshot"),
         "ready"
       );
     }
-    focusSuiteChangeControl({ focusGroupId, focusProtocolSuiteId });
+    focusSuiteChangeControl({
+      focusGroupId,
+      focusProtocolSuiteId,
+      revealInRail: !restoreUrl && !initial,
+      restoreFocus: restoreNavigationFocus,
+    });
+    if (shouldLandAfterCommit) {
+      await navigateToPageView(PAGE_VIEW_WORKSPACE_HASH, { generation });
+    } else if (preservedProtocolScroll) {
+      await restoreViewportScroll(preservedProtocolScroll, { generation });
+    }
+    releaseBenchmarkDrawerSuiteLoad(generation);
     return true;
   }
 
@@ -3378,28 +4394,50 @@ async function requestSuiteChange(
   protocolSwitchError = "";
   if (!initial && portalData) {
     renderSuiteCards();
-    renderProtocolSelector(activeSuite());
+    renderProtocolContext(activeSuite());
   }
-  setPortalStatus(`Loading ${targetCatalogSuite.title || targetSuiteId}`, "loading");
+  setPortalStatus(
+    uiText("loading.suite", { title: targetCatalogSuite.title || targetSuiteId }),
+    "loading"
+  );
 
   try {
     const nextPortalData = await portalDataForSuite(targetCatalogSuite);
     if (generation !== suiteLoadGeneration) return false;
 
-    portalData = nextPortalData;
-    buildDataIndex(portalData);
-    selectedSuiteId = targetSuiteId;
-    activeSuiteShardId = suiteNeedsShard(targetCatalogSuite) ? targetSuiteId : null;
-    pendingSuiteId = null;
-    protocolSwitchError = "";
+    const committed = await commitSuiteViewUpdate(
+      () => {
+        portalData = nextPortalData;
+        buildDataIndex(portalData);
+        selectedSuiteId = targetSuiteId;
+        activeSuiteShardId = suiteNeedsShard(targetCatalogSuite) ? targetSuiteId : null;
+        pendingSuiteId = null;
+        protocolSwitchError = "";
 
-    const suite = activeSuite();
-    if (restoreUrl) applyUrlState();
-    else resetSuiteInteractionState(suite);
-    renderSuiteView();
-    if (!restoreUrl) syncUrlState({ push });
-    setPortalStatus("Curated static snapshot", "ready");
-    focusSuiteChangeControl({ focusGroupId, focusProtocolSuiteId });
+        const suite = activeSuite();
+        if (restoreUrl) applyUrlState();
+        else resetSuiteInteractionState(suite);
+        renderSuiteView();
+        if (!restoreUrl) syncUrlState({ push });
+        setPortalStatus(uiText("status.static_snapshot"), "ready");
+      },
+      { generation, initial }
+    );
+    if (!committed || generation !== suiteLoadGeneration) return false;
+    focusSuiteChangeControl({
+      focusGroupId,
+      focusProtocolSuiteId,
+      revealInRail: !restoreUrl && !initial,
+      restoreFocus: restoreNavigationFocus,
+    });
+    if (shouldLandAfterCommit) {
+      await navigateToPageView(PAGE_VIEW_WORKSPACE_HASH, { generation });
+      if (generation !== suiteLoadGeneration) return false;
+    } else if (preservedProtocolScroll) {
+      await restoreViewportScroll(preservedProtocolScroll, { generation });
+      if (generation !== suiteLoadGeneration) return false;
+    }
+    releaseBenchmarkDrawerSuiteLoad(generation);
     return true;
   } catch (error) {
     if (generation !== suiteLoadGeneration) return false;
@@ -3407,23 +4445,37 @@ async function requestSuiteChange(
     protocolSwitchError = `Could not load ${targetCatalogSuite.title || targetSuiteId}. ${error?.message || String(error)}`;
     if (initial) throw error;
     renderSuiteCards();
-    renderProtocolSelector(activeSuite());
-    setPortalStatus("Curated snapshot · protocol unchanged", "ready");
+    renderProtocolContext(activeSuite());
+    setPortalStatus(uiText("status.protocol_unchanged"), "ready");
     if (restoreUrl) syncUrlState();
+    if (preservedProtocolScroll) {
+      await restoreViewportScroll(preservedProtocolScroll, { generation });
+    }
+    releaseBenchmarkDrawerSuiteLoad(generation, { failed: true });
     return false;
   }
 }
 
 async function restoreSuiteFromLocation() {
   if (!portalData || !globalThis.location) return;
-  const requestedSuiteId = new URLSearchParams(globalThis.location.search).get("suite");
+  const params = new URLSearchParams(globalThis.location.search);
+  const requestedSuiteId = params.get("suite");
   const targetSuiteId = catalogSuiteById(requestedSuiteId)
     ? requestedSuiteId
     : selectedSuiteId;
-  await requestSuiteChange(targetSuiteId, { restoreUrl: true });
+  const targetPageHash = normalizedPageViewHash(globalThis.location.hash);
+  pageViewUrlSyncEnabled = false;
+  activePageViewHash = targetPageHash;
+  pendingPageViewHash = targetPageHash;
+  await requestSuiteChange(targetSuiteId, {
+    restoreUrl: true,
+    navigationIntent: "history",
+  });
+  await navigateToPageView(targetPageHash);
 }
 
 async function start() {
+  installLocaleController();
   setLoadingState(true);
   ++suiteLoadGeneration;
   pendingSuiteId = null;
@@ -3450,7 +4502,11 @@ async function start() {
       ? requestedSuiteId
       : defaultSuiteId;
     try {
-      await requestSuiteChange(selectedSuiteId, { restoreUrl: true, initial: true });
+      await requestSuiteChange(selectedSuiteId, {
+        restoreUrl: true,
+        initial: true,
+        navigationIntent: "initial",
+      });
     } catch (initialShardError) {
       const aggregate = normalizedPortalData(await loadPortalSnapshot());
       if (!Array.isArray(aggregate.suites) || !aggregate.suites.length) {
@@ -3483,12 +4539,16 @@ async function start() {
     }
     setPortalStatus(
       usedAggregateFallback
-        ? "Curated static snapshot · aggregate fallback"
+        ? uiText("status.aggregate_fallback")
         : portalLoadMode === "catalog"
-          ? "Curated catalog · suite loaded"
-          : "Curated static snapshot",
+          ? uiText("status.catalog_loaded")
+          : uiText("status.static_snapshot"),
       "ready"
     );
+    installEntryController();
+    installRevealController();
+    resolveInitialEntry();
+    updateTopbarState();
   } catch (error) {
     renderLoadError(error);
   }
@@ -3509,7 +4569,8 @@ function installPortalTestApi() {
         data.suites[0]?.suite_id ||
         null;
       chartScaleMode = "full";
-      focusedChartRunId = null;
+      focusedChartRunIds = new Set();
+      chartLabelMode = "none";
       resetRunFilters();
       const suite = activeSuite();
       if (suite) {
@@ -3534,12 +4595,23 @@ function installPortalTestApi() {
       const run = runById(runId);
       if (!run || run.suite_id !== selectedSuiteId) return false;
       selectedRunId = runId;
-      if (focusChart && selectedChartRunIds.has(runId)) focusedChartRunId = runId;
+      if (focusChart && selectedChartRunIds.has(runId)) {
+        if (focusedChartRunIds.has(runId)) focusedChartRunIds.delete(runId);
+        else focusedChartRunIds.add(runId);
+        chartLabelMode = focusedChartRunIds.size ? "focused" : "none";
+      }
       return true;
     },
     clearChartFocus() {
-      const changed = focusedChartRunId !== null;
-      focusedChartRunId = null;
+      const changed = focusedChartRunIds.size > 0 || chartLabelMode !== "none";
+      focusedChartRunIds = new Set();
+      chartLabelMode = "none";
+      return changed;
+    },
+    showAllChartLabels() {
+      const changed = focusedChartRunIds.size > 0 || chartLabelMode !== "all";
+      focusedChartRunIds = new Set();
+      chartLabelMode = "all";
       return changed;
     },
     getBenchmarkNavigation() {
@@ -3570,7 +4642,8 @@ function installPortalTestApi() {
         selectedSuiteId,
         selectedRunId,
         chartScaleMode,
-        focusedChartRunId,
+        focusedChartRunIds: chartFocusRunIds(),
+        chartLabelMode,
         selectedChartRunIds: Array.from(selectedChartRunIds),
         pendingSuiteId,
         suiteLoadGeneration,

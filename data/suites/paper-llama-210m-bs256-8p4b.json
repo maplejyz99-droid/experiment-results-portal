@@ -1,5 +1,5 @@
 {
-  "delivery_id": "sha256:5d461cfc37e113595c0c05c65c40cd673563983b43390a6ba4fb9b50f91e8572",
+  "delivery_id": "sha256:1704d22953698285eb3ade871f0baaf9e043a95aa775c7b7bbe572cbcd2d8f9d",
   "suite_id": "paper-llama-210m-bs256-8p4b",
   "runs": [
     {
@@ -7249,6 +7249,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/bv7htjy8/output.log"
     },
     {
+      "metric_id": "m-paper-paper-llama-210m-bs256-8p4b-adopt-last-observed-loss",
+      "run_id": "paper-paper-llama-210m-bs256-8p4b-adopt",
+      "metric_scope": "summary",
+      "step": 63940,
+      "tokens_seen": 8380743680,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.125,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/bv7htjy8/output.log"
+    },
+    {
       "metric_id": "m-paper-paper-llama-210m-bs256-8p4b-adopt-best-loss",
       "run_id": "paper-paper-llama-210m-bs256-8p4b-adopt",
       "metric_scope": "summary",
@@ -13942,6 +13954,18 @@
       "metric_name": "val_loss",
       "value": 3.11,
       "split": "val",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/o3alezby/output.log"
+    },
+    {
+      "metric_id": "m-paper-paper-llama-210m-bs256-8p4b-ademamix-last-observed-loss",
+      "run_id": "paper-paper-llama-210m-bs256-8p4b-ademamix",
+      "metric_scope": "summary",
+      "step": 63940,
+      "tokens_seen": 8380743680,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.11,
+      "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/o3alezby/output.log"
     },
     {
@@ -20641,6 +20665,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/t0vx5ai5/output.log"
     },
     {
+      "metric_id": "m-paper-paper-llama-210m-bs256-8p4b-lion-last-observed-loss",
+      "run_id": "paper-paper-llama-210m-bs256-8p4b-lion",
+      "metric_scope": "summary",
+      "step": 63940,
+      "tokens_seen": 8380743680,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.146,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/t0vx5ai5/output.log"
+    },
+    {
       "metric_id": "m-paper-paper-llama-210m-bs256-8p4b-lion-best-loss",
       "run_id": "paper-paper-llama-210m-bs256-8p4b-lion",
       "metric_scope": "summary",
@@ -27337,6 +27373,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/fg9t8vdj/output.log"
     },
     {
+      "metric_id": "m-paper-paper-llama-210m-bs256-8p4b-signum-last-observed-loss",
+      "run_id": "paper-paper-llama-210m-bs256-8p4b-signum",
+      "metric_scope": "summary",
+      "step": 63940,
+      "tokens_seen": 8380743680,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.155,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/fg9t8vdj/output.log"
+    },
+    {
       "metric_id": "m-paper-paper-llama-210m-bs256-8p4b-signum-best-loss",
       "run_id": "paper-paper-llama-210m-bs256-8p4b-signum",
       "metric_scope": "summary",
@@ -34030,6 +34078,18 @@
       "metric_name": "val_loss",
       "value": 3.126,
       "split": "val",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/dg8pa08k/output.log"
+    },
+    {
+      "metric_id": "m-paper-paper-llama-210m-bs256-8p4b-soap-last-observed-loss",
+      "run_id": "paper-paper-llama-210m-bs256-8p4b-soap",
+      "metric_scope": "summary",
+      "step": 63940,
+      "tokens_seen": 8380743680,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.126,
+      "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/dg8pa08k/output.log"
     },
     {
@@ -40736,6 +40796,18 @@
       "tokens_seen": 8388608000,
       "wall_time_sec": null,
       "metric_name": "final_val_loss",
+      "value": 3.1540722846984863,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/52b67fs2/wandb-summary.json"
+    },
+    {
+      "metric_id": "m-paper-paper-llama-210m-bs256-8p4b-sophia-last-observed-loss",
+      "run_id": "paper-paper-llama-210m-bs256-8p4b-sophia",
+      "metric_scope": "summary",
+      "step": 64000,
+      "tokens_seen": 8388608000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
       "value": 3.1540722846984863,
       "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/52b67fs2/wandb-summary.json"
@@ -47461,6 +47533,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/cu3rpkff/output.log"
     },
     {
+      "metric_id": "m-paper-paper-llama-210m-bs256-8p4b-prodigy-last-observed-loss",
+      "run_id": "paper-paper-llama-210m-bs256-8p4b-prodigy",
+      "metric_scope": "summary",
+      "step": 63940,
+      "tokens_seen": 8380743680,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.13,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/cu3rpkff/output.log"
+    },
+    {
       "metric_id": "m-paper-paper-llama-210m-bs256-8p4b-prodigy-best-loss",
       "run_id": "paper-paper-llama-210m-bs256-8p4b-prodigy",
       "metric_scope": "summary",
@@ -54154,6 +54238,18 @@
       "metric_name": "val_loss",
       "value": 3.139,
       "split": "val",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/ktuq8eok/output.log"
+    },
+    {
+      "metric_id": "m-paper-paper-llama-210m-bs256-8p4b-mars-last-observed-loss",
+      "run_id": "paper-paper-llama-210m-bs256-8p4b-mars",
+      "metric_scope": "summary",
+      "step": 63940,
+      "tokens_seen": 8380743680,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.139,
+      "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/ktuq8eok/output.log"
     },
     {

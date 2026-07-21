@@ -1,5 +1,5 @@
 {
-  "delivery_id": "sha256:5d461cfc37e113595c0c05c65c40cd673563983b43390a6ba4fb9b50f91e8572",
+  "delivery_id": "sha256:1704d22953698285eb3ade871f0baaf9e043a95aa775c7b7bbe572cbcd2d8f9d",
   "suite_id": "paper-llama-124m-bs256-1b",
   "runs": [
     {
@@ -1137,6 +1137,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/2edfc009/wandb-summary.json"
     },
     {
+      "metric_id": "m-paper-paper-llama-124m-bs256-1b-adopt-last-observed-loss",
+      "run_id": "paper-paper-llama-124m-bs256-1b-adopt",
+      "metric_scope": "summary",
+      "step": 8000,
+      "tokens_seen": 1048576000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.5340449810028076,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/2edfc009/wandb-summary.json"
+    },
+    {
       "metric_id": "m-paper-paper-llama-124m-bs256-1b-adopt-best-loss",
       "run_id": "paper-paper-llama-124m-bs256-1b-adopt",
       "metric_scope": "summary",
@@ -2020,6 +2032,18 @@
       "tokens_seen": 1048576000,
       "wall_time_sec": null,
       "metric_name": "final_val_loss",
+      "value": 3.5009520053863525,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/6d4a2kee/wandb-summary.json"
+    },
+    {
+      "metric_id": "m-paper-paper-llama-124m-bs256-1b-ademamix-last-observed-loss",
+      "run_id": "paper-paper-llama-124m-bs256-1b-ademamix",
+      "metric_scope": "summary",
+      "step": 8000,
+      "tokens_seen": 1048576000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
       "value": 3.5009520053863525,
       "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/6d4a2kee/wandb-summary.json"
@@ -2913,6 +2937,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/lob0jo84/wandb-summary.json"
     },
     {
+      "metric_id": "m-paper-paper-llama-124m-bs256-1b-prodigy-last-observed-loss",
+      "run_id": "paper-paper-llama-124m-bs256-1b-prodigy",
+      "metric_scope": "summary",
+      "step": 8000,
+      "tokens_seen": 1048576000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.515416145324707,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/lob0jo84/wandb-summary.json"
+    },
+    {
       "metric_id": "m-paper-paper-llama-124m-bs256-1b-prodigy-best-loss",
       "run_id": "paper-paper-llama-124m-bs256-1b-prodigy",
       "metric_scope": "summary",
@@ -3796,6 +3832,18 @@
       "tokens_seen": 1048576000,
       "wall_time_sec": null,
       "metric_name": "final_val_loss",
+      "value": 3.5053699016571045,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/kql1tbvf/wandb-summary.json"
+    },
+    {
+      "metric_id": "m-paper-paper-llama-124m-bs256-1b-mars-last-observed-loss",
+      "run_id": "paper-paper-llama-124m-bs256-1b-mars",
+      "metric_scope": "summary",
+      "step": 8000,
+      "tokens_seen": 1048576000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
       "value": 3.5053699016571045,
       "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/kql1tbvf/wandb-summary.json"

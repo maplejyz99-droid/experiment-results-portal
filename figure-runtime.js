@@ -5,7 +5,7 @@
 })(typeof globalThis === "object" ? globalThis : this, function createPortalFigureRuntime() {
   "use strict";
 
-  const SCHEMA_VERSION = "1.1";
+  const SCHEMA_VERSION = "1.2";
   const PROFILES = {
     interactive: { name: "interactive", width: 960, height: 520 },
     presentation: { name: "presentation", width: 1200, height: 900 },
@@ -252,6 +252,7 @@
       step: "Training step",
       val_loss: "Validation loss \u2193",
       final_val_loss: "Final validation loss \u2193",
+      last_observed_val_loss: "Last observed validation loss \u2193",
       steps_to_target_3_28: "Steps to target \u2193",
     };
     return labels[metricName] || String(metricName || "Metric").replaceAll("_", " ");
@@ -342,17 +343,32 @@
     const visible = selected.filter((runId) => requestedVisible.has(runId));
     const visibleSet = new Set(visible);
     const hidden = selected.filter((runId) => !visibleSet.has(runId));
-    const requestedFocus = request?.focusRunId;
-    const focus = requestedFocus === undefined
-      ? visible[0] || null
-      : visibleSet.has(requestedFocus)
-        ? requestedFocus
-        : null;
+    const hasFocusSet = Array.isArray(request?.focusRunIds);
+    const requestedFocusIds = hasFocusSet
+      ? request.focusRunIds
+      : request?.focusRunId === undefined || request.focusRunId === null
+        ? []
+        : [request.focusRunId];
+    const focusRunIds = canonicalRunIds(
+      indexes,
+      figure,
+      Array.from(new Set(requestedFocusIds)).filter((runId) => visibleSet.has(runId))
+    );
+    const requestedLabelMode = ["none", "all", "focused"].includes(request?.labelMode)
+      ? request.labelMode
+      : focusRunIds.length
+        ? "focused"
+        : "none";
+    const labelMode = requestedLabelMode === "focused" && !focusRunIds.length
+      ? "none"
+      : requestedLabelMode;
     return {
       selectedRunIds: selected,
       visibleRunIds: visible,
       hiddenRunIds: hidden,
-      focusRunId: focus,
+      focusRunIds,
+      focusRunId: focusRunIds.length === 1 ? focusRunIds[0] : null,
+      labelMode,
     };
   }
 
@@ -379,13 +395,20 @@
       xMin = figure.tail_step_min;
       xMax = figure.tail_step_max;
     } else {
-      const xSpan = Math.max(xMax - xMin, 1);
-      xMax += xSpan * 0.02;
+      const configuredMax = scaleMode === "zoom"
+        ? figure.zoom_step_max
+        : figure.full_step_max;
+      if (finite(configuredMax) && configuredMax > xMin) {
+        xMax = configuredMax;
+      } else {
+        const xSpan = Math.max(xMax - xMin, 1);
+        xMax += xSpan * 0.02;
+      }
     }
 
-    const domainPoints = scaleMode === "tail"
-      ? allPoints.filter((point) => point.step >= xMin && point.step <= xMax)
-      : allPoints;
+    const domainPoints = allPoints.filter(
+      (point) => point.step >= xMin && point.step <= xMax
+    );
     const values = (domainPoints.length ? domainPoints : allPoints).map((point) => point.value);
     const target = suite.target;
     if (target?.metric_name === yMetric && finite(target.value)) values.push(target.value);
@@ -406,12 +429,15 @@
       const underSpread = Math.max(underExtent[1] - underExtent[0], 0.02);
       yMin = Math.max(0, underExtent[0] - Math.max(underSpread * 0.08, 0.006));
     }
+    if (scaleMode === "tail" && finite(figure.tail_y_axis_max)) {
+      yMax = figure.tail_y_axis_max;
+    }
     if (yMax <= yMin) yMax = yMin + 0.1;
     return { xMin, xMax, yMin, yMax };
   }
 
-  function buildLayout(profile, rulerItemCount) {
-    const hasRuler = rulerItemCount > 0;
+  function buildLayout(profile, rankingItemCount) {
+    const hasRanking = rankingItemCount > 0;
     const compact = profile.name === "interactive" && profile.width < 620;
     if (profile.name === "interactive") {
       const left = compact ? 50 : 64;
@@ -430,23 +456,17 @@
         compact,
         header: { top: 0, height: 0 },
         plot,
-        ruler: null,
+        ranking: null,
         footer: null,
       };
     }
 
     const left = profile.name === "paper" ? 72 : 84;
-    const rightGutter = profile.name === "paper" ? 172 : 220;
+    const rightGutter = profile.name === "paper" ? 230 : 288;
     const headerHeight = profile.name === "paper" ? 86 : 108;
     const footerHeight = 46;
     const footerTop = profile.height - footerHeight;
-    const rulerRowGap = profile.name === "paper" ? 15 : 17;
-    const rulerHeight = hasRuler
-      ? 46 + Math.max(0, rulerItemCount - 1) * rulerRowGap
-      : 0;
-    const rulerBottom = footerTop - 18;
-    const rulerTop = hasRuler ? rulerBottom - rulerHeight : null;
-    const plotBottom = hasRuler ? rulerTop - 44 : footerTop - 48;
+    const plotBottom = footerTop - 48;
     const plot = {
       left,
       top: headerHeight,
@@ -459,13 +479,13 @@
       compact: false,
       header: { top: 0, height: headerHeight },
       plot,
-      ruler: hasRuler
+      ranking: hasRanking
         ? {
-            top: rulerTop,
-            height: rulerHeight,
-            left,
-            right: profile.width - 44,
-            rowGap: rulerRowGap,
+            top: headerHeight,
+            left: plot.right + 16,
+            right: profile.width - 24,
+            rowGap: profile.name === "paper" ? 15 : 17,
+            headerHeight: profile.name === "paper" ? 30 : 34,
           }
         : null,
       footer: { top: footerTop, height: footerHeight },
@@ -515,7 +535,7 @@
   function labelForRun(run) {
     const rank = run?.leaderboard_meta?.rank_label;
     const name = String(run?.display_name || run?.run_id || "run");
-    if (rank && rank !== "ours") return `${rank} \u00b7 ${name}`;
+    if (rank && rank !== "ours" && !/^R\d+\b/iu.test(name)) return `${rank} \u00b7 ${name}`;
     return name;
   }
 
@@ -525,7 +545,7 @@
     return `${text.slice(0, Math.max(1, maximum - 1)).trimEnd()}\u2026`;
   }
 
-  function layoutDirectLabels(series, plot, domain, compact) {
+  function layoutDirectLabels(series, plot, domain, compact, reservedTop = plot.top) {
     const candidates = series
       .map((entry) => {
         const inDomain = entry.plotPoints.filter((point) =>
@@ -548,6 +568,7 @@
           },
           color: entry.style.color,
           focused: entry.focused,
+          visible: entry.labeled,
         };
       })
       .filter(Boolean)
@@ -559,7 +580,8 @@
         label.y = clamp(label.point.y, plot.top + 6, plot.bottom - 6);
       }
     } else {
-      let cursor = plot.top + 6;
+      const availableStart = plot.bottom - 6 - Math.max(0, candidates.length - 1) * minimumGap;
+      let cursor = Math.min(Math.max(plot.top + 6, reservedTop), availableStart);
       for (const label of candidates) {
         label.y = Math.max(label.point.y, cursor);
         cursor = label.y + minimumGap;
@@ -596,63 +618,52 @@
     return candidates;
   }
 
-  function buildEvidenceRuler(indexes, suite, figure, series, profile) {
-    const metricName = figure.target_marker_metric || suite.primary_metric || "final_val_loss";
-    const values = [];
-    const items = series.map((entry) => {
+  function buildRanking(indexes, suite, series, profile, layout) {
+    if (profile.name === "interactive" || !layout.ranking || !series.length) return null;
+    const rule = suite.leaderboard_rule || {};
+    const metricName = rule.sort_by || suite.primary_metric || "final_val_loss";
+    const direction = rule.direction === "desc" ? "desc" : "asc";
+    const box = layout.ranking;
+    const maximumLabel = profile.name === "paper" ? 20 : 27;
+    const items = series.map((entry, index) => {
       const metric = indexes.summaries.get(entry.runId)?.get(metricName);
       const value = finite(metric?.value) ? metric.value : null;
-      if (value !== null) values.push(value);
+      const y = box.top + box.headerHeight + index * box.rowGap + 10;
       return {
+        rank: index + 1,
         runId: entry.runId,
-        label: fitLabelText(entry.label, profile.name === "paper" ? 24 : 32),
+        label: fitLabelText(entry.label, maximumLabel),
         value,
+        valueLabel: value === null
+          ? "Not reached"
+          : metricName.includes("step")
+            ? formatExactStep(value)
+            : formatNumber(value, 4),
         color: entry.style.color,
-        marker: entry.style.marker,
-        methodGroup: entry.methodGroup,
-        role: entry.role,
-        status: entry.status,
         focused: entry.focused,
+        x: box.left,
+        y,
+        bounds: {
+          x: box.left,
+          y: y - 11,
+          width: box.right - box.left,
+          height: Math.max(13, box.rowGap - 2),
+        },
       };
     });
-    if (!items.length) return null;
-    const extent = numberExtent(values, [0, 1]);
-    const spread = Math.max(extent[1] - extent[0], metricName.includes("step") ? 50 : 0.01);
-    const domain = [
-      extent[0] - spread * 0.08,
-      extent[1] + spread * 0.08,
-    ];
-    const ticks = niceTicks(domain[0], domain[1], 4);
+    box.bottom = box.top + box.headerHeight + items.length * box.rowGap + 4;
     return {
       metricName,
-      label: metricLabel(metricName),
-      direction: metricName.includes("step") || metricName.includes("loss") ? "lower" : "higher",
-      domain,
-      ticks,
+      metricLabel: metricLabel(metricName),
+      direction,
       items,
+      bounds: {
+        x: box.left,
+        y: box.top,
+        width: box.right - box.left,
+        height: box.bottom - box.top,
+      },
     };
-  }
-
-  function addEvidenceGeometry(ruler, layout) {
-    if (!ruler || !layout.ruler) return ruler;
-    const trackLeft = layout.ruler.left + 185;
-    const trackRight = layout.ruler.right - 82;
-    ruler.items.forEach((item, index) => {
-      item.x = item.value === null
-        ? null
-        : linearMap(item.value, ruler.domain, [trackLeft, trackRight]);
-      item.labelX = layout.ruler.left;
-      item.labelY = layout.ruler.top + 34 + index * layout.ruler.rowGap;
-      item.lane = index;
-      item.bounds = {
-        x: layout.ruler.left,
-        y: item.labelY - 11,
-        width: layout.ruler.right - layout.ruler.left,
-        height: 16,
-      };
-    });
-    ruler.track = { left: trackLeft, right: trackRight };
-    return ruler;
   }
 
   function buildFigureModel(data, request) {
@@ -683,7 +694,8 @@
       .map((runId) => indexes.runs.get(runId))
       .filter(Boolean);
     const allocatedStyles = allocateRunStyles(anchorRuns, styleRegistry);
-    const hasFocusedSeries = selection.focusRunId !== null;
+    const focusedRunIds = new Set(selection.focusRunIds);
+    const hasFocusedSeries = focusedRunIds.size > 0;
     const series = selection.visibleRunIds.map((runId) => {
       const run = indexes.runs.get(runId);
       const style = allocatedStyles.get(runId) || styleForRun(run, styleRegistry);
@@ -696,10 +708,12 @@
         wallTimeSec: finite(point.wall_time_sec) ? point.wall_time_sec : null,
         split: point.split || "",
       }));
-      const plotPoints = scaleMode === "tail"
-        ? points.filter((point) => point.step >= domain.xMin && point.step <= domain.xMax)
-        : points;
-      const focused = runId === selection.focusRunId;
+      const plotPoints = points.filter(
+        (point) => point.step >= domain.xMin && point.step <= domain.xMax
+      );
+      const focused = focusedRunIds.has(runId);
+      const labeled = selection.labelMode === "all" ||
+        (selection.labelMode === "focused" && focused);
       const contextOpacity = profile.name === "interactive"
         ? style.status === "completed" ? 0.52 : 0.36
         : style.status === "completed" ? 0.82 : 0.68;
@@ -719,6 +733,7 @@
         role: style.role,
         status: style.status,
         focused,
+        labeled,
         style: {
           ...style,
           contextOpacity,
@@ -755,46 +770,62 @@
       }
     }
 
-    const provisionalRuler = buildEvidenceRuler(indexes, suite, figure, series, profile);
-    const layout = buildLayout(profile, provisionalRuler?.items.length || 0);
+    const layout = buildLayout(profile, profile.name === "interactive" ? 0 : series.length);
+    const ranking = buildRanking(indexes, suite, series, profile, layout);
     const geometry = {
       xScale: { domain: [domain.xMin, domain.xMax], range: [layout.plot.left, layout.plot.right] },
       yScale: { domain: [domain.yMin, domain.yMax], range: [layout.plot.bottom, layout.plot.top] },
     };
-    const directLabels = layoutDirectLabels(series, layout.plot, domain, layout.compact);
+    const directLabels = layoutDirectLabels(
+      series,
+      layout.plot,
+      domain,
+      layout.compact,
+      ranking ? ranking.bounds.y + ranking.bounds.height + 10 : layout.plot.top
+    );
     const labelsByRun = new Map(directLabels.map((label) => [label.runId, label]));
     series.forEach((entry) => {
       entry.endLabel = labelsByRun.get(entry.runId) || null;
     });
 
     const clippingRuns = new Set();
-    let clippedPointCount = 0;
-    if (scaleMode === "zoom") {
-      for (const entry of series) {
-        for (const point of entry.points) {
-          if (point.value > domain.yMax) {
-            clippingRuns.add(entry.runId);
-            clippedPointCount += 1;
-          }
+    const yClippingRuns = new Set();
+    const clippedPoints = new Set();
+    const xWindowActive = scaleMode === "tail" || series.some(
+      (entry) => entry.points.length > entry.plotPoints.length
+    );
+    for (const entry of series) {
+      for (const point of entry.points) {
+        const clippedByX = point.step < domain.xMin || point.step > domain.xMax;
+        const clippedByY = scaleMode === "zoom" && point.value > domain.yMax;
+        if (clippedByX || clippedByY) {
+          clippingRuns.add(entry.runId);
+          clippedPoints.add(`${entry.runId}:${point.pointIndex}`);
         }
+        if (clippedByY) yClippingRuns.add(entry.runId);
       }
     }
+    const clippingReasons = [
+      scaleMode === "zoom" ? "y-maximum" : "",
+      xWindowActive ? "x-window" : "",
+    ].filter(Boolean);
+    const xWindowNote = scaleMode === "tail"
+      ? `Tail focus x ${formatStep(domain.xMin)}\u2013${formatStep(domain.xMax)}`
+      : xWindowActive
+        ? `View capped at step ${Math.round(domain.xMax).toLocaleString("en-US")}`
+        : "";
+    const yWindowNote = scaleMode === "zoom"
+      ? yClippingRuns.size
+        ? `${yClippingRuns.size} ${yClippingRuns.size === 1 ? "series" : "series"} clipped above y=${formatNumber(domain.yMax, 2)}`
+        : `Focused range y \u2264 ${formatNumber(domain.yMax, 2)}`
+      : "";
     const clipping = {
-      active: scaleMode !== "full",
-      pointCount: clippedPointCount,
+      active: clippingReasons.length > 0,
+      pointCount: clippedPoints.size,
       runCount: clippingRuns.size,
       runIds: Array.from(clippingRuns),
-      reasons: [
-        scaleMode === "zoom" ? "y-maximum" : "",
-        scaleMode === "tail" ? "x-window" : "",
-      ].filter(Boolean),
-      note: scaleMode === "zoom"
-        ? clippingRuns.size
-          ? `${clippingRuns.size} ${clippingRuns.size === 1 ? "series" : "series"} clipped above y=${formatNumber(domain.yMax, 2)}`
-          : `Focused range y \u2264 ${formatNumber(domain.yMax, 2)}`
-        : scaleMode === "tail"
-          ? `Tail focus x ${formatStep(domain.xMin)}\u2013${formatStep(domain.xMax)}`
-          : "",
+      reasons: clippingReasons,
+      note: [xWindowNote, yWindowNote].filter(Boolean).join(" · "),
     };
 
     const target = suite.target?.metric_name === yMetric && finite(suite.target?.value)
@@ -806,7 +837,6 @@
             `Target ${suite.target.direction === "above" ? "\u2265" : "\u2264"} ${formatNumber(suite.target.value, 4)}`,
         }
       : null;
-    const evidenceRuler = addEvidenceGeometry(provisionalRuler, layout);
     const xTicks = niceTicks(domain.xMin, domain.xMax, layout.compact ? 4 : 6);
     const yTicks = niceTicks(domain.yMin, domain.yMax, layout.compact ? 5 : 7);
     const selectedCount = selection.visibleRunIds.length;
@@ -826,7 +856,9 @@
       { name: "suite_id", value: suite.suite_id },
       { name: "scale_mode", value: scaleMode },
       { name: "visible_run_ids", value: selection.visibleRunIds.join(",") },
+      { name: "focus_run_ids", value: selection.focusRunIds.join(",") },
       { name: "focus_run_id", value: selection.focusRunId || "" },
+      { name: "label_mode", value: selection.labelMode },
       { name: "snapshot_version", value: snapshot.schemaVersion },
       { name: "snapshot_date", value: snapshot.generatedAt },
       {
@@ -861,7 +893,9 @@
         figureId: figure.figure_id,
         selectedRunIds: [...selection.selectedRunIds],
         visibleRunIds: [...selection.visibleRunIds],
+        focusRunIds: [...selection.focusRunIds],
         focusRunId: selection.focusRunId,
+        labelMode: selection.labelMode,
         scaleMode,
         profile: profile.name,
         width: profile.width,
@@ -891,7 +925,7 @@
       series,
       target,
       clipping,
-      evidenceRuler,
+      ranking,
       directLabels,
       styleCollisions,
       metadata,
@@ -943,6 +977,11 @@
     return Math.round(value).toLocaleString("en-US");
   }
 
+  function formatExactStep(value) {
+    if (!finite(value)) return "n/a";
+    return String(Math.round(value));
+  }
+
   function pathData(model, segments) {
     return segments
       .map((segment) =>
@@ -989,7 +1028,10 @@
         suite: model.suite.id,
         scale: model.request.scaleMode,
         runIds: model.selection.visibleRunIds,
+        focusRunIds: model.selection.focusRunIds,
         focusRunId: model.selection.focusRunId,
+        labelMode: model.selection.labelMode,
+        ranking: model.ranking,
         domain: model.domain,
         snapshot: model.snapshot,
         comparability: model.suite.comparability,
@@ -1007,9 +1049,10 @@
       ".curve{fill:none;stroke-linecap:round;stroke-linejoin:round}",
       ".end-label{font-size:10px;font-weight:650}",
       ".clip-note{font-size:10px;font-weight:650;fill:#985A06}",
-      ".ruler-title{font-size:11px;font-weight:700}",
-      ".ruler-label{font-size:9px;fill:#475467}",
-      ".ruler-marker{stroke-linecap:round}",
+      ".ranking-title{font-size:10px;font-weight:750;letter-spacing:.4px;fill:#344054}",
+      ".ranking-label{font-size:9px;fill:#344054}",
+      ".ranking-value{font-size:9px;fill:#667085;font-variant-numeric:tabular-nums}",
+      ".ranking-line{stroke-linecap:round}",
       ".footer{font-size:9px;fill:#667085}",
       "</style>",
       `<rect width="${width}" height="${height}" fill="#FFFFFF"/>`,
@@ -1058,34 +1101,25 @@
     }
     lines.push("</g>");
 
-    if (model.clipping.runCount) {
-      model.series
-        .filter((entry) => model.clipping.runIds.includes(entry.runId))
-        .forEach((entry, index) => {
-          const x = plot.left + 12 + index * 13;
-          lines.push(`<path d="M${x} ${plot.top + 2} l5 -7 l5 7 Z" fill="${entry.style.color}"/>`);
-        });
-    }
-
-    for (const label of model.directLabels) {
+    for (const label of model.directLabels.filter((candidate) => candidate.visible)) {
       lines.push(`<line x1="${label.connector.x1.toFixed(2)}" y1="${label.connector.y1.toFixed(2)}" x2="${label.connector.x2.toFixed(2)}" y2="${label.connector.y2.toFixed(2)}" stroke="${label.color}" stroke-width="1" opacity=".7"/>`);
       lines.push(`<text class="end-label" x="${label.x.toFixed(2)}" y="${label.y.toFixed(2)}" text-anchor="${label.textAnchor || "start"}" fill="${label.color}"${label.focused ? ' font-weight="750"' : ' opacity=".78"'}>${escapeXml(label.text)}</text>`);
     }
 
-    if (model.evidenceRuler && model.layout.ruler) {
-      const ruler = model.evidenceRuler;
-      const box = model.layout.ruler;
-      lines.push(`<line x1="${box.left}" x2="${box.right}" y1="${box.top - 18}" y2="${box.top - 18}" stroke="#DCE3EC"/>`);
-      lines.push(`<text class="ruler-title" x="${box.left}" y="${box.top}">${escapeXml(`${ruler.label.toUpperCase()} \u00b7 ${ruler.direction === "lower" ? "LOWER IS BETTER" : "HIGHER IS BETTER"}`)}</text>`);
-      for (const item of ruler.items) {
-        lines.push(`<text class="ruler-label" x="${item.labelX}" y="${item.labelY}">${escapeXml(item.label)}</text>`);
-        lines.push(`<line x1="${ruler.track.left}" x2="${ruler.track.right}" y1="${item.labelY - 3}" y2="${item.labelY - 3}" stroke="#E3E9F1"/>`);
-        if (item.value === null) {
-          lines.push(`<text class="ruler-label" x="${ruler.track.right}" y="${item.labelY}" text-anchor="end">Not reached</text>`);
-        } else {
-          lines.push(`<line class="ruler-marker" x1="${item.x}" x2="${item.x}" y1="${item.labelY - 9}" y2="${item.labelY + 3}" stroke="${item.color}" stroke-width="${item.focused ? 3 : 2}"/>`);
-          lines.push(`<text class="ruler-label" x="${box.right}" y="${item.labelY}" text-anchor="end">${escapeXml(formatNumber(item.value, ruler.metricName.includes("step") ? 0 : 4))}</text>`);
-        }
+    if (model.ranking && model.layout.ranking) {
+      const ranking = model.ranking;
+      const box = model.layout.ranking;
+      const directionCopy = ranking.direction === "asc"
+        ? "BEST TO WORST \u00b7 LOWER IS BETTER"
+        : "BEST TO WORST \u00b7 HIGHER IS BETTER";
+      lines.push(`<text class="ranking-title" x="${box.left}" y="${box.top + 10}">${escapeXml(`RANKING \u00b7 ${ranking.metricLabel.toUpperCase()}`)}</text>`);
+      lines.push(`<text class="ranking-value" x="${box.right}" y="${box.top + 24}" text-anchor="end">${escapeXml(directionCopy)}</text>`);
+      for (const item of ranking.items) {
+        const lineY = item.y - 3;
+        lines.push(`<text class="ranking-label" x="${box.left}" y="${item.y}">${item.rank}</text>`);
+        lines.push(`<line class="ranking-line" x1="${box.left + 16}" x2="${box.left + 30}" y1="${lineY}" y2="${lineY}" stroke="${item.color}" stroke-width="${item.focused ? 3 : 2}"/>`);
+        lines.push(`<text class="ranking-label" x="${box.left + 36}" y="${item.y}">${escapeXml(item.label)}</text>`);
+        lines.push(`<text class="ranking-value" x="${box.right}" y="${item.y}" text-anchor="end">${escapeXml(item.valueLabel)}</text>`);
       }
     }
 
@@ -1113,6 +1147,7 @@
       "display_name",
       "selection_order",
       "focused",
+      "label_mode",
       "role",
       "status",
       "optimizer_family",
@@ -1155,6 +1190,7 @@
           entry.displayName,
           selectionIndex + 1,
           entry.focused,
+          model.selection.labelMode,
           entry.role,
           entry.status,
           entry.optimizerFamily,

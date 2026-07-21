@@ -1,12 +1,12 @@
 {
-  "delivery_id": "sha256:5d461cfc37e113595c0c05c65c40cd673563983b43390a6ba4fb9b50f91e8572",
+  "delivery_id": "sha256:1704d22953698285eb3ade871f0baaf9e043a95aa775c7b7bbe572cbcd2d8f9d",
   "meta": {
     "title": "LLM Optimizer Results Portal",
     "version": "0.5.0",
     "generated_at": "2026-07-18",
     "mode": "static-multi-protocol-paper-main",
     "notes": "Static suite-local portal data with Track 3, current curated benchmarks, and audited arXiv:2509.01440v1 main-benchmark protocols.",
-    "delivery_id": "sha256:5d461cfc37e113595c0c05c65c40cd673563983b43390a6ba4fb9b50f91e8572",
+    "delivery_id": "sha256:1704d22953698285eb3ade871f0baaf9e043a95aa775c7b7bbe572cbcd2d8f9d",
     "publication": "github-pages-public-snapshot",
     "source_path_policy": "Remote absolute paths are replaced with public source labels in this published snapshot."
   },
@@ -188,17 +188,17 @@
       },
       "notes": "Leaderboard is suite-local and ranked by known steps_to_target_3_28. Runs that did not reach target remain traceable but display as not reached. Official references are reference-only and should not be mixed with benchmark or muP suites. R22 SpectralDescent is intentionally excluded from this curated portal because its lone 8,225-step result distorts the Full scale; the upstream official record remains unchanged.",
       "evidence_summary": {
-        "mapped": 39,
-        "expected": 39,
-        "complete": 39,
+        "mapped": 53,
+        "expected": 53,
+        "complete": 53,
         "partial": 0,
         "failed": 0,
-        "drawable": 39,
-        "metrics": 1609,
+        "drawable": 52,
+        "metrics": 2167,
         "claims": 3,
         "figures": 1,
         "status_counts": {
-          "completed": 39
+          "completed": 53
         }
       }
     },
@@ -453,24 +453,30 @@
       "title": "Llama 124M · Paper · Batch 32 · 2.1B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "Llama 124M · Paper · Batch 32 · 2.1B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -484,11 +490,11 @@
       },
       "card": {
         "headline": "9/10 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "llama-124m",
       "protocol": {
         "protocol_id": "paper-llama-124m-bs32-2p1b",
@@ -529,7 +535,7 @@
         "partial": 5,
         "failed": 1,
         "drawable": 8,
-        "metrics": 4991,
+        "metrics": 5000,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -546,24 +552,30 @@
       "title": "Llama 124M · Paper · Batch 32 · 4.2B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "Llama 124M · Paper · Batch 32 · 4.2B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -577,11 +589,11 @@
       },
       "card": {
         "headline": "9/10 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "llama-124m",
       "protocol": {
         "protocol_id": "paper-llama-124m-bs32-4p2b",
@@ -622,7 +634,7 @@
         "partial": 5,
         "failed": 1,
         "drawable": 8,
-        "metrics": 9173,
+        "metrics": 9182,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -639,24 +651,30 @@
       "title": "Llama 124M · Paper · Batch 32 · 6.3B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "Llama 124M · Paper · Batch 32 · 6.3B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -670,11 +688,11 @@
       },
       "card": {
         "headline": "9/10 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "llama-124m",
       "protocol": {
         "protocol_id": "paper-llama-124m-bs32-6p3b",
@@ -715,7 +733,7 @@
         "partial": 6,
         "failed": 0,
         "drawable": 9,
-        "metrics": 16926,
+        "metrics": 16935,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -731,24 +749,30 @@
       "title": "Llama 124M · Paper · Batch 256 · 1B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "Llama 124M · Paper · Batch 256 · 1B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -762,11 +786,11 @@
       },
       "card": {
         "headline": "4/11 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "llama-124m",
       "protocol": {
         "protocol_id": "paper-llama-124m-bs256-1b",
@@ -831,7 +855,7 @@
         "partial": 0,
         "failed": 0,
         "drawable": 4,
-        "metrics": 296,
+        "metrics": 300,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -846,24 +870,30 @@
       "title": "Llama 124M · Paper · Batch 256 · 2.1B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "Llama 124M · Paper · Batch 256 · 2.1B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -877,11 +907,11 @@
       },
       "card": {
         "headline": "5/11 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "llama-124m",
       "protocol": {
         "protocol_id": "paper-llama-124m-bs256-2p1b",
@@ -942,7 +972,7 @@
         "partial": 0,
         "failed": 0,
         "drawable": 5,
-        "metrics": 720,
+        "metrics": 725,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -957,24 +987,30 @@
       "title": "Llama 124M · Paper · Batch 256 · 4.2B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "Llama 124M · Paper · Batch 256 · 4.2B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -988,11 +1024,11 @@
       },
       "card": {
         "headline": "4/11 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "llama-124m",
       "protocol": {
         "protocol_id": "paper-llama-124m-bs256-4p2b",
@@ -1057,7 +1093,7 @@
         "partial": 0,
         "failed": 0,
         "drawable": 4,
-        "metrics": 1132,
+        "metrics": 1136,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -1072,24 +1108,30 @@
       "title": "Llama 124M · Paper · Batch 256 · 6.3B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "Llama 124M · Paper · Batch 256 · 6.3B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -1103,11 +1145,11 @@
       },
       "card": {
         "headline": "4/11 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "llama-124m",
       "protocol": {
         "protocol_id": "paper-llama-124m-bs256-6p3b",
@@ -1172,7 +1214,7 @@
         "partial": 2,
         "failed": 1,
         "drawable": 4,
-        "metrics": 1679,
+        "metrics": 1683,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -1189,24 +1231,30 @@
       "title": "Llama 210M · Paper · Batch 256 · 1B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "Llama 210M · Paper · Batch 256 · 1B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -1220,11 +1268,11 @@
       },
       "card": {
         "headline": "8/11 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "llama-210m",
       "protocol": {
         "protocol_id": "paper-llama-210m-bs256-1b",
@@ -1273,7 +1321,7 @@
         "partial": 0,
         "failed": 0,
         "drawable": 8,
-        "metrics": 592,
+        "metrics": 600,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -1288,24 +1336,30 @@
       "title": "Llama 210M · Paper · Batch 256 · 2.1B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "Llama 210M · Paper · Batch 256 · 2.1B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -1319,11 +1373,11 @@
       },
       "card": {
         "headline": "8/11 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "llama-210m",
       "protocol": {
         "protocol_id": "paper-llama-210m-bs256-2p1b",
@@ -1372,7 +1426,7 @@
         "partial": 0,
         "failed": 0,
         "drawable": 8,
-        "metrics": 1152,
+        "metrics": 1160,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -1387,24 +1441,30 @@
       "title": "Llama 210M · Paper · Batch 256 · 4.2B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "Llama 210M · Paper · Batch 256 · 4.2B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -1418,11 +1478,11 @@
       },
       "card": {
         "headline": "8/11 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "llama-210m",
       "protocol": {
         "protocol_id": "paper-llama-210m-bs256-4p2b",
@@ -1471,7 +1531,7 @@
         "partial": 3,
         "failed": 1,
         "drawable": 8,
-        "metrics": 2252,
+        "metrics": 2260,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -1488,24 +1548,30 @@
       "title": "Llama 210M · Paper · Batch 256 · 6.3B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "Llama 210M · Paper · Batch 256 · 6.3B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -1519,11 +1585,11 @@
       },
       "card": {
         "headline": "8/11 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "llama-210m",
       "protocol": {
         "protocol_id": "paper-llama-210m-bs256-6p3b",
@@ -1572,7 +1638,7 @@
         "partial": 4,
         "failed": 2,
         "drawable": 8,
-        "metrics": 3358,
+        "metrics": 3366,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -1589,24 +1655,30 @@
       "title": "Llama 210M · Paper · Batch 256 · 8.4B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "Llama 210M · Paper · Batch 256 · 8.4B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -1620,11 +1692,11 @@
       },
       "card": {
         "headline": "8/11 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "llama-210m",
       "protocol": {
         "protocol_id": "paper-llama-210m-bs256-8p4b",
@@ -1673,7 +1745,7 @@
         "partial": 7,
         "failed": 0,
         "drawable": 8,
-        "metrics": 4467,
+        "metrics": 4475,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -1689,24 +1761,30 @@
       "title": "Llama 210M · Paper · Batch 256 · 16.8B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "Llama 210M · Paper · Batch 256 · 16.8B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -1720,11 +1798,11 @@
       },
       "card": {
         "headline": "9/11 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "llama-210m",
       "protocol": {
         "protocol_id": "paper-llama-210m-bs256-16p8b",
@@ -1769,7 +1847,7 @@
         "partial": 5,
         "failed": 0,
         "drawable": 8,
-        "metrics": 4902,
+        "metrics": 4910,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -1785,24 +1863,30 @@
       "title": "Llama 720M · Paper · Batch 1984 · 8B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "Llama 720M · Paper · Batch 1984 · 8B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -1816,11 +1900,11 @@
       },
       "card": {
         "headline": "4/11 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "llama-720m",
       "protocol": {
         "protocol_id": "paper-llama-720m-bs1984-8b",
@@ -1885,7 +1969,7 @@
         "partial": 0,
         "failed": 0,
         "drawable": 4,
-        "metrics": 180,
+        "metrics": 184,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -1900,24 +1984,30 @@
       "title": "Llama 720M · Paper · Batch 1984 · 16B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "Llama 720M · Paper · Batch 1984 · 16B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -1931,11 +2021,11 @@
       },
       "card": {
         "headline": "8/11 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "llama-720m",
       "protocol": {
         "protocol_id": "paper-llama-720m-bs1984-16b",
@@ -1984,7 +2074,7 @@
         "partial": 0,
         "failed": 0,
         "drawable": 8,
-        "metrics": 580,
+        "metrics": 588,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -1999,24 +2089,30 @@
       "title": "Llama 720M · Paper · Batch 1984 · 48B",
       "family": "benchmark",
       "status": "partial",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "Llama 720M · Paper · Batch 1984 · 48B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -2030,11 +2126,11 @@
       },
       "card": {
         "headline": "7/11 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "partial",
         "detail_state": "placeholder"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "llama-720m",
       "protocol": {
         "protocol_id": "paper-llama-720m-bs1984-48b",
@@ -2102,24 +2198,30 @@
       "title": "MoE 520M · Paper · Batch 256 · 5.5B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "MoE 520M · Paper · Batch 256 · 5.5B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -2133,11 +2235,11 @@
       },
       "card": {
         "headline": "10/11 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "moe-520m",
       "protocol": {
         "protocol_id": "paper-moe-520m-bs256-5p5b",
@@ -2178,7 +2280,7 @@
         "partial": 3,
         "failed": 4,
         "drawable": 10,
-        "metrics": 3679,
+        "metrics": 3689,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -2195,24 +2297,30 @@
       "title": "MoE 520M · Paper · Batch 256 · 44B",
       "family": "benchmark",
       "status": "active",
-      "primary_metric": "final_val_loss",
+      "primary_metric": "last_observed_val_loss",
       "target": {
         "metric_name": null,
         "value": null,
         "direction": null
       },
       "leaderboard_rule": {
-        "sort_by": "final_val_loss",
+        "sort_by": "last_observed_val_loss",
         "direction": "asc",
         "display_name": "MoE 520M · Paper · Batch 256 · 44B validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
+        "formal_rank_metric": "last_observed_val_loss",
         "tie_breakers": [
           "best_val_loss"
         ]
       },
       "leaderboard_eligibility": {
         "allowed_status": [
-          "completed"
+          "completed",
+          "running",
+          "stopped",
+          "partial",
+          "crashed",
+          "diverged",
+          "oom"
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
@@ -2226,11 +2334,11 @@
       },
       "card": {
         "headline": "11/11 formal methods mapped from the paper archive.",
-        "metric_label": "Final validation loss",
+        "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Partial and non-finite outcomes are retained but unranked; unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
       "benchmark_group_id": "moe-520m",
       "protocol": {
         "protocol_id": "paper-moe-520m-bs256-44b",
@@ -2266,7 +2374,7 @@
         "partial": 6,
         "failed": 2,
         "drawable": 9,
-        "metrics": 9358,
+        "metrics": 9368,
         "claims": 0,
         "figures": 1,
         "status_counts": {
@@ -2282,8 +2390,8 @@
   "evidence_summary": {
     "suites": 23,
     "active_suites": 19,
-    "runs": 192,
-    "metrics": 72654,
+    "runs": 206,
+    "metrics": 73336,
     "claims": 4,
     "figures": 19
   }

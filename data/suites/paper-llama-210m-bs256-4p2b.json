@@ -1,5 +1,5 @@
 {
-  "delivery_id": "sha256:5d461cfc37e113595c0c05c65c40cd673563983b43390a6ba4fb9b50f91e8572",
+  "delivery_id": "sha256:1704d22953698285eb3ade871f0baaf9e043a95aa775c7b7bbe572cbcd2d8f9d",
   "suite_id": "paper-llama-210m-bs256-4p2b",
   "runs": [
     {
@@ -3913,6 +3913,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/sh3wb4gs/output.log"
     },
     {
+      "metric_id": "m-paper-paper-llama-210m-bs256-4p2b-adopt-last-observed-loss",
+      "run_id": "paper-paper-llama-210m-bs256-4p2b-adopt",
+      "metric_scope": "summary",
+      "step": 31970,
+      "tokens_seen": 4190371840,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.214,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/sh3wb4gs/output.log"
+    },
+    {
       "metric_id": "m-paper-paper-llama-210m-bs256-4p2b-adopt-best-loss",
       "run_id": "paper-paper-llama-210m-bs256-4p2b-adopt",
       "metric_scope": "summary",
@@ -7270,6 +7282,18 @@
       "metric_name": "val_loss",
       "value": 3.188,
       "split": "val",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/7384se8y/output.log"
+    },
+    {
+      "metric_id": "m-paper-paper-llama-210m-bs256-4p2b-ademamix-last-observed-loss",
+      "run_id": "paper-paper-llama-210m-bs256-4p2b-ademamix",
+      "metric_scope": "summary",
+      "step": 31970,
+      "tokens_seen": 4190371840,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.188,
+      "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/7384se8y/output.log"
     },
     {
@@ -10640,6 +10664,18 @@
       "tokens_seen": 4194304000,
       "wall_time_sec": null,
       "metric_name": "final_val_loss",
+      "value": 3.2092864513397217,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/gaxebxqx/wandb-summary.json"
+    },
+    {
+      "metric_id": "m-paper-paper-llama-210m-bs256-4p2b-lion-last-observed-loss",
+      "run_id": "paper-paper-llama-210m-bs256-4p2b-lion",
+      "metric_scope": "summary",
+      "step": 32000,
+      "tokens_seen": 4194304000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
       "value": 3.2092864513397217,
       "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/gaxebxqx/wandb-summary.json"
@@ -14041,6 +14077,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/oe2i1kfp/wandb-summary.json"
     },
     {
+      "metric_id": "m-paper-paper-llama-210m-bs256-4p2b-signum-last-observed-loss",
+      "run_id": "paper-paper-llama-210m-bs256-4p2b-signum",
+      "metric_scope": "summary",
+      "step": 32000,
+      "tokens_seen": 4194304000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.217998743057251,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/oe2i1kfp/wandb-summary.json"
+    },
+    {
       "metric_id": "m-paper-paper-llama-210m-bs256-4p2b-signum-best-loss",
       "run_id": "paper-paper-llama-210m-bs256-4p2b-signum",
       "metric_scope": "summary",
@@ -17437,6 +17485,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/ivikpxga/wandb-summary.json"
     },
     {
+      "metric_id": "m-paper-paper-llama-210m-bs256-4p2b-soap-last-observed-loss",
+      "run_id": "paper-paper-llama-210m-bs256-4p2b-soap",
+      "metric_scope": "summary",
+      "step": 32000,
+      "tokens_seen": 4194304000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.1912808418273926,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/ivikpxga/wandb-summary.json"
+    },
+    {
       "metric_id": "m-paper-paper-llama-210m-bs256-4p2b-soap-best-loss",
       "run_id": "paper-paper-llama-210m-bs256-4p2b-soap",
       "metric_scope": "summary",
@@ -20821,6 +20881,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/38gdkafs/output.log"
     },
     {
+      "metric_id": "m-paper-paper-llama-210m-bs256-4p2b-sophia-last-observed-loss",
+      "run_id": "paper-paper-llama-210m-bs256-4p2b-sophia",
+      "metric_scope": "summary",
+      "step": 31970,
+      "tokens_seen": 4190371840,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.252,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/38gdkafs/output.log"
+    },
+    {
       "metric_id": "m-paper-paper-llama-210m-bs256-4p2b-sophia-best-loss",
       "run_id": "paper-paper-llama-210m-bs256-4p2b-sophia",
       "metric_scope": "summary",
@@ -24188,6 +24260,18 @@
       "tokens_seen": 4194304000,
       "wall_time_sec": null,
       "metric_name": "final_val_loss",
+      "value": 3.195612907409668,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/ivoq89l3/wandb-summary.json"
+    },
+    {
+      "metric_id": "m-paper-paper-llama-210m-bs256-4p2b-prodigy-last-observed-loss",
+      "run_id": "paper-paper-llama-210m-bs256-4p2b-prodigy",
+      "metric_scope": "summary",
+      "step": 32000,
+      "tokens_seen": 4194304000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
       "value": 3.195612907409668,
       "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/ivoq89l3/wandb-summary.json"
@@ -27574,6 +27658,18 @@
       "metric_name": "val_loss",
       "value": 3.208,
       "split": "val",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/y1okys46/output.log"
+    },
+    {
+      "metric_id": "m-paper-paper-llama-210m-bs256-4p2b-mars-last-observed-loss",
+      "run_id": "paper-paper-llama-210m-bs256-4p2b-mars",
+      "metric_scope": "summary",
+      "step": 31970,
+      "tokens_seen": 4190371840,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.208,
+      "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/y1okys46/output.log"
     },
     {

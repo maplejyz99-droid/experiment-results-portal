@@ -1,5 +1,5 @@
 {
-  "delivery_id": "sha256:5d461cfc37e113595c0c05c65c40cd673563983b43390a6ba4fb9b50f91e8572",
+  "delivery_id": "sha256:1704d22953698285eb3ade871f0baaf9e043a95aa775c7b7bbe572cbcd2d8f9d",
   "suite_id": "moe_520m",
   "runs": [
     {
@@ -5097,6 +5097,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/0azwkje9/output.log"
     },
     {
+      "metric_id": "m-paper-moe-520m-adamw-last-observed-loss",
+      "run_id": "paper-moe-520m-adamw",
+      "metric_scope": "summary",
+      "step": 41975,
+      "tokens_seen": 5501747200,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.129,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/0azwkje9/output.log"
+    },
+    {
       "metric_id": "m-paper-moe-520m-adamw-best-loss",
       "run_id": "paper-moe-520m-adamw",
       "metric_scope": "summary",
@@ -9498,6 +9510,18 @@
       "metric_name": "val_loss",
       "value": 3.122,
       "split": "val",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/dto3dl4v/output.log"
+    },
+    {
+      "metric_id": "m-paper-moe-520m-adopt-last-observed-loss",
+      "run_id": "paper-moe-520m-adopt",
+      "metric_scope": "summary",
+      "step": 41975,
+      "tokens_seen": 5501747200,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.122,
+      "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/dto3dl4v/output.log"
     },
     {
@@ -13912,6 +13936,18 @@
       "tokens_seen": 5505024000,
       "wall_time_sec": null,
       "metric_name": "final_val_loss",
+      "value": 3.086498975753784,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/spj79rka/wandb-summary.json"
+    },
+    {
+      "metric_id": "m-paper-moe-520m-ademamix-last-observed-loss",
+      "run_id": "paper-moe-520m-ademamix",
+      "metric_scope": "summary",
+      "step": 42000,
+      "tokens_seen": 5505024000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
       "value": 3.086498975753784,
       "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/spj79rka/wandb-summary.json"
@@ -18345,6 +18381,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/ow89wpdz/output.log"
     },
     {
+      "metric_id": "m-paper-moe-520m-lion-last-observed-loss",
+      "run_id": "paper-moe-520m-lion",
+      "metric_scope": "summary",
+      "step": 41975,
+      "tokens_seen": 5501747200,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.144,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/ow89wpdz/output.log"
+    },
+    {
       "metric_id": "m-paper-moe-520m-lion-best-loss",
       "run_id": "paper-moe-520m-lion",
       "metric_scope": "summary",
@@ -22746,6 +22794,18 @@
       "metric_name": "val_loss",
       "value": 3.149,
       "split": "val",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/2qcn10tg/output.log"
+    },
+    {
+      "metric_id": "m-paper-moe-520m-signum-last-observed-loss",
+      "run_id": "paper-moe-520m-signum",
+      "metric_scope": "summary",
+      "step": 41975,
+      "tokens_seen": 5501747200,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.149,
+      "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/2qcn10tg/output.log"
     },
     {
@@ -27153,6 +27213,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/jutlej1d/output.log"
     },
     {
+      "metric_id": "m-paper-moe-520m-d-muon-last-observed-loss",
+      "run_id": "paper-moe-520m-d-muon",
+      "metric_scope": "summary",
+      "step": 41975,
+      "tokens_seen": 5501747200,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.121,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/jutlej1d/output.log"
+    },
+    {
       "metric_id": "m-paper-moe-520m-d-muon-best-loss",
       "run_id": "paper-moe-520m-d-muon",
       "metric_scope": "summary",
@@ -31554,6 +31626,18 @@
       "metric_name": "val_loss",
       "value": 3.127,
       "split": "val",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/jbmn8hgu/output.log"
+    },
+    {
+      "metric_id": "m-paper-moe-520m-soap-last-observed-loss",
+      "run_id": "paper-moe-520m-soap",
+      "metric_scope": "summary",
+      "step": 41975,
+      "tokens_seen": 5501747200,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.127,
+      "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/jbmn8hgu/output.log"
     },
     {
@@ -35968,6 +36052,18 @@
       "tokens_seen": 5505024000,
       "wall_time_sec": null,
       "metric_name": "final_val_loss",
+      "value": 3.145912170410156,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/b9ahf3gq/wandb-summary.json"
+    },
+    {
+      "metric_id": "m-paper-moe-520m-sophia-last-observed-loss",
+      "run_id": "paper-moe-520m-sophia",
+      "metric_scope": "summary",
+      "step": 42000,
+      "tokens_seen": 5505024000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
       "value": 3.145912170410156,
       "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/b9ahf3gq/wandb-summary.json"
@@ -40401,6 +40497,18 @@
       "source_path": "artifacts/wandb-paper-2509.01440/runs/bsjn5eiw/output.log"
     },
     {
+      "metric_id": "m-paper-moe-520m-prodigy-last-observed-loss",
+      "run_id": "paper-moe-520m-prodigy",
+      "metric_scope": "summary",
+      "step": 41975,
+      "tokens_seen": 5501747200,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
+      "value": 3.128,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/bsjn5eiw/output.log"
+    },
+    {
       "metric_id": "m-paper-moe-520m-prodigy-best-loss",
       "run_id": "paper-moe-520m-prodigy",
       "metric_scope": "summary",
@@ -44812,6 +44920,18 @@
       "tokens_seen": 5505024000,
       "wall_time_sec": null,
       "metric_name": "final_val_loss",
+      "value": 3.1028237342834473,
+      "split": "summary",
+      "source_path": "artifacts/wandb-paper-2509.01440/runs/awu9hmtm/wandb-summary.json"
+    },
+    {
+      "metric_id": "m-paper-moe-520m-mars-last-observed-loss",
+      "run_id": "paper-moe-520m-mars",
+      "metric_scope": "summary",
+      "step": 42000,
+      "tokens_seen": 5505024000,
+      "wall_time_sec": null,
+      "metric_name": "last_observed_val_loss",
       "value": 3.1028237342834473,
       "split": "summary",
       "source_path": "artifacts/wandb-paper-2509.01440/runs/awu9hmtm/wandb-summary.json"

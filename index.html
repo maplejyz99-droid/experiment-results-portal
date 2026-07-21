@@ -7,146 +7,240 @@
       name="description"
       content="A source-traceable evidence portal for suite-local LLM optimizer experiments."
     />
-    <meta name="theme-color" content="#f7f9fc" />
-    <title>Optimizer Experiment Evidence Portal</title>
+    <meta name="theme-color" content="#f5f8ff" />
+    <title>LLM Optimizer Benchmark</title>
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <a class="skip-link" href="#main-content">Skip to experiment evidence</a>
+    <a class="skip-link" href="#workspace-start" data-i18n="a11y.skip_workspace">Skip to benchmark workspace</a>
 
-    <header class="topbar">
-      <div class="topbar-shell">
-        <div class="topbar-identity">
-          <div class="document-mark" aria-hidden="true">
-            <span>OE</span>
-            <small>LAB</small>
+    <div class="landing-screen" id="home">
+      <header class="topbar portal-shellbar">
+        <div class="topbar-shell shellbar-grid">
+          <a class="topbar-identity brand-lockup" href="#home" aria-label="LLM Optimizer Benchmark home" data-i18n-aria-label="a11y.home">
+            <span class="document-mark" role="img" aria-label="OPLAB">
+              <span>OP</span>
+              <small>LAB</small>
+            </span>
+            <span class="brand-copy portal-brand-copy">
+              <span class="eyebrow" data-i18n="brand.archive">Optimizer experiment archive</span>
+              <span class="brand-title" data-i18n="brand.portal">LLM Optimizer Benchmark</span>
+            </span>
+            <span class="brand-copy workspace-brand-copy" aria-hidden="true">
+              <span class="eyebrow" id="workspaceTopbarKicker">Active benchmark</span>
+              <span class="brand-title" id="workspaceTopbarTitle">Benchmark workspace</span>
+              <span class="workspace-topbar-coordinate" id="workspaceTopbarCoordinate"></span>
+            </span>
+          </a>
+
+          <div class="header-utility">
+            <nav class="portal-nav" aria-label="Portal sections" data-i18n-aria-label="a11y.portal_sections">
+              <a href="#workspace-start" data-i18n="nav.benchmarks">Benchmarks</a>
+              <a href="#detailBand" data-i18n="nav.evidence">Evidence</a>
+            </nav>
+            <div class="locale-switch" role="group" aria-label="Interface language" data-i18n-aria-label="a11y.language">
+              <button type="button" id="localeZh" data-locale-option="zh" aria-pressed="false">中</button>
+              <button type="button" id="localeEn" data-locale-option="en" aria-pressed="true">EN</button>
+            </div>
+            <div
+              class="workspace-topbar-evidence"
+              id="workspaceTopbarEvidence"
+              aria-live="polite"
+            ></div>
+            <div
+              class="source-pill"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <span class="dot" aria-hidden="true"></span>
+              <span class="source-pill-label" data-i18n="status.snapshot">Curated snapshot</span>
+            </div>
           </div>
-          <div class="brand-copy">
-            <p class="eyebrow">Optimizer Evaluation Lab</p>
-            <h1>Experiment Evidence Portal</h1>
-            <p class="topbar-summary">
-              Protocol-bound comparisons for optimizer research, review, and publication.
+        </div>
+      </header>
+
+      <section class="hero-screen" aria-labelledby="overview-title">
+        <div class="hero-content">
+          <div class="hero-message">
+            <p class="hero-kicker" data-hero-stage="1" data-i18n="hero.kicker">Optimizer Experiment Archive</p>
+            <div class="hero-mesh-title" data-hero-stage="2" data-hero-mesh>
+              <h1 id="overview-title">LLM Optimizer Benchmark</h1>
+              <canvas
+                class="hero-mesh-title-canvas"
+                id="heroMeshTitle"
+                aria-hidden="true"
+              ></canvas>
+            </div>
+            <p class="hero-subtitle" data-hero-stage="3">
+              <span data-i18n="hero.comparable">Comparable results.</span> <span data-i18n="hero.traceable">Traceable runs.</span>
+            </p>
+            <p class="hero-lede" data-hero-stage="4" data-i18n="hero.lede">
+              Explore optimizer experiments without mixing models, datasets, batches, or token
+              budgets.
             </p>
           </div>
+          <a class="hero-cta" id="exploreBenchmarks" href="#workspace-start" data-hero-stage="5">
+            <span data-i18n="hero.explore">Explore benchmarks</span>
+            <span class="hero-cta-arrow" aria-hidden="true">↘</span>
+          </a>
+
+          <aside class="hero-snapshot" aria-label="Snapshot overview" data-i18n-aria-label="a11y.snapshot" data-hero-stage="6">
+            <div class="snapshot-coordinate" aria-hidden="true">
+              <span data-i18n="snapshot.model">MODEL</span><i></i><span data-i18n="snapshot.data">DATA</span><i></i><span data-i18n="snapshot.batch">BATCH</span><i></i><span data-i18n="snapshot.budget">BUDGET</span>
+            </div>
+            <div
+              class="metric-strip"
+              id="overviewMetrics"
+              aria-label="Portal summary metrics"
+              data-i18n-aria-label="a11y.summary_metrics"
+              aria-live="polite"
+            ></div>
+          </aside>
         </div>
-        <div class="header-utility">
-          <nav class="portal-nav" aria-label="Portal sections">
-            <a href="#suite-cards-title">Benchmarks</a>
-            <a href="#suite-title">Workspace</a>
-            <a href="#detail-title">Evidence</a>
-          </nav>
-          <div
-            class="source-pill"
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-            aria-label="Data source: curated static snapshot"
-          >
-            <span class="dot" aria-hidden="true"></span>
-            <span class="source-pill-label">Curated static snapshot</span>
-          </div>
-        </div>
-      </div>
-      <div class="protocol-ribbon" aria-label="Portal comparison contract">
-        <span><strong>Scope</strong> Suite-local comparison</span>
-        <span><strong>Evidence</strong> Source-traceable runs</span>
-        <span><strong>Interpretation</strong> Manual claims only</span>
-      </div>
-    </header>
+        <a class="hero-scroll-cue" href="#workspace-start" aria-label="Scroll to benchmark workspace" data-i18n-aria-label="a11y.scroll_workspace">
+          <span data-i18n="hero.workspace">Research workspace</span>
+          <i aria-hidden="true"></i>
+        </a>
+      </section>
+    </div>
 
     <main id="main-content">
-      <section class="overview-band" aria-labelledby="overview-title">
-        <div class="overview-copy">
-          <p class="section-kicker">Research workspace</p>
-          <h2 id="overview-title">Decisions backed by inspectable evidence.</h2>
-          <p class="lede">
-            Compare optimizers only within a shared protocol, inspect every selected run, and
-            carry defensible results into figures and research notes.
-          </p>
-          <ul class="context-list" aria-label="Portal operating principles">
-            <li>Protocol-aware ranking</li>
-            <li>Run-level provenance</li>
-            <li>Publication-ready curves</li>
-          </ul>
-        </div>
-        <div
-          class="metric-strip"
-          id="overviewMetrics"
-          aria-label="Portal summary metrics"
-          aria-live="polite"
-        ></div>
-      </section>
-
-      <section class="suite-cards-band" aria-labelledby="suite-cards-title">
-        <div class="section-heading">
-          <div>
-            <p class="section-kicker">Benchmark catalog</p>
-            <h2 id="suite-cards-title">Choose a comparison protocol.</h2>
+      <div class="portal-body-grid" id="workspace-start" tabindex="-1">
+        <aside
+          class="benchmark-rail"
+          id="benchmarkDock"
+          aria-labelledby="suite-cards-title"
+          data-reveal
+          data-reveal-order="1"
+        >
+          <div class="benchmark-rail-heading">
+            <div class="benchmark-rail-heading-copy">
+              <p class="section-kicker" data-i18n="dock.kicker">Benchmark index</p>
+              <h2 id="suite-cards-title" data-i18n="dock.title">Models</h2>
+            </div>
+            <button
+              class="benchmark-drawer-toggle"
+              id="benchmarkDrawerToggle"
+              type="button"
+              aria-controls="benchmarkNavigationPanel"
+              aria-expanded="false"
+              aria-label="Expand benchmark navigation"
+              data-i18n-aria-label="a11y.expand_benchmarks"
+            >
+              <span aria-hidden="true"></span>
+            </button>
           </div>
-          <p class="muted wide-muted">
-            Leaderboards appear only when the comparison contract is complete. Partial and planned
-            suites stay visible so research gaps remain explicit.
-          </p>
-        </div>
-        <div class="suite-card-grid" id="suiteCards" aria-label="Experiment suites"></div>
-      </section>
+          <nav
+            class="benchmark-navigation"
+            id="benchmarkNavigationPanel"
+            aria-label="Benchmark selection"
+            data-i18n-aria-label="a11y.benchmark_navigation"
+          >
+            <div
+              class="suite-card-grid protocol-deck-grid"
+              id="suiteCards"
+              aria-label="Experiment suites"
+              data-i18n-aria-label="a11y.experiment_suites"
+            ></div>
+          </nav>
+        </aside>
 
-      <section class="suite-band" aria-labelledby="suite-title">
-        <div class="suite-header">
-          <div>
-            <p class="section-kicker">Active protocol workspace</p>
+        <div class="workspace-content">
+      <section
+        class="suite-band workspace-shell"
+        aria-labelledby="suite-title"
+      >
+        <div class="suite-header workspace-header workspace-semantic-header">
+          <div class="workspace-title-group">
+            <p class="section-kicker" data-i18n="workspace.kicker">Active protocol workspace</p>
             <h2 id="suite-title">modded-nanogpt Track 3</h2>
+            <p class="workspace-intro" data-i18n="workspace.intro">
+              One protocol, one leaderboard, and one inspectable body of evidence.
+            </p>
           </div>
-          <div class="target-box" id="targetBox" aria-live="polite"></div>
+          <div class="target-box evidence-coverage-tile" id="targetBox" aria-live="polite"></div>
         </div>
-        <div
-          class="comparability-rail"
-          id="protocolRail"
-          aria-label="Active suite comparability boundary"
-          aria-live="polite"
-        ></div>
+
+        <div class="suite-landing-anchor" id="suiteLandingAnchor" aria-hidden="true"></div>
 
         <section
-          class="protocol-ledger"
-          id="protocolSelector"
-          aria-label="Protocol selector"
-          hidden
-        ></section>
+          class="protocol-context-card"
+          id="protocolContext"
+          aria-label="Active experiment protocol"
+          data-i18n-aria-label="a11y.protocol"
+          data-reveal
+          data-reveal-order="2"
+        >
+          <div
+            class="protocol-context-main"
+            id="protocolSelector"
+            aria-label="Protocol selector"
+            data-i18n-aria-label="a11y.protocol_selector"
+            aria-live="polite"
+          ></div>
+        </section>
 
-        <div class="dashboard-grid" id="suiteDataPanel">
-          <section class="panel chart-panel" aria-labelledby="chart-title">
-            <div class="panel-heading">
+        <div
+          class="dashboard-grid workspace-grid"
+          id="suiteDataPanel"
+          data-reveal
+          data-reveal-order="3"
+        >
+          <section
+            class="panel leaderboard-panel ranking-tile"
+            aria-labelledby="leaderboard-title"
+          >
+            <div class="panel-heading leaderboard-heading">
               <div>
-                <p class="panel-kicker">Observed training trajectories</p>
+                <p class="panel-kicker" data-i18n="runs.kicker">Run selection</p>
+                <h3 id="leaderboard-title" data-i18n="runs.title">Optimizer runs</h3>
+              </div>
+              <p class="muted" id="leaderboardNote">Select a row to inspect its provenance.</p>
+            </div>
+            <div id="leaderboardContent"></div>
+          </section>
+
+          <section
+            class="panel chart-panel chart-workbench"
+            aria-labelledby="chart-title"
+          >
+            <div class="panel-heading chart-heading">
+              <div>
+                <p class="panel-kicker" data-i18n="chart.kicker">Observed training trajectories</p>
                 <h3 id="chart-title">Validation loss by training step</h3>
               </div>
               <p class="muted" id="chartMeta">
                 Suite-local curves with the protocol target when defined.
               </p>
             </div>
-            <div class="chart-toolbar" aria-label="Chart tools">
-              <div class="chart-mode-row" id="chartModeSwitch" aria-label="Chart scale mode"></div>
+
+            <div class="chart-toolbar" aria-label="Chart tools" data-i18n-aria-label="a11y.chart_tools">
+              <div class="chart-mode-row" id="chartModeSwitch" aria-label="Chart scale mode" data-i18n-aria-label="a11y.chart_scale"></div>
               <div
                 class="chart-emphasis-row"
                 id="chartEmphasisSwitch"
                 role="group"
                 aria-label="Chart focus reset"
+                data-i18n-aria-label="a11y.chart_focus"
               ></div>
               <p class="chart-toolbar-meta" id="chartToolbarMeta"></p>
-              <div class="chart-tools" aria-label="Chart export tools">
-                <span class="chart-tools-label">Export</span>
-                <button type="button" id="downloadPng">Visible PNG</button>
-                <button type="button" id="downloadSvg">Visible SVG</button>
-                <button type="button" id="downloadCsv">Visible CSV</button>
+              <div class="chart-tools" aria-label="Chart export tools" data-i18n-aria-label="a11y.chart_export">
+                <span class="chart-tools-label" data-i18n="chart.export">Export</span>
+                <button type="button" id="downloadPng" data-i18n="chart.visible_png">Visible PNG</button>
+                <button type="button" id="downloadSvg" data-i18n="chart.visible_svg">Visible SVG</button>
+                <button type="button" id="downloadCsv" data-i18n="chart.visible_csv">Visible CSV</button>
               </div>
             </div>
+
             <div
               class="chart-chips"
               id="chartSelectionChips"
               aria-label="Selected chart runs"
+              data-i18n-aria-label="a11y.selected_runs"
             ></div>
-            <div class="chart-frame">
+            <div class="chart-frame figure-canvas">
               <svg
                 id="lossChart"
                 role="img"
@@ -154,23 +248,6 @@
                 tabindex="0"
               ></svg>
             </div>
-            <div
-              class="target-step-strip"
-              id="targetStepStrip"
-              aria-label="Selected runs target steps"
-            ></div>
-            <div class="legend" id="chartLegend" aria-label="Chart legend"></div>
-          </section>
-
-          <section class="panel leaderboard-panel" aria-labelledby="leaderboard-title">
-            <div class="panel-heading">
-              <div>
-                <p class="panel-kicker">02 · Run selection</p>
-                <h3 id="leaderboard-title">Track 3 steps-to-target leaderboard</h3>
-              </div>
-              <p class="muted" id="leaderboardNote">Select a row to inspect its provenance.</p>
-            </div>
-            <div id="leaderboardContent"></div>
           </section>
         </div>
 
@@ -182,8 +259,8 @@
         >
           <div class="panel-heading">
             <div>
-              <p class="panel-kicker" id="placeholder-kicker">Protocol status</p>
-              <h3 id="placeholder-title">Curated data not attached yet</h3>
+              <p class="panel-kicker" id="placeholder-kicker" data-i18n="placeholder.kicker">Protocol status</p>
+              <h3 id="placeholder-title" data-i18n="placeholder.title">Curated data not attached yet</h3>
             </div>
             <p class="muted" id="placeholder-status">planned</p>
           </div>
@@ -191,52 +268,67 @@
         </section>
       </section>
 
-      <section class="detail-band" id="detailBand" aria-labelledby="detail-title">
-        <div class="panel detail-panel">
+      <section
+        class="detail-band evidence-workspace"
+        id="detailBand"
+        aria-labelledby="detail-title"
+        data-reveal
+        data-reveal-order="4"
+      >
+        <article class="panel detail-panel provenance-tile">
           <div class="panel-heading">
             <div>
-              <p class="panel-kicker">03 · Run provenance</p>
-              <h3 id="detail-title">Selected run</h3>
+              <p class="panel-kicker" data-i18n="detail.kicker">Run provenance</p>
+              <h3 id="detail-title" data-i18n="detail.selected">Selected run</h3>
             </div>
-            <p class="muted">Every published result retains a source path or URL.</p>
+            <p class="muted" data-i18n="detail.note">Reviewed source type and accessible evidence links.</p>
           </div>
           <div id="runDetail" class="run-detail" aria-live="polite"></div>
-        </div>
+        </article>
 
-        <div class="panel claim-panel">
+        <article class="panel claim-panel claims-tile">
           <div class="panel-heading">
             <div>
-              <p class="panel-kicker">04 · Evidence review</p>
-              <h3>Curated research claims</h3>
+              <p class="panel-kicker" data-i18n="claims.kicker">Evidence review</p>
+              <h3 data-i18n="claims.title">Curated research claims</h3>
             </div>
-            <p class="muted">Human-authored interpretations only.</p>
+            <p class="muted" data-i18n="claims.note">Human-authored interpretations only.</p>
           </div>
           <div id="claimsList" class="claim-list"></div>
-        </div>
+        </article>
       </section>
 
-      <details class="panel health-panel" aria-labelledby="data-health-title">
+      <details
+        class="panel health-panel health-workspace"
+        aria-labelledby="data-health-title"
+        data-reveal
+        data-reveal-order="5"
+      >
         <summary class="health-summary">
           <div>
-            <p class="panel-kicker">Data integrity</p>
-            <h3 id="data-health-title">Snapshot coverage and checks</h3>
+            <p class="panel-kicker" data-i18n="health.kicker">Data integrity</p>
+            <h3 id="data-health-title" data-i18n="health.title">Snapshot coverage and checks</h3>
           </div>
-          <p class="muted" id="dataHealthSummary">Snapshot coverage</p>
+          <p class="muted" id="dataHealthSummary" data-i18n="health.summary">Snapshot coverage</p>
         </summary>
         <div id="dataHealth" class="data-health"></div>
       </details>
+        </div>
+      </div>
     </main>
 
-    <footer>
-      <span class="footer-mark">Optimizer Experiment Evidence</span>
-      <span>Source snapshot <code id="sourceSnapshotPath">data/portal-data.json</code></span>
-      <span>Static · protocol-bound · source-traceable</span>
+    <footer class="portal-footer">
+      <span class="footer-mark">LLM Optimizer Benchmark</span>
+      <span><span data-i18n="footer.snapshot">Source snapshot</span> <code id="sourceSnapshotPath">data/portal-data.json</code></span>
+      <span data-i18n="footer.meta">Static · protocol-bound · source-traceable</span>
     </footer>
 
     <noscript>
-      <p class="noscript-message">JavaScript is required to inspect the experiment evidence.</p>
+      <p class="noscript-message" data-i18n="noscript">JavaScript is required to inspect the experiment evidence.</p>
     </noscript>
     <script src="figure-runtime.js"></script>
+    <script src="portal-i18n.js"></script>
+    <script src="hero-mesh-text.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
