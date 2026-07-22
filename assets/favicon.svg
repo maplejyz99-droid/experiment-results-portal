@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">OPLAB</title>
+  <defs>
+    <linearGradient id="oplab-gradient" x1="72" y1="48" x2="440" y2="464" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2764ff" />
+      <stop offset="1" stop-color="#6547f5" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#oplab-gradient)" />
+  <text
+    x="256"
+    y="270"
+    fill="#ffffff"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="184"
+    font-weight="700"
+    letter-spacing="-13"
+    text-anchor="middle"
+  >OP</text>
+  <text
+    x="256"
+    y="374"
+    fill="#ffffff"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="70"
+    font-weight="700"
+    letter-spacing="16"
+    text-anchor="middle"
+  >LAB</text>
+</svg>
