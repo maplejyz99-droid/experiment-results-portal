@@ -531,7 +531,7 @@ function renderLocalizedInterface() {
     } else {
       renderPlaceholder(suite);
     }
-    const statusState = document.querySelector(".source-pill")?.dataset.state;
+    const statusState = document.querySelector(".portal-status")?.dataset.state;
     if (pendingSuiteId) {
       setPortalStatus(
         uiText("loading.suite", {
@@ -1906,10 +1906,14 @@ function refreshRunViews({ focusState = captureFocusState(), includeDetail = tru
   syncUrlState();
 }
 
+function canonicalSuiteId(suiteId) {
+  return portalData?.meta?.suite_aliases?.[suiteId] || suiteId;
+}
+
 function applyUrlState() {
   if (!globalThis.location) return;
   const params = new URLSearchParams(globalThis.location.search);
-  const requestedSuite = params.get("suite");
+  const requestedSuite = canonicalSuiteId(params.get("suite"));
   if (requestedSuite && suiteById(requestedSuite)) selectedSuiteId = requestedSuite;
   const suite = activeSuite();
   const requestedScale = params.get("scale");
@@ -2000,8 +2004,6 @@ function updateWorkspaceTopbar(suite) {
   const source = protocolSourceCoordinate(suite);
   const batch = protocolBatchCoordinate(suite);
   const budget = protocolBudgetCoordinate(suite);
-  const evidence = suiteEvidenceSummary(suite);
-  const expected = evidence.expected ?? evidence.mapped;
   const track3Coordinate = isTrack3 ? track3ProtocolCoordinate(suite) : null;
   const coordinates = isTrack3
     ? [
@@ -2031,10 +2033,6 @@ function updateWorkspaceTopbar(suite) {
         ? title
         : `${title} Benchmark`;
   byId("workspaceTopbarCoordinate").textContent = coordinates.join(" · ");
-  byId("workspaceTopbarEvidence").innerHTML = `
-    <strong>${escapeHtml(`${evidence.mapped}/${expected}`)}</strong>
-    <span>${escapeHtml(uiText("workspace.mapped_curves", { count: evidence.drawable }))}</span>
-  `;
 }
 
 function renderSuiteHeader(suite) {
@@ -2295,9 +2293,12 @@ function renderProtocolContext(suite) {
               });
               const active = source.key === currentSource.key;
               const loading = target?.suite_id === pendingSuiteId;
+              // Three sources share the existing compact cell. The dataset is
+              // already shown below; retain the full name for accessibility.
+              const label = sources.length > 2 ? source.label.split(" · ")[0] : source.label;
               return `
-                <button type="button" class="${active ? "active" : ""} ${loading ? "loading" : ""}" data-target-suite-id="${escapeHtml(target?.suite_id || "")}" aria-pressed="${active}" aria-busy="${loading}" ${target ? "" : "disabled"}>
-                  ${escapeHtml(source.label)}
+                <button type="button" class="${active ? "active" : ""} ${loading ? "loading" : ""}" data-target-suite-id="${escapeHtml(target?.suite_id || "")}" aria-label="${escapeHtml(source.label)}" title="${escapeHtml(source.label)}" aria-pressed="${active}" aria-busy="${loading}" ${target ? "" : "disabled"}>
+                  ${escapeHtml(label)}
                 </button>
               `;
             })
@@ -2852,11 +2853,16 @@ function renderLeaderboard({ preserveScroll = true } = {}) {
   const filterableRows = [...rows, ...unranked];
   const visibleRows = filteredRows(rows);
   const visibleUnranked = filteredRows(unranked);
-  const referenceRows = visibleRows.filter((row) => referenceRunForSuite(suite, row.run));
-  const localRows = visibleRows.filter((row) => !referenceRunForSuite(suite, row.run));
+  const splitByOurs = suite.suite_id !== "track3" &&
+    rows.some((row) => row.run.run_role === "ours");
+  const belongsToReferenceGroup = (row) => splitByOurs
+    ? row.run.run_role !== "ours"
+    : referenceRunForSuite(suite, row.run);
+  const referenceRows = visibleRows.filter(belongsToReferenceGroup);
+  const localRows = visibleRows.filter((row) => !belongsToReferenceGroup(row));
   const hasReferenceAndLocal =
-    rows.some((row) => referenceRunForSuite(suite, row.run)) &&
-    rows.some((row) => !referenceRunForSuite(suite, row.run));
+    rows.some(belongsToReferenceGroup) &&
+    rows.some((row) => !belongsToReferenceGroup(row));
 
   if (!selectedRunId && rows.length) selectedRunId = rows[0].run.run_id;
 
@@ -2903,15 +2909,17 @@ function renderLeaderboard({ preserveScroll = true } = {}) {
     `
     : "";
 
-  if (hasReferenceAndLocal) {
+  if (hasReferenceAndLocal || splitByOurs) {
     const referenceLabel = uiText(
-      suite.suite_id === "track3" ? "runs.track3_official" : "runs.reference"
+      suite.suite_id === "track3" ? "runs.track3_official"
+        : splitByOurs ? (suite.protocol?.source_kind === "paper_main_benchmark" ? "runs.paper" : "runs.title")
+          : "runs.reference"
     );
     const localLabel = uiText(
-      suite.suite_id === "track3" ? "runs.track3_ours" : "runs.comparison"
+      suite.suite_id === "track3" ? "runs.track3_ours" : splitByOurs ? "runs.ours" : "runs.comparison"
     );
-    const referenceHelper = uiText("runs.official_helper");
-    const localHelper = uiText("runs.comparison_helper");
+    const referenceHelper = splitByOurs ? "" : uiText("runs.official_helper");
+    const localHelper = splitByOurs ? "" : uiText("runs.comparison_helper");
     const hasPlottedUnranked = unranked.some((row) =>
       selectedChartRunIds.has(row.run.run_id)
     );
@@ -2922,13 +2930,14 @@ function renderLeaderboard({ preserveScroll = true } = {}) {
     if (!preserveScroll) {
       state.scroll[state.active] = { top: 0, left: 0 };
     }
-    const allReferenceRows = rows.filter((row) => referenceRunForSuite(suite, row.run));
-    const allLocalRows = rows.filter((row) => !referenceRunForSuite(suite, row.run));
+    const allReferenceRows = rows.filter(belongsToReferenceGroup);
+    const allLocalRows = rows.filter((row) => !belongsToReferenceGroup(row));
+    if (state.active === "official" && !allReferenceRows.length) state.active = "local";
     byId("leaderboardContent").innerHTML = `
       ${selectionBlock}
       <div class="run-list-viewport ranked-run-list-viewport" role="region" aria-label="${escapeHtml(uiText("runs.table", { title: navigationEntryTitle(navigationEntry) }))}">
         <div class="ranked-run-group-stack" data-suite-id="${escapeHtml(suite.suite_id)}">
-          ${renderRankedRunGroup({
+          ${allReferenceRows.length ? renderRankedRunGroup({
             suite,
             group: "official",
             label: referenceLabel,
@@ -2936,7 +2945,7 @@ function renderLeaderboard({ preserveScroll = true } = {}) {
             rows: referenceRows,
             totalCount: allReferenceRows.length,
             active: state.active === "official",
-          })}
+          }) : ""}
           ${renderRankedRunGroup({
             suite,
             group: "local",
@@ -3021,6 +3030,7 @@ function bindChartPathInteractions(path) {
 }
 
 function shortRunLabel(run) {
+  if (run.leaderboard_meta?.short_label) return run.leaderboard_meta.short_label;
   const rank = run.leaderboard_meta?.official_rank;
   if (Number.isInteger(rank)) return `R${String(rank).padStart(2, "0")}`;
   const labels = {
@@ -3969,18 +3979,18 @@ function renderSuiteView() {
 }
 
 function setPortalStatus(message, state) {
-  const pill = document.querySelector(".source-pill");
-  if (!pill) return;
-  pill.dataset.state = state;
-  pill.setAttribute("aria-live", "polite");
-  let label = pill.querySelector(".source-pill-label");
+  const status = document.querySelector(".portal-status");
+  if (!status) return;
+  status.dataset.state = state;
+  status.setAttribute("aria-live", "polite");
+  let label = status.querySelector(".portal-status-label");
   if (!label) {
     label = document.createElement("span");
-    label.className = "source-pill-label";
-    Array.from(pill.childNodes)
+    label.className = "portal-status-label";
+    Array.from(status.childNodes)
       .filter((node) => node.nodeType === Node.TEXT_NODE)
       .forEach((node) => node.remove());
-    pill.appendChild(label);
+    status.appendChild(label);
   }
   label.removeAttribute("data-i18n");
   label.textContent = message;
@@ -4459,7 +4469,7 @@ async function requestSuiteChange(
 async function restoreSuiteFromLocation() {
   if (!portalData || !globalThis.location) return;
   const params = new URLSearchParams(globalThis.location.search);
-  const requestedSuiteId = params.get("suite");
+  const requestedSuiteId = canonicalSuiteId(params.get("suite"));
   const targetSuiteId = catalogSuiteById(requestedSuiteId)
     ? requestedSuiteId
     : selectedSuiteId;
@@ -4496,7 +4506,7 @@ async function start() {
       portalCatalog.suites.find((suite) => suite.status === "active")?.suite_id ||
       portalCatalog.suites[0]?.suite_id;
     const requestedSuiteId = globalThis.location
-      ? new URLSearchParams(globalThis.location.search).get("suite")
+      ? canonicalSuiteId(new URLSearchParams(globalThis.location.search).get("suite"))
       : null;
     selectedSuiteId = catalogSuiteById(requestedSuiteId)
       ? requestedSuiteId

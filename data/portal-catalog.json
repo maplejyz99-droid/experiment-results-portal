@@ -1,12 +1,26 @@
 {
-  "delivery_id": "sha256:1704d22953698285eb3ade871f0baaf9e043a95aa775c7b7bbe572cbcd2d8f9d",
+  "delivery_id": "sha256:84a1267b169ad32dd9e88b58b0187a9b6485e08e64e1dfdc82fd15accb86aebb",
   "meta": {
     "title": "LLM Optimizer Results Portal",
     "version": "0.5.0",
-    "generated_at": "2026-07-18",
+    "generated_at": "2026-09-15",
     "mode": "static-multi-protocol-paper-main",
     "notes": "Static suite-local portal data with Track 3, current curated benchmarks, and audited arXiv:2509.01440v1 main-benchmark protocols.",
-    "delivery_id": "sha256:1704d22953698285eb3ade871f0baaf9e043a95aa775c7b7bbe572cbcd2d8f9d",
+    "delivery_id": "sha256:84a1267b169ad32dd9e88b58b0187a9b6485e08e64e1dfdc82fd15accb86aebb",
+    "local_optimizer_import": {
+      "date": "2026-09-15",
+      "manifest": "local-optimizer-manifest.json",
+      "selected_seed": 0,
+      "runs": 14
+    },
+    "suite_aliases": {
+      "ours-llama-124m-bs32-1p5b": "llama_124m",
+      "ours-llama-210m-bs256-2p1b": "llama_210m",
+      "ours-llama-210m-bs256-4p2b": "paper-llama-210m-bs256-4p2b",
+      "ours-llama-210m-bs256-6p3b": "paper-llama-210m-bs256-6p3b",
+      "ours-llama-210m-bs256-8p4b": "paper-llama-210m-bs256-8p4b",
+      "ours-llama-720m-bs1984-8p126b": "paper-llama-720m-bs1984-8b"
+    },
     "publication": "github-pages-public-snapshot",
     "source_path_policy": "Remote absolute paths are replaced with public source labels in this published snapshot."
   },
@@ -83,6 +97,14 @@
       "mars": {
         "label": "MARS",
         "color": "#CA8504"
+      },
+      "creno": {
+        "label": "CRENO",
+        "color": "#147D64"
+      },
+      "per-head-creno": {
+        "label": "Per-Head CRENO",
+        "color": "#B54923"
       }
     }
   },
@@ -260,27 +282,35 @@
         "display_order": 0,
         "paper": null,
         "evidence_summary": {
-          "expected": 12,
-          "mapped": 12,
-          "complete": 12,
+          "expected": 14,
+          "mapped": 14,
+          "complete": 14,
           "partial": 0,
           "nonfinite": 0,
           "unresolved": 0
         },
         "unresolved_methods": []
       },
+      "comparison_overlay": {
+        "run_ids": [
+          "creno-llama-124m-1p5b-lr0030-seed-0",
+          "per-head-creno-llama-124m-1p5b-lr0030-seed-0"
+        ],
+        "group_label": "Our optimizers",
+        "basis": "User-requested shared chart by model, dataset family, batch and nominal token budget. Original run configuration and measurements are retained; identical validation splits are not established."
+      },
       "evidence_summary": {
-        "mapped": 12,
-        "expected": 12,
-        "complete": 12,
+        "mapped": 14,
+        "expected": 14,
+        "complete": 14,
         "partial": 0,
         "failed": 0,
-        "drawable": 12,
-        "metrics": 5568,
+        "drawable": 14,
+        "metrics": 8318,
         "claims": 1,
         "figures": 1,
         "status_counts": {
-          "completed": 12
+          "completed": 14
         },
         "nonfinite": 0,
         "unresolved": 0
@@ -1397,9 +1427,9 @@
           "figure": "fig:benchmarking-210m-losses"
         },
         "evidence_summary": {
-          "expected": 11,
-          "mapped": 8,
-          "complete": 8,
+          "expected": 13,
+          "mapped": 10,
+          "complete": 10,
           "partial": 0,
           "nonfinite": 0,
           "unresolved": 3
@@ -1419,18 +1449,26 @@
           }
         ]
       },
+      "comparison_overlay": {
+        "run_ids": [
+          "creno-llama-210m-2p1b-lr0070-seed-0",
+          "per-head-creno-llama-210m-2p1b-lr0070-seed-0"
+        ],
+        "group_label": "Our optimizers",
+        "basis": "User-requested shared chart by model, dataset family, batch and nominal token budget. Original run configuration and measurements are retained; identical validation splits are not established."
+      },
       "evidence_summary": {
-        "mapped": 8,
-        "expected": 11,
-        "complete": 8,
+        "mapped": 10,
+        "expected": 13,
+        "complete": 10,
         "partial": 0,
         "failed": 0,
-        "drawable": 8,
-        "metrics": 1160,
+        "drawable": 10,
+        "metrics": 2004,
         "claims": 0,
         "figures": 1,
         "status_counts": {
-          "completed": 8
+          "completed": 10
         },
         "nonfinite": 0,
         "unresolved": 3
@@ -1502,9 +1540,9 @@
           "figure": "fig:benchmarking-210m-losses"
         },
         "evidence_summary": {
-          "expected": 11,
-          "mapped": 8,
-          "complete": 4,
+          "expected": 13,
+          "mapped": 10,
+          "complete": 6,
           "partial": 3,
           "nonfinite": 1,
           "unresolved": 3
@@ -1524,19 +1562,27 @@
           }
         ]
       },
+      "comparison_overlay": {
+        "run_ids": [
+          "creno-llama-210m-4p2b-lr0070-seed-0",
+          "per-head-creno-llama-210m-4p2b-lr0070-seed-0"
+        ],
+        "group_label": "Our optimizers",
+        "basis": "User-requested shared chart by model, dataset family, batch and nominal token budget. Original run configuration and measurements are retained; identical validation splits are not established."
+      },
       "evidence_summary": {
-        "mapped": 8,
-        "expected": 11,
-        "complete": 4,
+        "mapped": 10,
+        "expected": 13,
+        "complete": 6,
         "partial": 3,
         "failed": 1,
-        "drawable": 8,
-        "metrics": 2260,
+        "drawable": 10,
+        "metrics": 3938,
         "claims": 0,
         "figures": 1,
         "status_counts": {
           "partial": 3,
-          "completed": 4,
+          "completed": 6,
           "diverged": 1
         },
         "nonfinite": 1,
@@ -1609,9 +1655,9 @@
           "figure": "fig:benchmarking-210m-losses"
         },
         "evidence_summary": {
-          "expected": 11,
-          "mapped": 8,
-          "complete": 2,
+          "expected": 13,
+          "mapped": 10,
+          "complete": 4,
           "partial": 4,
           "nonfinite": 2,
           "unresolved": 3
@@ -1631,18 +1677,26 @@
           }
         ]
       },
+      "comparison_overlay": {
+        "run_ids": [
+          "creno-llama-210m-6p3b-lr0070-seed-0",
+          "per-head-creno-llama-210m-6p3b-lr0070-seed-0"
+        ],
+        "group_label": "Our optimizers",
+        "basis": "User-requested shared chart by model, dataset family, batch and nominal token budget. Original run configuration and measurements are retained; identical validation splits are not established."
+      },
       "evidence_summary": {
-        "mapped": 8,
-        "expected": 11,
-        "complete": 2,
+        "mapped": 10,
+        "expected": 13,
+        "complete": 4,
         "partial": 4,
         "failed": 2,
-        "drawable": 8,
-        "metrics": 3366,
+        "drawable": 10,
+        "metrics": 5878,
         "claims": 0,
         "figures": 1,
         "status_counts": {
-          "completed": 2,
+          "completed": 4,
           "partial": 4,
           "diverged": 2
         },
@@ -1716,9 +1770,9 @@
           "figure": "fig:benchmarking-210m-losses"
         },
         "evidence_summary": {
-          "expected": 11,
-          "mapped": 8,
-          "complete": 1,
+          "expected": 13,
+          "mapped": 10,
+          "complete": 3,
           "partial": 7,
           "nonfinite": 0,
           "unresolved": 3
@@ -1738,19 +1792,27 @@
           }
         ]
       },
+      "comparison_overlay": {
+        "run_ids": [
+          "creno-llama-210m-8p4b-lr0070-seed-0",
+          "per-head-creno-llama-210m-8p4b-lr0070-seed-0"
+        ],
+        "group_label": "Our optimizers",
+        "basis": "User-requested shared chart by model, dataset family, batch and nominal token budget. Original run configuration and measurements are retained; identical validation splits are not established."
+      },
       "evidence_summary": {
-        "mapped": 8,
-        "expected": 11,
-        "complete": 1,
+        "mapped": 10,
+        "expected": 13,
+        "complete": 3,
         "partial": 7,
         "failed": 0,
-        "drawable": 8,
-        "metrics": 4475,
+        "drawable": 10,
+        "metrics": 7821,
         "claims": 0,
         "figures": 1,
         "status_counts": {
           "partial": 7,
-          "completed": 1
+          "completed": 3
         },
         "nonfinite": 0,
         "unresolved": 3
@@ -1924,9 +1986,9 @@
           "figure": "fig:benchmark-720"
         },
         "evidence_summary": {
-          "expected": 11,
-          "mapped": 4,
-          "complete": 4,
+          "expected": 15,
+          "mapped": 8,
+          "complete": 8,
           "partial": 0,
           "nonfinite": 0,
           "unresolved": 7
@@ -1962,18 +2024,28 @@
           }
         ]
       },
+      "comparison_overlay": {
+        "run_ids": [
+          "creno-llama-720m-8p126b-lr0140-seed-0",
+          "creno-llama-720m-8p126b-lr0200-seed-0",
+          "per-head-creno-llama-720m-8p126b-lr0140-seed-0",
+          "per-head-creno-llama-720m-8p126b-lr0200-seed-0"
+        ],
+        "group_label": "Our optimizers",
+        "basis": "User-requested shared chart by model, dataset family, batch and nominal token budget. Original run configuration and measurements are retained; identical validation splits are not established."
+      },
       "evidence_summary": {
-        "mapped": 4,
-        "expected": 11,
-        "complete": 4,
+        "mapped": 8,
+        "expected": 15,
+        "complete": 8,
         "partial": 0,
         "failed": 0,
-        "drawable": 4,
-        "metrics": 184,
+        "drawable": 8,
+        "metrics": 696,
         "claims": 0,
         "figures": 1,
         "status_counts": {
-          "completed": 4
+          "completed": 8
         },
         "nonfinite": 0,
         "unresolved": 7
@@ -2390,8 +2462,8 @@
   "evidence_summary": {
     "suites": 23,
     "active_suites": 19,
-    "runs": 206,
-    "metrics": 73336,
+    "runs": 220,
+    "metrics": 84978,
     "claims": 4,
     "figures": 19
   }

@@ -98,6 +98,7 @@
   --shadow-md: 0 28px 70px rgba(37, 72, 150, 0.13);
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-emphasis: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-topbar-morph: cubic-bezier(0.22, 1, 0.36, 1);
   --workbench-height: clamp(680px, 76svh, 840px);
 }
 
@@ -290,10 +291,10 @@ pre {
 }
 
 .topbar-scrolled .topbar {
-  background: rgba(255, 255, 255, 0.88);
-  border-bottom-color: rgba(216, 226, 255, 0.9);
-  box-shadow: 0 10px 30px rgba(49, 74, 136, 0.07);
-  backdrop-filter: blur(16px) saturate(145%);
+  background: transparent;
+  border-bottom-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .topbar-shell {
@@ -305,6 +306,54 @@ pre {
   gap: 28px;
   margin: 0 auto;
   padding: 14px clamp(18px, 4vw, 68px);
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  transform-origin: top center;
+  transition:
+    width 420ms var(--ease-topbar-morph),
+    min-height 420ms var(--ease-topbar-morph),
+    margin-top 420ms var(--ease-topbar-morph),
+    padding 420ms var(--ease-topbar-morph),
+    border-radius 420ms var(--ease-topbar-morph),
+    border-color 420ms var(--ease-topbar-morph),
+    background-color 420ms var(--ease-topbar-morph),
+    box-shadow 420ms var(--ease-topbar-morph),
+    backdrop-filter 420ms var(--ease-topbar-morph);
+}
+
+.topbar-scrolled .topbar-shell {
+  width: min(960px, calc(100% - 32px));
+  min-height: 64px;
+  margin-top: 12px;
+  padding: 8px 18px;
+  border-color: rgba(202, 217, 255, 0.82);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow:
+    0 18px 44px rgba(49, 74, 136, 0.12),
+    0 4px 12px rgba(49, 74, 136, 0.06);
+  backdrop-filter: blur(16px) saturate(145%);
+  animation: topbar-settle 420ms var(--ease-topbar-morph) both;
+}
+
+@keyframes topbar-settle {
+  0% {
+    opacity: 0.96;
+    transform: translateY(-5px);
+  }
+
+  68% {
+    opacity: 1;
+    transform: translateY(1px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .topbar-identity {
@@ -328,6 +377,18 @@ pre {
   box-shadow: 0 10px 24px rgba(69, 80, 220, 0.23);
   font-family: var(--mono);
   line-height: 1;
+  transition:
+    width 420ms var(--ease-topbar-morph),
+    height 420ms var(--ease-topbar-morph),
+    border-radius 420ms var(--ease-topbar-morph),
+    box-shadow 420ms var(--ease-topbar-morph);
+}
+
+.topbar-scrolled .document-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(69, 80, 220, 0.2);
 }
 
 .document-mark span {
@@ -349,8 +410,7 @@ pre {
   gap: 1px;
 }
 
-.workspace-brand-copy,
-.workspace-topbar-evidence {
+.workspace-brand-copy {
   display: none;
 }
 
@@ -379,29 +439,17 @@ pre {
   white-space: nowrap;
 }
 
-.workspace-mode .workspace-topbar-evidence {
-  min-width: 124px;
-  display: grid;
-  justify-items: end;
-  color: var(--slate-500);
-  font-family: var(--mono);
-  font-size: 12px;
-  line-height: 16px;
-  white-space: nowrap;
-}
-
-.workspace-topbar-evidence strong {
-  color: var(--electric);
-  font-size: 14px;
-  line-height: 18px;
-}
-
 .brand-title {
   color: var(--ink);
   font-size: 22px;
   font-weight: 750;
   line-height: 1.1;
   letter-spacing: -0.035em;
+  transition: font-size 420ms var(--ease-topbar-morph);
+}
+
+.topbar-scrolled .brand-title {
+  font-size: 20px;
 }
 
 .eyebrow,
@@ -420,6 +468,11 @@ pre {
 .brand-copy .eyebrow {
   font-size: 13px;
   line-height: 16px;
+  transition: font-size 420ms var(--ease-topbar-morph);
+}
+
+.topbar-scrolled .brand-copy .eyebrow {
+  font-size: 12px;
 }
 
 .header-utility {
@@ -511,46 +564,15 @@ pre {
   transform: scaleX(1);
 }
 
-.source-pill {
-  min-height: 38px;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  padding: 8px 12px;
-  border: 1px solid rgba(202, 217, 255, 0.85);
-  border-radius: 999px;
-  color: var(--slate-700);
-  background: rgba(255, 255, 255, 0.72);
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 650;
-  line-height: 16px;
+.portal-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
   white-space: nowrap;
-}
-
-.dot {
-  width: 7px;
-  height: 7px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--electric);
-  box-shadow: 0 0 0 4px rgba(39, 100, 255, 0.12);
-}
-
-.source-pill[data-state="loading"] .dot {
-  background: var(--violet);
-  box-shadow: 0 0 0 4px var(--violet-100);
-}
-
-.source-pill[data-state="error"] {
-  color: var(--danger-700);
-  border-color: var(--danger-100);
-  background: var(--danger-50);
-}
-
-.source-pill[data-state="error"] .dot {
-  background: var(--danger-700);
-  box-shadow: 0 0 0 4px var(--danger-100);
+  border: 0;
 }
 
 .hero-screen {
@@ -2918,13 +2940,13 @@ button:disabled {
 
   .topbar-shell {
     display: grid;
-    grid-template-columns: minmax(280px, 1fr) 712px;
+    grid-template-columns: minmax(280px, 1fr) 300px;
     gap: 24px;
   }
 
   .header-utility {
     display: grid;
-    grid-template-columns: 190px 94px 124px 256px;
+    grid-template-columns: 190px 94px;
     align-items: center;
     gap: 16px;
   }
@@ -2938,14 +2960,9 @@ button:disabled {
     justify-self: center;
   }
 
-  .workspace-topbar-evidence {
-    justify-self: end;
-  }
-
-  .source-pill {
-    width: 256px;
-    justify-content: center;
-    overflow: hidden;
+  .topbar-scrolled .topbar-shell {
+    min-height: 64px;
+    padding: 8px 18px;
   }
 
   .portal-body-grid {
@@ -3172,15 +3189,27 @@ button:disabled {
     padding: 11px 16px;
   }
 
+  .topbar-scrolled .topbar-shell {
+    width: calc(100% - 16px);
+    min-height: 60px;
+    margin-top: 6px;
+    padding: 7px 12px;
+    border-radius: 22px;
+  }
+
   .document-mark {
     width: 42px;
     height: 42px;
     border-radius: 12px;
   }
 
-  .brand-copy .eyebrow,
-  .source-pill,
-  .workspace-topbar-evidence {
+  .topbar-scrolled .document-mark {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+  }
+
+  .brand-copy .eyebrow {
     display: none;
   }
 
@@ -3642,6 +3671,10 @@ button:disabled {
   }
 
   #lossChart path.series-path.is-selected {
+    animation: none !important;
+  }
+
+  .topbar-scrolled .topbar-shell {
     animation: none !important;
   }
 
