@@ -39,6 +39,11 @@ let selectedChartRunIds = new Set();
 let rankedRunGroupState = {};
 let chartSelectionNotice = "";
 let chartScaleMode = "full";
+let chartViewport = null;
+let chartViewportFrame = 0;
+let chartViewportTimer = 0;
+let chartGesture = null;
+let chartSuppressClick = false;
 let focusedChartRunIds = new Set();
 let chartLabelMode = "none";
 let runFilterText = "";
@@ -1582,6 +1587,7 @@ function buildCurrentFigureModel({
     focusRunIds: chartFocusRunIds(),
     labelMode: chartLabelMode,
     scaleMode: chartScaleMode,
+    viewport: chartViewport,
     profile,
     width,
     height,
@@ -1910,16 +1916,27 @@ function canonicalSuiteId(suiteId) {
   return portalData?.meta?.suite_aliases?.[suiteId] || suiteId;
 }
 
-function applyUrlState() {
+function applyUrlState(search = globalThis.location?.search) {
   if (!globalThis.location) return;
-  const params = new URLSearchParams(globalThis.location.search);
+  const params = new URLSearchParams(search);
   const requestedSuite = canonicalSuiteId(params.get("suite"));
   if (requestedSuite && suiteById(requestedSuite)) selectedSuiteId = requestedSuite;
   const suite = activeSuite();
-  const requestedScale = params.get("scale");
-  if (requestedScale) chartScaleMode = requestedScale;
+  cancelChartGesture();
+  chartScaleMode = params.get("scale") || "full";
   normalizeChartScaleMode(suite);
   initializeChartSelection(suite);
+  if (params.has("plot")) {
+    const requested = params.getAll("plot");
+    const valid = [...new Set(requested)].filter((id) => {
+      const run = runById(id);
+      return run?.suite_id === suite.suite_id && curveAvailable(run, suite);
+    }).slice(0, chartSelectionLimit(suite));
+    if (valid.length || requested.every((id) => id === "")) selectedChartRunIds = new Set(valid);
+  }
+  const x = parseChartRange(params.get("view_x"));
+  const y = parseChartRange(params.get("view_y"));
+  chartViewport = x ? { xMin: x[0], xMax: x[1], ...(y ? { yMin: y[0], yMax: y[1] } : {}) } : null;
   runFilterText = params.get("q") || "";
   const requestedRun = runById(params.get("run"));
   selectedRunId = requestedRun?.suite_id === suite.suite_id
@@ -1947,6 +1964,21 @@ function syncUrlState({ push = false } = {}) {
   if (selectedRunId) url.searchParams.set("run", selectedRunId);
   else url.searchParams.delete("run");
   url.searchParams.set("scale", chartScaleMode);
+  url.searchParams.delete("view_x");
+  url.searchParams.delete("view_y");
+  if (chartViewport) {
+    url.searchParams.set("view_x", `${chartViewport.xMin},${chartViewport.xMax}`);
+    if (Number.isFinite(chartViewport.yMin) && Number.isFinite(chartViewport.yMax)) {
+      url.searchParams.set("view_y", `${chartViewport.yMin},${chartViewport.yMax}`);
+    }
+  }
+  url.searchParams.delete("plot");
+  const defaults = defaultChartRunIds(activeSuite());
+  const plotted = [...selectedChartRunIds];
+  if (plotted.length !== defaults.length || plotted.some((id) => !defaults.includes(id))) {
+    if (!plotted.length) url.searchParams.append("plot", "");
+    else plotted.forEach((id) => url.searchParams.append("plot", id));
+  }
   url.searchParams.delete("focus");
   chartFocusRunIds().forEach((runId) => url.searchParams.append("focus", runId));
   if (chartLabelMode === "all") url.searchParams.set("labels", "all");
@@ -3052,34 +3084,198 @@ function chartRunChipLabel(run, suite) {
   return compactTooltipText(label, 24);
 }
 
+function parseChartRange(value) {
+  if (!value) return null;
+  const parts = value.split(",");
+  if (parts.length !== 2 || parts.some((part) => !part.trim())) return null;
+  const numbers = parts.map(Number);
+  return numbers.every(Number.isFinite) && numbers[1] > numbers[0] ? numbers : null;
+}
+
+function cancelChartGesture() {
+  if (chartViewportFrame) (globalThis.cancelAnimationFrame || clearTimeout)(chartViewportFrame);
+  clearTimeout(chartViewportTimer);
+  chartViewportFrame = 0;
+  chartViewportTimer = 0;
+  const svg = globalThis.document?.getElementById("lossChart");
+  if (chartGesture && svg?.hasPointerCapture?.(chartGesture.id)) svg.releasePointerCapture(chartGesture.id);
+  chartGesture = null;
+  chartSuppressClick = false;
+  svg?.classList.remove("is-panning");
+}
+
+function scheduleChartViewport(viewport) {
+  if (pendingSuiteId) return;
+  const generation = suiteLoadGeneration;
+  const suiteId = selectedSuiteId;
+  const isCurrent = () => generation === suiteLoadGeneration && suiteId === selectedSuiteId && !pendingSuiteId;
+  chartViewport = viewport;
+  if (!chartViewportFrame) {
+    chartViewportFrame = (globalThis.requestAnimationFrame || ((fn) => setTimeout(fn, 0)))(() => {
+      chartViewportFrame = 0;
+      if (isCurrent()) renderChart({ viewportOnly: true });
+    });
+  }
+  clearTimeout(chartViewportTimer);
+  chartViewportTimer = setTimeout(() => {
+    chartViewportTimer = 0;
+    if (isCurrent()) syncUrlState();
+  }, 150);
+}
+
+function resetChartViewport(scaleMode = "full") {
+  cancelChartGesture();
+  chartViewport = null;
+  chartScaleMode = scaleMode;
+  renderChart();
+  syncUrlState();
+}
+
+function chartViewDomain() {
+  return currentChartModel ? { ...currentChartModel.domain, ...chartViewport } : null;
+}
+
+function zoomChartViewport(factor, anchor = 0.5, vertical = false) {
+  const domain = chartViewDomain();
+  if (!domain) return;
+  const view = { xMin: domain.xMin, xMax: domain.xMax };
+  if (vertical) {
+    const center = domain.yMin + (domain.yMax - domain.yMin) * anchor;
+    const span = Math.max(1e-7, Math.min(1e6, (domain.yMax - domain.yMin) * factor));
+    view.yMin = center - span * anchor;
+    view.yMax = view.yMin + span;
+  } else {
+    const center = domain.xMin + (domain.xMax - domain.xMin) * anchor;
+    const span = Math.max(1, (domain.xMax - domain.xMin) * factor);
+    view.xMin = center - span * anchor;
+    view.xMax = view.xMin + span;
+    if (Number.isFinite(chartViewport?.yMin)) {
+      view.yMin = chartViewport.yMin;
+      view.yMax = chartViewport.yMax;
+    }
+  }
+  scheduleChartViewport(view);
+}
+
+function panChartViewport(fraction, domain = chartViewDomain()) {
+  if (!domain) return;
+  const shift = (domain.xMax - domain.xMin) * fraction;
+  scheduleChartViewport({ xMin: domain.xMin + shift, xMax: domain.xMax + shift,
+    ...(Number.isFinite(chartViewport?.yMin) ? { yMin: chartViewport.yMin, yMax: chartViewport.yMax } : {}) });
+}
+
+function installChartViewportController(svg) {
+  if (svg.dataset.viewportBound) return;
+  svg.dataset.viewportBound = "true";
+  svg.setAttribute("tabindex", "0");
+  svg.setAttribute("aria-keyshortcuts", "+ - ArrowLeft ArrowRight Home");
+  const localPoint = (event) => {
+    const matrix = svg.getScreenCTM();
+    if (!matrix || !currentChartModel) return null;
+    const point = svg.createSVGPoint();
+    point.x = event.clientX; point.y = event.clientY;
+    return point.matrixTransform(matrix.inverse());
+  };
+  const inPlot = (point, includeAxis = false) => {
+    const plot = currentChartModel?.plotRect;
+    return point && plot && point.x >= (includeAxis ? 0 : plot.left) && point.x <= plot.right && point.y >= plot.top && point.y <= plot.bottom;
+  };
+  svg.addEventListener("wheel", (event) => {
+    if (event.ctrlKey || event.metaKey || !currentChartModel?.series.length) return;
+    const point = localPoint(event);
+    if (!inPlot(point, true)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const plot = currentChartModel.plotRect;
+    const vertical = point.x < plot.left;
+    const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? plot.height : 1);
+    const factor = Math.exp(Math.max(-0.7, Math.min(0.7, delta * 0.002)));
+    const anchor = vertical ? 1 - (point.y - plot.top) / plot.height : (point.x - plot.left) / plot.width;
+    zoomChartViewport(factor, anchor, vertical);
+  }, { passive: false });
+  svg.addEventListener("pointerdown", (event) => {
+    chartSuppressClick = false;
+    if (event.button !== 0 || event.isPrimary === false || !inPlot(localPoint(event))) return;
+    chartGesture = { id: event.pointerId, x: event.clientX, y: event.clientY,
+      domain: chartViewDomain(), width: currentChartModel.plotRect.width * svg.getScreenCTM().a,
+      dragging: false, touch: event.pointerType === "touch" };
+  });
+  svg.addEventListener("pointermove", (event) => {
+    if (!chartGesture || chartGesture.id !== event.pointerId) return;
+    const dx = event.clientX - chartGesture.x;
+    const dy = event.clientY - chartGesture.y;
+    if (!chartGesture.dragging && chartGesture.touch && Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 6) {
+      chartGesture = null;
+      return;
+    }
+    if (!chartGesture.dragging && Math.abs(dx) <= 6) return;
+    chartGesture.dragging = true;
+    chartSuppressClick = true;
+    svg.setPointerCapture(event.pointerId);
+    svg.classList.add("is-panning");
+    svg.querySelector(".chart-hover")?.setAttribute("style", "display:none");
+    panChartViewport(-dx / chartGesture.width, chartGesture.domain);
+  });
+  const finish = (event) => {
+    if (!chartGesture || chartGesture.id !== event.pointerId) return;
+    const dragged = chartGesture.dragging;
+    if (svg.hasPointerCapture?.(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+    chartGesture = null;
+    svg.classList.remove("is-panning");
+    if (dragged) {
+      if (chartViewportFrame) (globalThis.cancelAnimationFrame || clearTimeout)(chartViewportFrame);
+      chartViewportFrame = 0;
+      clearTimeout(chartViewportTimer);
+      chartViewportTimer = 0;
+      renderChart({ viewportOnly: true });
+      syncUrlState();
+    }
+  };
+  svg.addEventListener("pointerup", finish);
+  svg.addEventListener("pointercancel", finish);
+  svg.addEventListener("lostpointercapture", finish);
+  svg.addEventListener("click", (event) => {
+    if (!chartSuppressClick) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    chartSuppressClick = false;
+  }, true);
+  svg.addEventListener("keydown", (event) => {
+    if (event.target !== svg || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (!["+", "=", "-", "ArrowLeft", "ArrowRight", "Home"].includes(event.key)) return;
+    event.preventDefault();
+    if (event.key === "Home") resetChartViewport();
+    else if (event.key === "ArrowLeft" || event.key === "ArrowRight") panChartViewport(event.key === "ArrowLeft" ? -0.15 : 0.15);
+    else zoomChartViewport(event.key === "-" ? 1.25 : 0.8);
+  });
+  globalThis.addEventListener?.("pagehide", cancelChartGesture);
+}
+
 function renderChartModeSwitch() {
   const modeSwitch = byId("chartModeSwitch");
   const tailDomain = tailStepDomain(activeSuite());
   modeSwitch.innerHTML = `
-    <span class="chart-mode-label">${escapeHtml(uiText("chart.scale"))}</span>
-    <button type="button" class="${chartScaleMode === "full" ? "active" : ""}" data-scale-mode="full" aria-pressed="${chartScaleMode === "full"}">
-      <span class="mode-icon">F</span>
-      <span>${escapeHtml(uiText("chart.full"))}</span>
-    </button>
-    <button type="button" class="${chartScaleMode === "zoom" ? "active" : ""}" data-scale-mode="zoom" aria-pressed="${chartScaleMode === "zoom"}">
-      <span class="mode-icon"><=5</span>
-      <span>${escapeHtml(uiText("chart.zoom"))}</span>
-    </button>
+    <span class="chart-mode-label">${escapeHtml(uiText("chart.view"))}</span>
+    <button type="button" data-scale-mode="full">${escapeHtml(uiText("chart.reset_view"))}</button>
     ${tailDomain ? `
-      <button type="button" class="${chartScaleMode === "tail" ? "active" : ""}" data-scale-mode="tail" aria-pressed="${chartScaleMode === "tail"}">
+      <button type="button" class="${!chartViewport && chartScaleMode === "tail" ? "active" : ""}" data-scale-mode="tail" aria-pressed="${!chartViewport && chartScaleMode === "tail"}">
         <span class="mode-icon">${escapeHtml(tailDomain.min)}</span>
         <span>${escapeHtml(uiText("chart.tail"))}</span>
       </button>
     ` : ""}
+    <button type="button" class="chart-touch-zoom" data-zoom-factor="0.8" aria-label="${escapeHtml(uiText("chart.zoom_in"))}">+</button>
+    <button type="button" class="chart-touch-zoom" data-zoom-factor="1.25" aria-label="${escapeHtml(uiText("chart.zoom_out"))}">−</button>
   `;
-  modeSwitch.querySelectorAll("button").forEach((button) => {
+  const hint = byId("chartGestureHint");
+  if (hint) hint.textContent = uiText("chart.gesture_hint");
+  modeSwitch.querySelectorAll("button[data-scale-mode]").forEach((button) => {
     button.addEventListener("click", () => {
       const focusState = captureFocusState();
-      chartScaleMode = button.dataset.scaleMode;
-      renderChart();
+      resetChartViewport(button.dataset.scaleMode);
       restoreFocusState(focusState);
-      syncUrlState();
     });
+  });
+  modeSwitch.querySelectorAll("button[data-zoom-factor]").forEach((button) => {
+    button.addEventListener("click", () => zoomChartViewport(Number(button.dataset.zoomFactor)));
   });
 }
 
@@ -3165,7 +3361,9 @@ function chartExportFilename(model, extension) {
   const hash = chartSelectionHash(model?.selection?.visibleRunIds || []);
   return [
     safeFilename(model?.figure?.id || activeSuite()?.suite_id),
-    safeFilename(model?.request?.scaleMode || chartScaleMode),
+    model?.request?.viewport
+      ? `view-${chartSelectionHash([JSON.stringify(model.domain)])}`
+      : safeFilename(model?.request?.scaleMode || chartScaleMode),
     model?.selection?.focusRunIds?.length
       ? `focused-${model.selection.focusRunIds.length}`
       : `labels-${model?.selection?.labelMode || "none"}`,
@@ -3333,7 +3531,17 @@ function nearestCurveObservation(
   return best && best.distance <= maxDistance ? best : null;
 }
 
-function renderChart() {
+function chartHoverAnchor(nearest, plot) {
+  const observedInView = nearest.x >= plot.left && nearest.x <= plot.right
+    && nearest.y >= plot.top && nearest.y <= plot.bottom;
+  return {
+    observedInView,
+    x: Math.max(plot.left, Math.min(plot.right, observedInView ? nearest.x : nearest.curveX)),
+    y: Math.max(plot.top, Math.min(plot.bottom, observedInView ? nearest.y : nearest.curveY)),
+  };
+}
+
+function renderChart({ viewportOnly = false } = {}) {
   const svg = byId("lossChart");
   const reusableSeriesPaths = new Map(
     Array.from(svg.querySelectorAll("path.series-path[data-chart-run-id]"))
@@ -3344,9 +3552,12 @@ function renderChart() {
   const suite = activeSuite();
   normalizeChartScaleMode(suite);
   const yMetric = curveMetricName(suite);
-  renderChartModeSwitch();
-  renderChartEmphasisSwitch();
-  bindChartExportControls();
+  if (!viewportOnly) {
+    renderChartModeSwitch();
+    renderChartEmphasisSwitch();
+    bindChartExportControls();
+  }
+  installChartViewportController(svg);
   const width = Math.max(280, Math.round(svg.clientWidth || 740));
   const height = Math.max(280, Math.round(svg.clientHeight || 420));
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
@@ -3357,6 +3568,13 @@ function renderChart() {
   });
 
   const model = currentChartModel;
+  chartViewport = model?.request.viewport || null;
+  const tailButton = byId("chartModeSwitch").querySelector('[data-scale-mode="tail"]');
+  if (tailButton) {
+    const isTailPreset = !chartViewport && chartScaleMode === "tail";
+    tailButton.classList.toggle("active", isTailPreset);
+    tailButton.setAttribute("aria-pressed", String(isTailPreset));
+  }
   const runs = (model?.series || []).map((entry) => runById(entry.runId)).filter(Boolean);
   const seriesByRun = new Map((model?.series || []).map((entry) => [entry.runId, entry]));
   const focusedRunIds = new Set(chartFocusRunIds());
@@ -3366,6 +3584,7 @@ function renderChart() {
     ? `${model.axes.y.label} by ${model.axes.x.label}${model.target ? ` · ${model.target.label}` : ""}`
     : `${yMetric} by step`;
 
+  if (!viewportOnly) {
   byId("chartSelectionChips").innerHTML = runs.length
     ? runs
         .map(
@@ -3399,6 +3618,7 @@ function renderChart() {
       selectRun(button.dataset.runId, { focusChart: true });
     });
   });
+  }
 
   if (!model?.series?.length || !model.stats.points) {
     byId("chartToolbarMeta").textContent = `${runs.length}/${chartSelectionLimit(suite)} visible`;
@@ -3410,7 +3630,7 @@ function renderChart() {
 
   byId("chartToolbarMeta").textContent = [
     `${model.stats.visibleRuns}/${chartSelectionLimit(suite)} visible`,
-    chartScaleMode === "full" ? "Full data range" : "",
+    !chartViewport && chartScaleMode === "full" ? "Full data range" : "",
     model.clipping.note,
     ...model.warnings,
   ].filter(Boolean).join(" · ");
@@ -3424,6 +3644,11 @@ function renderChart() {
   chartDescription.textContent =
     `${model.figure.subtitle}${model.clipping.note ? `. ${model.clipping.note}` : ""}${model.warnings.length ? `. ${model.warnings.join(". ")}` : ""}`;
   svg.append(chartTitle, chartDescription);
+  if (model.stats.emptyWindow) {
+    const empty = svgEl("text", { x: model.plotRect.left + 12, y: model.plotRect.top + 28, class: "chart-label" });
+    empty.textContent = uiText("chart.empty_window");
+    svg.appendChild(empty);
+  }
 
   const plot = model.plotRect;
   const x = (step) => mapFigureValue(step, model.geometry.xScale);
@@ -3708,6 +3933,7 @@ function renderChart() {
     };
 
     const showNearest = (event) => {
+      if (chartGesture?.dragging) return null;
       const nearest = nearestPoint(event);
       if (!nearest) {
         hoverLayer.setAttribute("style", "display:none");
@@ -3715,8 +3941,11 @@ function renderChart() {
         return null;
       }
       hoverLayer.setAttribute("style", "display:block");
-      crosshair.setAttribute("x1", nearest.x);
-      crosshair.setAttribute("x2", nearest.x);
+      const anchor = chartHoverAnchor(nearest, plot);
+      crosshair.setAttribute("x1", anchor.x);
+      crosshair.setAttribute("x2", anchor.x);
+      // Edge neighbours are evidence, not new points inside the viewport.
+      focus.setAttribute("visibility", anchor.observedInView ? "visible" : "hidden");
       focus.setAttribute("cx", nearest.x);
       focus.setAttribute("cy", nearest.y);
       focus.setAttribute("fill", nearest.color);
@@ -3731,12 +3960,12 @@ function renderChart() {
       tooltipContext.textContent = model.target
         ? `target gap ${nearest.value - model.target.value >= 0 ? "+" : ""}${formatMetricValue(yMetric, nearest.value - model.target.value)}`
         : compactTooltipText(`run_id ${nearest.run.run_id}`, width < 720 ? 35 : 48);
-      const preferredX = nearest.x + 14 + tooltipWidth <= width - 6
-        ? nearest.x + 14
-        : nearest.x - tooltipWidth - 14;
+      const preferredX = anchor.x + 14 + tooltipWidth <= width - 6
+        ? anchor.x + 14
+        : anchor.x - tooltipWidth - 14;
       const tooltipX = Math.min(Math.max(preferredX, 4), width - tooltipWidth - 4);
       const tooltipY = Math.min(
-        Math.max(nearest.y - tooltipHeight / 2, plot.top + 4),
+        Math.max(anchor.y - tooltipHeight / 2, plot.top + 4),
         plot.bottom - tooltipHeight - 4
       );
       tooltip.setAttribute("transform", `translate(${tooltipX}, ${tooltipY})`);
@@ -3750,6 +3979,7 @@ function renderChart() {
       overlay.dataset.pointerDownRunId = nearest?.entry?.runId || "";
     });
     overlay.addEventListener("click", (event) => {
+      if (chartSuppressClick) return;
       const nearest = showNearest(event);
       const runId = nearest?.entry?.runId || overlay.dataset.nearestRunId;
       if (runId) selectRun(runId, { focusChart: true });
@@ -4284,6 +4514,8 @@ async function portalDataForSuite(suite) {
 }
 
 function resetSuiteInteractionState(suite) {
+  cancelChartGesture();
+  chartViewport = null;
   clearTimeout(runSearchTimer);
   resetRunFilters();
   chartScaleMode = "full";
@@ -4340,6 +4572,8 @@ async function requestSuiteChange(
 ) {
   const targetCatalogSuite = catalogSuiteById(targetSuiteId);
   if (!targetCatalogSuite) return false;
+  cancelChartGesture();
+  const restoreSearch = restoreUrl ? globalThis.location?.search : null;
   const generation = ++suiteLoadGeneration;
   const shouldLandAfterCommit = navigationIntent === "benchmark";
   if (shouldLandAfterCommit) {
@@ -4369,7 +4603,7 @@ async function requestSuiteChange(
     if (restoreUrl) {
       const committed = await commitSuiteViewUpdate(
         () => {
-          applyUrlState();
+          applyUrlState(restoreSearch);
           renderSuiteView();
         },
         { generation, initial }
@@ -4425,7 +4659,7 @@ async function requestSuiteChange(
         protocolSwitchError = "";
 
         const suite = activeSuite();
-        if (restoreUrl) applyUrlState();
+        if (restoreUrl) applyUrlState(restoreSearch);
         else resetSuiteInteractionState(suite);
         renderSuiteView();
         if (!restoreUrl) syncUrlState({ push });
@@ -4468,6 +4702,7 @@ async function requestSuiteChange(
 
 async function restoreSuiteFromLocation() {
   if (!portalData || !globalThis.location) return;
+  cancelChartGesture();
   const params = new URLSearchParams(globalThis.location.search);
   const requestedSuiteId = canonicalSuiteId(params.get("suite"));
   const targetSuiteId = catalogSuiteById(requestedSuiteId)
@@ -4477,11 +4712,13 @@ async function restoreSuiteFromLocation() {
   pageViewUrlSyncEnabled = false;
   activePageViewHash = targetPageHash;
   pendingPageViewHash = targetPageHash;
-  await requestSuiteChange(targetSuiteId, {
+  const restoration = requestSuiteChange(targetSuiteId, {
     restoreUrl: true,
     navigationIntent: "history",
   });
-  await navigateToPageView(targetPageHash);
+  const generation = suiteLoadGeneration;
+  const restored = await restoration;
+  if (restored && generation === suiteLoadGeneration) await navigateToPageView(targetPageHash, { generation });
 }
 
 async function start() {
@@ -4579,6 +4816,8 @@ function installPortalTestApi() {
         data.suites[0]?.suite_id ||
         null;
       chartScaleMode = "full";
+      cancelChartGesture();
+      chartViewport = null;
       focusedChartRunIds = new Set();
       chartLabelMode = "none";
       resetRunFilters();
@@ -4652,6 +4891,7 @@ function installPortalTestApi() {
         selectedSuiteId,
         selectedRunId,
         chartScaleMode,
+        chartViewport,
         focusedChartRunIds: chartFocusRunIds(),
         chartLabelMode,
         selectedChartRunIds: Array.from(selectedChartRunIds),

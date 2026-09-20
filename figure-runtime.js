@@ -5,7 +5,9 @@
 })(typeof globalThis === "object" ? globalThis : this, function createPortalFigureRuntime() {
   "use strict";
 
-  const SCHEMA_VERSION = "1.2";
+  const SCHEMA_VERSION = "1.3";
+  // Snapshots are immutable; replacing the data object invalidates these indexes.
+  const indexCache = new WeakMap();
   const PROFILES = {
     interactive: { name: "interactive", width: 960, height: 520 },
     presentation: { name: "presentation", width: 1200, height: 900 },
@@ -223,6 +225,7 @@
   }
 
   function buildIndexes(data) {
+    if (indexCache.has(data)) return indexCache.get(data);
     const suites = new Map((data?.suites || []).map((suite) => [suite.suite_id, suite]));
     const runs = new Map((data?.runs || []).map((run) => [run.run_id, run]));
     const figures = new Map((data?.figures || []).map((figure) => [figure.figure_id, figure]));
@@ -240,7 +243,67 @@
       }
     }
     for (const values of points.values()) values.sort((left, right) => left.step - right.step);
-    return { suites, runs, figures, points, summaries };
+    const indexes = { suites, runs, figures, points, summaries, observations: new Map(), domains: new Map() };
+    indexCache.set(data, indexes);
+    return indexes;
+  }
+
+  function observationsFor(indexes, runId, metric) {
+    const key = pointKey(runId, metric);
+    if (!indexes.observations.has(key)) {
+      const points = (indexes.points.get(key) || []).map((point, pointIndex) => ({
+        pointIndex, metricId: point.metric_id || "", step: point.step, value: point.value,
+        tokensSeen: finite(point.tokens_seen) ? point.tokens_seen : null,
+        wallTimeSec: finite(point.wall_time_sec) ? point.wall_time_sec : null,
+        split: point.split || "",
+      }));
+      indexes.observations.set(key, { points, segments: splitSegments(points) });
+    }
+    return indexes.observations.get(key);
+  }
+
+  function normalizeViewport(viewport, extent) {
+    if (!viewport || !finite(viewport.xMin) || !finite(viewport.xMax) || viewport.xMax <= viewport.xMin) return null;
+    const span = clamp(viewport.xMax - viewport.xMin, Math.min(1, extent.xMax - extent.xMin), extent.xMax - extent.xMin);
+    const xMin = clamp(viewport.xMin, extent.xMin, extent.xMax - span);
+    const result = { xMin, xMax: xMin + span };
+    if (finite(viewport.yMin) && finite(viewport.yMax) && finite(viewport.yMax - viewport.yMin) && viewport.yMax - viewport.yMin >= 1e-8) {
+      result.yMin = viewport.yMin;
+      result.yMax = viewport.yMax;
+    }
+    return result;
+  }
+
+  // Keep real neighbours at window edges. The SVG clip path clips geometry,
+  // never inventing an observation or joining separate original segments.
+  function windowSegments(segments, xMin, xMax) {
+    return segments.flatMap((segment) => {
+      if (segment.at(-1).step < xMin || segment[0].step > xMax) return [];
+      let first = segment.findIndex((point) => point.step >= xMin);
+      if (first < 0) return [];
+      first = Math.max(0, first - 1);
+      let last = first;
+      while (last < segment.length - 1 && segment[last].step < xMax) last += 1;
+      return [segment.slice(first, last + 1)];
+    });
+  }
+
+  function windowValueExtent(segments, xMin, xMax) {
+    const values = [];
+    for (const segment of segments) {
+      for (let index = 0; index < segment.length; index += 1) {
+        const point = segment[index];
+        if (point.step >= xMin && point.step <= xMax) values.push(point.value);
+        const next = segment[index + 1];
+        if (!next || next.step <= point.step) continue;
+        for (const edge of [xMin, xMax]) {
+          if (point.step < edge && next.step > edge) {
+            values.push(point.value + (next.value - point.value) * (edge - point.step) / (next.step - point.step));
+          }
+        }
+      }
+    }
+    return values.length ? numberExtent(values, [0, 1]) : null;
   }
 
   function pointKey(runId, metricName) {
@@ -381,6 +444,8 @@
   }
 
   function computeDomain(indexes, suite, figure, drawable, scaleMode) {
+    const cacheKey = `${figure.figure_id}:${scaleMode}`;
+    if (indexes.domains.has(cacheKey)) return indexes.domains.get(cacheKey);
     const yMetric = figure.y_metric || "val_loss";
     const allPoints = [];
     for (const run of drawable) {
@@ -433,7 +498,9 @@
       yMax = figure.tail_y_axis_max;
     }
     if (yMax <= yMin) yMax = yMin + 0.1;
-    return { xMin, xMax, yMin, yMax };
+    const domain = { xMin, xMax, yMin, yMax };
+    indexes.domains.set(cacheKey, domain);
+    return domain;
   }
 
   function buildLayout(profile, rankingItemCount) {
@@ -545,7 +612,36 @@
     return `${text.slice(0, Math.max(1, maximum - 1)).trimEnd()}\u2026`;
   }
 
-  function layoutDirectLabels(series, plot, domain, compact, reservedTop = plot.top) {
+  function visibleSegmentEnd(segments, domain) {
+    // Clip only label geometry, never the stored observations or CSV evidence.
+    for (let s = segments.length - 1; s >= 0; s -= 1) {
+      const segment = segments[s];
+      for (let i = segment.length - 1; i >= 0; i -= 1) {
+        const end = segment[i];
+        const start = segment[Math.max(0, i - 1)];
+        let enter = 0;
+        let leave = 1;
+        for (const [key, min, max] of [["step", domain.xMin, domain.xMax], ["value", domain.yMin, domain.yMax]]) {
+          const delta = end[key] - start[key];
+          if (!delta) {
+            if (start[key] < min || start[key] > max) leave = -1;
+          } else {
+            const a = (min - start[key]) / delta;
+            const b = (max - start[key]) / delta;
+            enter = Math.max(enter, Math.min(a, b));
+            leave = Math.min(leave, Math.max(a, b));
+          }
+        }
+        if (enter <= leave) return {
+          step: start.step + (end.step - start.step) * leave,
+          value: start.value + (end.value - start.value) * leave,
+        };
+      }
+    }
+    return null;
+  }
+
+  function layoutDirectLabels(series, plot, domain, compact, reservedTop = plot.top, customViewport = false) {
     const candidates = series
       .map((entry) => {
         const inDomain = entry.plotPoints.filter((point) =>
@@ -554,7 +650,7 @@
           point.value >= domain.yMin &&
           point.value <= domain.yMax
         );
-        const point = inDomain[inDomain.length - 1];
+        const point = customViewport ? visibleSegmentEnd(entry.segments, domain) : inDomain[inDomain.length - 1];
         if (!point) return null;
         return {
           runId: entry.runId,
@@ -680,7 +776,30 @@
     const yMetric = figure.y_metric || "val_loss";
     const drawable = drawableRuns(indexes, suite.suite_id, yMetric);
     const selection = normalizeSelection(indexes, figure, request || {}, drawable);
-    const domain = computeDomain(indexes, suite, figure, drawable, scaleMode);
+    const defaultDomain = computeDomain(indexes, suite, figure, drawable, "full");
+    const explorationDomain = { xMin: defaultDomain.xMin, xMax: defaultDomain.xMax };
+    for (const runId of selection.visibleRunIds) {
+      const points = observationsFor(indexes, runId, yMetric).points;
+      if (points.length) {
+        explorationDomain.xMin = Math.min(explorationDomain.xMin, points[0].step);
+        explorationDomain.xMax = Math.max(explorationDomain.xMax, points.at(-1).step);
+      }
+    }
+    const viewport = normalizeViewport(request?.viewport, explorationDomain);
+    let domain = computeDomain(indexes, suite, figure, drawable, scaleMode);
+    let emptyWindow = false;
+    if (viewport) {
+      const extents = selection.visibleRunIds.map((runId) => windowValueExtent(
+        windowSegments(observationsFor(indexes, runId, yMetric).segments, viewport.xMin, viewport.xMax),
+        viewport.xMin, viewport.xMax
+      )).filter(Boolean);
+      emptyWindow = extents.length === 0;
+      const [low, high] = numberExtent(extents.flat(), [defaultDomain.yMin, defaultDomain.yMax]);
+      const padding = Math.max((high - low) * 0.08, 0.006);
+      domain = { xMin: viewport.xMin, xMax: viewport.xMax,
+        yMin: viewport.yMin ?? Math.max(0, low - padding),
+        yMax: viewport.yMax ?? high + padding };
+    }
 
     const styleRegistry = data?.visual_style_registry || {};
     const drawableIds = new Set(drawable.map((run) => run.run_id));
@@ -699,15 +818,8 @@
     const series = selection.visibleRunIds.map((runId) => {
       const run = indexes.runs.get(runId);
       const style = allocatedStyles.get(runId) || styleForRun(run, styleRegistry);
-      const points = (indexes.points.get(pointKey(runId, yMetric)) || []).map((point, pointIndex) => ({
-        pointIndex,
-        metricId: point.metric_id || "",
-        step: point.step,
-        value: point.value,
-        tokensSeen: finite(point.tokens_seen) ? point.tokens_seen : null,
-        wallTimeSec: finite(point.wall_time_sec) ? point.wall_time_sec : null,
-        split: point.split || "",
-      }));
+      const observations = observationsFor(indexes, runId, yMetric);
+      const points = observations.points;
       const plotPoints = points.filter(
         (point) => point.step >= domain.xMin && point.step <= domain.xMax
       );
@@ -746,7 +858,7 @@
         },
         points,
         plotPoints,
-        segments: splitSegments(plotPoints),
+        segments: viewport ? windowSegments(observations.segments, domain.xMin, domain.xMax) : splitSegments(plotPoints),
         markerPoints: [],
         endLabel: null,
       };
@@ -781,7 +893,8 @@
       layout.plot,
       domain,
       layout.compact,
-      ranking ? ranking.bounds.y + ranking.bounds.height + 10 : layout.plot.top
+      ranking ? ranking.bounds.y + ranking.bounds.height + 10 : layout.plot.top,
+      Boolean(viewport)
     );
     const labelsByRun = new Map(directLabels.map((label) => [label.runId, label]));
     series.forEach((entry) => {
@@ -797,7 +910,9 @@
     for (const entry of series) {
       for (const point of entry.points) {
         const clippedByX = point.step < domain.xMin || point.step > domain.xMax;
-        const clippedByY = scaleMode === "zoom" && point.value > domain.yMax;
+        const clippedByY = viewport
+          ? point.value < domain.yMin || point.value > domain.yMax
+          : scaleMode === "zoom" && point.value > domain.yMax;
         if (clippedByX || clippedByY) {
           clippingRuns.add(entry.runId);
           clippedPoints.add(`${entry.runId}:${point.pointIndex}`);
@@ -806,7 +921,7 @@
       }
     }
     const clippingReasons = [
-      scaleMode === "zoom" ? "y-maximum" : "",
+      viewport ? "custom-viewport" : scaleMode === "zoom" ? "y-maximum" : "",
       xWindowActive ? "x-window" : "",
     ].filter(Boolean);
     const xWindowNote = scaleMode === "tail"
@@ -825,7 +940,9 @@
       runCount: clippingRuns.size,
       runIds: Array.from(clippingRuns),
       reasons: clippingReasons,
-      note: [xWindowNote, yWindowNote].filter(Boolean).join(" · "),
+      note: viewport
+        ? `View: step ${formatNumber(domain.xMin, 2)}–${formatNumber(domain.xMax, 2)} · y ${formatNumber(domain.yMin, 5)}–${formatNumber(domain.yMax, 5)}`
+        : [xWindowNote, yWindowNote].filter(Boolean).join(" · "),
     };
 
     const target = suite.target?.metric_name === yMetric && finite(suite.target?.value)
@@ -844,7 +961,7 @@
       suite.title,
       `${selectedCount} selected ${selectedCount === 1 ? "run" : "runs"}`,
       target ? target.label.toLowerCase() : "",
-      scaleLabel(scaleMode, domain),
+      viewport ? clipping.note : scaleLabel(scaleMode, domain),
     ].filter(Boolean);
     const snapshot = {
       schemaVersion: data?.meta?.version || "",
@@ -855,6 +972,7 @@
       { name: "figure_id", value: figure.figure_id },
       { name: "suite_id", value: suite.suite_id },
       { name: "scale_mode", value: scaleMode },
+      { name: "viewport", value: viewport ? JSON.stringify(domain) : "" },
       { name: "visible_run_ids", value: selection.visibleRunIds.join(",") },
       { name: "focus_run_ids", value: selection.focusRunIds.join(",") },
       { name: "focus_run_id", value: selection.focusRunId || "" },
@@ -897,6 +1015,7 @@
         focusRunId: selection.focusRunId,
         labelMode: selection.labelMode,
         scaleMode,
+        viewport,
         profile: profile.name,
         width: profile.width,
         height: profile.height,
@@ -922,6 +1041,8 @@
         },
       },
       domain,
+      defaultDomain,
+      explorationDomain,
       series,
       target,
       clipping,
@@ -935,6 +1056,7 @@
           : []),
       ],
       stats: {
+        emptyWindow,
         selectedRuns: selection.selectedRunIds.length,
         visibleRuns: selection.visibleRunIds.length,
         hiddenRuns: selection.hiddenRunIds.length,
@@ -1027,6 +1149,8 @@
         figure: model.figure.id,
         suite: model.suite.id,
         scale: model.request.scaleMode,
+        viewport: model.request.viewport,
+        domain: model.domain,
         runIds: model.selection.visibleRunIds,
         focusRunIds: model.selection.focusRunIds,
         focusRunId: model.selection.focusRunId,

@@ -1523,7 +1523,7 @@ html:not(.workspace-visible) .benchmark-rail {
 
 .chart-panel {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
 }
 
 .leaderboard-panel {
@@ -1857,6 +1857,21 @@ text.chart-clip-note {
 .chart-hover-capture {
   fill: transparent;
   cursor: crosshair;
+}
+
+#lossChart { touch-action: pan-y; }
+#lossChart.is-panning, #lossChart.is-panning * { cursor: grabbing; }
+.chart-gesture-hint {
+  margin: 0;
+  padding: 5px 16px;
+  color: var(--slate-500);
+  font-size: var(--type-caption);
+  line-height: var(--leading-caption);
+}
+.chart-mode-row .chart-touch-zoom { display: none; }
+@media (pointer: coarse), (max-width: 600px) {
+  .chart-mode-row .chart-touch-zoom { display: inline-flex; min-width: 44px; min-height: 44px; }
+  .chart-mode-row { flex-wrap: wrap; }
 }
 
 .chart-crosshair {
