@@ -22,6 +22,64 @@
   font-display: swap;
 }
 
+.local-library-toolbar { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--divider); }
+.local-library-toolbar button, .local-library-dialog button { border: 1px solid var(--divider); border-radius: 10px; background: var(--paper); color: var(--ink); padding: 8px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.local-library-toolbar button:hover, .local-library-dialog button:hover { border-color: var(--electric-blue); }
+.local-library-dialog { width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); padding: 0; border: 1px solid var(--divider); border-radius: 20px; color: var(--ink); background: var(--paper); box-shadow: 0 24px 80px #0b132b30; }
+.local-library-dialog::backdrop { background: #0b132b55; }
+.local-library-dialog header, .local-library-dialog footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px 20px; }
+.local-library-dialog header { border-bottom: 1px solid var(--divider); }
+.local-library-dialog h2 { margin: 0; font-size: 22px; }
+.local-library-dialog footer { justify-content: flex-end; border-top: 1px solid var(--divider); }
+.local-library-dialog button:is([data-action="files"], [data-action="preview"], [data-action="save"], [data-action="trial"], [data-action="restore"]) { background: var(--electric-blue); color: white; }
+.local-library-dialog button:is([data-action="clear"], [data-action="confirmDelete"]) { color: #a32a45; border-color: #e8b3bf; }
+.local-library-body { padding: 20px; overflow-wrap: anywhere; }
+.local-library-body label { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; font-size: 13px; font-weight: 600; }
+.local-library-body input, .local-library-body select { box-sizing: border-box; min-width: 0; width: 100%; padding: 10px; color: var(--ink); border: 1px solid var(--divider); border-radius: 8px; background: white; font: inherit; }
+.local-library-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.local-library-body .local-library-check { flex-direction: row; align-items: flex-start; font-weight: 400; }
+.local-library-check input { width: auto; flex: none; margin-top: 3px; }
+.local-library-notice { padding: 12px; border-radius: 8px; background: var(--pale-blue); font-size: 13px; line-height: 1.6; }
+.local-library-error, #localLibraryError { color: #a32a45; font-size: 13px; white-space: pre-wrap; }
+.local-library-records { list-style: none; padding: 0; }
+.local-library-records li { padding: 14px 0; border-bottom: 1px solid var(--divider); }
+.local-library-records small { display: block; margin: 6px 0; }
+.local-library-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.local-library-dialog :focus-visible { outline: 3px solid var(--electric-blue); outline-offset: 2px; }
+.local-library-dialog button:disabled { opacity: .5; cursor: not-allowed; }
+.local-library-dialog[open] { display: flex; flex-direction: column; overflow: hidden; }
+.local-library-dialog header, .local-library-dialog footer { flex: none; }
+.local-library-body { min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--blue-200) transparent; }
+.local-library-dialog h2 { font-size: 20px; letter-spacing: -.025em; }
+.local-library-dialog input::file-selector-button { padding: 8px 12px; margin-right: 12px; border: 0; border-radius: 6px; background: var(--pale-blue); color: var(--blue-700); font: inherit; cursor: pointer; }
+.local-library-file input { padding: 18px 12px; }
+.local-library-caption, .local-library-source, .local-library-help { color: var(--slate-700); font-size: 12px; line-height: 1.6; }
+.local-library-caption { margin: 6px 0 16px; }
+.local-library-source { display: block; margin: -8px 0 14px; }
+.local-library-storage { margin: 20px 0 4px; font-size: 12px; }
+.local-library-help p { margin: 8px 0 0; max-width: 70ch; }
+.local-library-help summary, .local-library-disclosure summary { cursor: pointer; }
+.local-library-disclosure { border-top: 1px solid var(--divider); margin: 16px 0; padding-top: 14px; }
+.local-library-disclosure summary { font-size: 13px; font-weight: 600; }
+.local-library-disclosure[open] summary { margin-bottom: 14px; }
+.local-library-disclosure > p { font-size: 12px; line-height: 1.6; }
+.local-library-wide { grid-column: 1 / -1; }
+.local-library-target { background: var(--blue-50); padding: 14px 16px; border-radius: 10px; font-size: 13px; line-height: 1.6; }
+.local-library-target p { margin: 6px 0 0; }
+.local-library-preview { margin: 10px 0 16px; }
+.local-library-preview svg { display: block; width: 100%; height: auto; }
+.local-library-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 0 0 20px; }
+.local-library-summary dt { color: var(--slate-700); font-size: 12px; }
+.local-library-summary dd { margin: 4px 0 0; font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.local-library-summary > div:last-child { grid-column: 1 / -1; }
+.local-library-body :is(#localLibraryError, #localLibraryProgress):empty { display: none; }
+@media (max-width: 600px) {
+  .local-library-dialog { width: 100vw; height: 100dvh; max-height: 100dvh; max-width: 100vw; margin: 0; border-radius: 0; }
+  .local-library-fields { grid-template-columns: 1fr; }
+  .local-library-toolbar button { min-height: 40px; }
+  .local-library-dialog button { min-height: 44px; }
+}
+
 :root {
   color-scheme: light;
 
@@ -1528,7 +1586,7 @@ html:not(.workspace-visible) .benchmark-rail {
 
 .leaderboard-panel {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 #leaderboardContent {
@@ -2308,6 +2366,16 @@ text.figure-meta {
 .ranked-run-group-section.is-inactive {
   flex: 0 0 auto;
   grid-template-rows: auto;
+}
+
+/* A third, browser-local group must not squeeze rows beneath the sticky header. */
+.ranked-run-group-stack:has([data-run-group-section="browser"]) {
+  overflow-y: auto;
+}
+
+.ranked-run-group-stack:has([data-run-group-section="browser"]) > .is-active {
+  flex: 1 0 190px;
+  min-height: 190px;
 }
 
 .ranked-run-group-toggle {

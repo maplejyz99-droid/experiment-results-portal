@@ -363,7 +363,8 @@
     const sortBy = rule.sort_by || suite?.primary_metric || "";
     const primaryDirection = rule.direction === "desc" ? -1 : 1;
     const metricValue = (runId, metricName) => {
-      const metric = indexes.summaries.get(runId)?.get(metricName);
+      const summary = indexes.summaries.get(runId);
+      const metric = summary?.get(metricName) || (metricName === "final_val_loss" && indexes.runs.get(runId)?.local_experiment ? summary?.get("last_observed_val_loss") : null);
       return finite(metric?.value) ? metric.value : null;
     };
     const compareMetric = (leftId, rightId, metricName, direction) => {
@@ -722,7 +723,8 @@
     const box = layout.ranking;
     const maximumLabel = profile.name === "paper" ? 20 : 27;
     const items = series.map((entry, index) => {
-      const metric = indexes.summaries.get(entry.runId)?.get(metricName);
+      const summary = indexes.summaries.get(entry.runId);
+      const metric = summary?.get(metricName) || (metricName === "final_val_loss" && indexes.runs.get(entry.runId)?.local_experiment ? summary?.get("last_observed_val_loss") : null);
       const value = finite(metric?.value) ? metric.value : null;
       const y = box.top + box.headerHeight + index * box.rowGap + 10;
       return {
@@ -836,6 +838,7 @@
       const focusStrokeWidth = Math.max(style.strokeWidth, 2.9);
       return {
         runId,
+        sourceType: run.local_experiment ? "browser_local" : run.source?.source_type || "",
         displayName: run.display_name,
         label: labelForRun(run),
         family: style.family,
@@ -959,6 +962,7 @@
     const selectedCount = selection.visibleRunIds.length;
     const subtitleParts = [
       suite.title,
+      series.some((entry) => entry.sourceType === "browser_local") ? "Includes local experiments" : "",
       `${selectedCount} selected ${selectedCount === 1 ? "run" : "runs"}`,
       target ? target.label.toLowerCase() : "",
       viewport ? clipping.note : scaleLabel(scaleMode, domain),
@@ -1294,6 +1298,7 @@
       "snapshot_version",
       "snapshot_date",
       "comparability",
+      "source_type",
     ];
     const comparability = JSON.stringify(model.suite.comparability || {});
     const rows = [headers];
@@ -1337,6 +1342,7 @@
           model.snapshot.schemaVersion,
           model.snapshot.generatedAt,
           comparability,
+          entry.sourceType || "",
         ]);
       });
     });

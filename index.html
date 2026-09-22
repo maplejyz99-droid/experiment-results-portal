@@ -195,6 +195,10 @@
               </div>
               <p class="muted" id="leaderboardNote">Select a row to inspect its provenance.</p>
             </div>
+            <div class="local-library-toolbar">
+              <button type="button" id="localImportButton">Import experiment</button>
+              <button type="button" id="localManageButton">Manage local experiments</button>
+            </div>
             <div id="leaderboardContent"></div>
           </section>
 
@@ -236,7 +240,7 @@
               aria-label="Selected chart runs"
               data-i18n-aria-label="a11y.selected_runs"
             ></div>
-            <p class="chart-gesture-hint" id="chartGestureHint" data-i18n="chart.gesture_hint">Scroll to zoom · Drag to pan · Scroll on Y axis to adjust loss</p>
+            <p class="chart-gesture-hint" id="chartGestureHint" data-i18n="chart.gesture_hint">Scroll to zoom X · Drag to pan · Y axis auto-fits</p>
             <div class="chart-frame figure-canvas">
               <svg
                 id="lossChart"
@@ -326,6 +330,8 @@
     <script src="figure-runtime.js"></script>
     <script src="portal-i18n.js"></script>
     <script src="hero-mesh-text.js"></script>
+    <script src="local-library.js"></script>
+    <script src="local-library-ui.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

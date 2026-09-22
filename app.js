@@ -31,6 +31,96 @@ function localizedSuiteStatus(status) {
 
 let portalData;
 let portalCatalog;
+let localLibrary = null;
+let localLibraryInstalled = false;
+let localRefreshGeneration = 0;
+const localText = (en, zh) => portalI18n.getLocale() === "zh" ? zh : en;
+
+function withLocalExperiments(data) {
+  return localLibrary ? globalThis.PortalLocalLibrary.overlay(data, localLibrary.list()) : data;
+}
+
+function restoreLocalPlot(suite) {
+  const ids = localLibrary?.preferences.get(suite.suite_id);
+  if (!Array.isArray(ids)) return;
+  selectedChartRunIds = new Set(ids.filter((id) => {
+    const run = runById(id);
+    return run?.suite_id === suite.suite_id && curveAvailable(run, suite);
+  }).slice(0, chartSelectionLimit(suite)));
+}
+
+async function refreshLocalExperiments() {
+  const generation = ++localRefreshGeneration;
+  const suiteGeneration = suiteLoadGeneration;
+  const suiteId = selectedSuiteId;
+  const next = await portalDataForSuite(activeSuite());
+  if (generation !== localRefreshGeneration || suiteGeneration !== suiteLoadGeneration || suiteId !== selectedSuiteId) return;
+  cancelChartGesture();
+  portalData = next;
+  buildDataIndex(portalData);
+  const valid = (id) => runById(id)?.suite_id === suiteId;
+  selectedChartRunIds = new Set([...selectedChartRunIds].filter(valid));
+  focusedChartRunIds = new Set([...focusedChartRunIds].filter((id) => valid(id) && selectedChartRunIds.has(id)));
+  if (!focusedChartRunIds.size && chartLabelMode === "focused") chartLabelMode = "none";
+  if (!valid(selectedRunId)) selectedRunId = firstChartRun(activeSuite())?.run_id || eligibleRows(activeSuite())[0]?.run.run_id || null;
+  renderSuiteView(); syncUrlState();
+}
+
+async function initializeLocalLibrary() {
+  if (!globalThis.PortalLocalLibrary) return;
+  if (!localLibrary) {
+    localLibrary = new globalThis.PortalLocalLibrary.Library();
+    await localLibrary.init();
+  }
+  if (localLibraryInstalled) return;
+  localLibraryInstalled = true;
+  globalThis.PortalLocalLibraryUI?.install({
+    library: localLibrary,
+    currentSuite: () => selectedSuiteId,
+    suites: () => catalogSuites().filter((suite) => suiteDetailState(suite) === "available" && !["memory", "memory_speed"].includes(suite.suite_id)),
+    protocol: async (id) => {
+      const suite = catalogSuiteById(id);
+      if (!suite) throw new Error("Protocol unavailable / 协议不可用");
+      const data = await portalDataForSuite(suite);
+      if (!data.figures.some((figure) => figure.suite_id === id && figure.figure_type === "loss_curve")) throw new Error("Protocol has no curve figure / 此协议不支持曲线");
+      return globalThis.PortalLocalLibrary.protocol(data, id);
+    },
+    refresh: refreshLocalExperiments,
+    preview: async (record) => {
+      const data = await portalDataForSuite(catalogSuiteById(record.configuration.suite_id));
+      const mixed = globalThis.PortalLocalLibrary.overlay(data, [record]);
+      const model = globalThis.PortalFigureRuntime.buildFigureModel(mixed, {
+        suiteId: record.configuration.suite_id, selectedRunIds: [record.id], visibleRunIds: [record.id],
+        labelMode: "none", profile: "interactive", width: 900, height: 500,
+        viewport: { xMin: record.points[0].step, xMax: record.points.at(-1).step },
+      });
+      // Import preview describes the candidate CSV, never the public snapshot's provenance.
+      const previewModel = { ...model, snapshot: {}, clipping: { ...model.clipping, note: "" },
+        figure: { ...model.figure, title: localText("CSV observations", "CSV 实际观测"),
+          subtitle: localText("Import preview · not saved yet", "导入预览 · 尚未保存"), caption: "" } };
+      return globalThis.PortalFigureRuntime.serializeStandaloneSvg(previewModel, model.profile);
+    },
+    saved: async (record, autoPlot = true) => {
+      const id = record.configuration.suite_id;
+      if (id !== selectedSuiteId) {
+        const changed = await requestSuiteChange(id, { navigationIntent: "protocol" });
+        if (!changed || id !== selectedSuiteId) throw new Error("Saved, but protocol could not be opened. Retry from the manager. / 已保存，但协议未能打开，请在管理面板重试。");
+      }
+      await refreshLocalExperiments();
+      if (!runById(record.id)) throw new Error("Record retained, but its configuration no longer matches this protocol. Export or delete it from the manager. / 记录已保留，但配置与当前协议不匹配；可在管理面板导出或删除。");
+      selectedRunId = record.id;
+      rankedRunGroupStateForSuite(id).active = "browser";
+      if (autoPlot && selectedChartRunIds.size < chartSelectionLimit(activeSuite())) selectedChartRunIds.add(record.id);
+      else if (autoPlot && !selectedChartRunIds.has(record.id)) chartSelectionNotice = localText("Saved. Unplot one curve to add this experiment (8-curve limit).", "已保存。请先取消一条 Plot，再添加此实验（最多八条）。");
+      refreshRunViews();
+    },
+  });
+  document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState !== "visible" || !localLibrary.db) return;
+    try { await localLibrary.reload(); await refreshLocalExperiments(); }
+    catch (error) { localLibrary.error = error.message; }
+  });
+}
 let portalLoadMode = "aggregate";
 let dataIndex;
 let selectedSuiteId;
@@ -977,7 +1067,7 @@ function buildDataIndex(data) {
   for (const suite of data.suites || []) {
     const allowed = new Set(suite.leaderboard_eligibility?.allowed_status || []);
     const rows = (runsBySuite.get(suite.suite_id) || [])
-      .filter((run) => allowed.has(run.status))
+      .filter((run) => run.local_experiment || allowed.has(run.status))
       .map((run) => rowFromRun(suite, run))
       .sort((left, right) => compareRunRows(suite, left, right));
     dataIndex.leaderboardRowsBySuite.set(suite.suite_id, rows);
@@ -1085,7 +1175,7 @@ function numericEvidenceValue(summary, keys) {
 
 function suiteEvidenceSummary(suite) {
   const configured = suite?.evidence_summary || suite?.protocol?.evidence_summary || {};
-  const loadedRuns = suite ? suiteRuns(suite.suite_id) : [];
+  const loadedRuns = suite ? suiteRuns(suite.suite_id).filter((run) => !run.local_experiment) : [];
   const statusCounts = configured.status_counts || {};
   const derivedComplete = loadedRuns.filter((run) => run.status === "completed").length;
   const derivedPartial = loadedRuns.filter((run) =>
@@ -1471,7 +1561,13 @@ function summaryMetricText(runId, metricName) {
   return metric ? formatMetricValue(metricName, metric.value) : "n/a";
 }
 
+function comparisonMetricText(run, suite) {
+  const row = rowFromRun(suite, run);
+  return row.primaryMetric ? formatMetricValue(primaryMetricName(suite), row.primaryMetric.value) : suite.target ? "Not reached" : "n/a";
+}
+
 function roleLabel(run) {
+  if (run.local_experiment) return localText("Local experiment", "本机实验");
   if (run.run_role === "ours") return uiText("role.ours");
   if (run.run_role === "official_reference") return uiText("role.official");
   return run.run_role.replaceAll("_", " ");
@@ -1512,11 +1608,13 @@ function rowFromRun(suite, run) {
   const summary = Object.fromEntries(
     summaryMetricsForRun(run.run_id).map((metric) => [metric.metric_name, metric])
   );
+  // Comparison alias only: the stored evidence still has no fabricated final summary.
+  if (run.local_experiment && !summary.final_val_loss) summary.final_val_loss = summary.last_observed_val_loss;
   return {
     run,
     metrics: summary,
     primaryMetric: summary[primary] || null,
-    finalMetric: summary.final_val_loss || null,
+    finalMetric: run.local_experiment ? null : summary.final_val_loss || null,
     bestMetric: summary.best_val_loss || null,
   };
 }
@@ -1528,7 +1626,7 @@ function eligibleRows(suite) {
 function unrankedRows(suite) {
   const allowed = new Set(suite.leaderboard_eligibility?.allowed_status || []);
   return suiteRuns(suite.suite_id)
-    .filter((run) => !allowed.has(run.status))
+    .filter((run) => !run.local_experiment && !allowed.has(run.status))
     .map((run) => rowFromRun(suite, run))
     .sort((left, right) => {
       const statusDelta = String(left.run.status).localeCompare(String(right.run.status));
@@ -1659,7 +1757,7 @@ function runChipLabel(run, suite) {
   const prefix = rankLabel && !/^R\d+\b/iu.test(run.display_name)
     ? `${rankLabel} `
     : "";
-  return `${prefix}${run.display_name} · ${summaryMetricText(run.run_id, primaryMetricName(suite))}`;
+  return `${prefix}${run.display_name} · ${comparisonMetricText(run, suite)}`;
 }
 
 function rowSearchText(row) {
@@ -1926,6 +2024,7 @@ function applyUrlState(search = globalThis.location?.search) {
   chartScaleMode = params.get("scale") || "full";
   normalizeChartScaleMode(suite);
   initializeChartSelection(suite);
+  if (!params.has("plot")) restoreLocalPlot(suite);
   if (params.has("plot")) {
     const requested = params.getAll("plot");
     const valid = [...new Set(requested)].filter((id) => {
@@ -1935,8 +2034,8 @@ function applyUrlState(search = globalThis.location?.search) {
     if (valid.length || requested.every((id) => id === "")) selectedChartRunIds = new Set(valid);
   }
   const x = parseChartRange(params.get("view_x"));
-  const y = parseChartRange(params.get("view_y"));
-  chartViewport = x ? { xMin: x[0], xMax: x[1], ...(y ? { yMin: y[0], yMax: y[1] } : {}) } : null;
+  // Legacy manual-Y links retain their X window, but cannot restore an empty Y crop.
+  chartViewport = x ? { xMin: x[0], xMax: x[1] } : null;
   runFilterText = params.get("q") || "";
   const requestedRun = runById(params.get("run"));
   selectedRunId = requestedRun?.suite_id === suite.suite_id
@@ -1968,13 +2067,13 @@ function syncUrlState({ push = false } = {}) {
   url.searchParams.delete("view_y");
   if (chartViewport) {
     url.searchParams.set("view_x", `${chartViewport.xMin},${chartViewport.xMax}`);
-    if (Number.isFinite(chartViewport.yMin) && Number.isFinite(chartViewport.yMax)) {
-      url.searchParams.set("view_y", `${chartViewport.yMin},${chartViewport.yMax}`);
-    }
   }
   url.searchParams.delete("plot");
   const defaults = defaultChartRunIds(activeSuite());
   const plotted = [...selectedChartRunIds];
+  if (localLibrary && (localLibrary.db || localLibrary.sessionOnly)) {
+    localLibrary.savePlot(selectedSuiteId, plotted).catch((error) => { localLibrary.error = error.message; });
+  }
   if (plotted.length !== defaults.length || plotted.some((id) => !defaults.includes(id))) {
     if (!plotted.length) url.searchParams.append("plot", "");
     else plotted.forEach((id) => url.searchParams.append("plot", id));
@@ -2014,7 +2113,7 @@ function renderOverview() {
     entries.filter((entry) => navigationEntryStatus(entry) === "active").length;
   const curatedRuns =
     numericEvidenceValue(globalEvidence, ["runs", "mapped"]) ??
-    (portalLoadMode === "aggregate" ? portalData.runs.length : summedEvidence.mapped);
+    (portalLoadMode === "aggregate" ? portalCatalog.runs.length : summedEvidence.mapped);
   const claimCards =
     numericEvidenceValue(globalEvidence, ["claims"]) ??
     (portalLoadMode === "aggregate" ? portalData.claims.length : summedEvidence.claims);
@@ -2615,7 +2714,7 @@ function leaderboardTable(suite, rows, startingRank, tableClass = "") {
           ${rows
             .map((row, index) => {
               const run = row.run;
-              const rankLabel = run.leaderboard_meta?.rank_label || row.displayRank || String(startingRank + index);
+              const rankLabel = run.local_experiment && suite.suite_id === "track3" ? "local" : run.leaderboard_meta?.rank_label || row.displayRank || String(startingRank + index);
               return `
                 <tr class="${run.run_id === selectedRunId ? "selected" : ""}" data-run-id="${escapeHtml(run.run_id)}" tabindex="0" aria-selected="${run.run_id === selectedRunId}" aria-label="${escapeHtml(uiText("runs.inspect", { name: run.display_name }))}">
                   ${columns.map((column) => `<td>${tableCell(column, suite, row, rankLabel)}</td>`).join("")}
@@ -2782,6 +2881,7 @@ function rankedRunGroupStateForSuite(suiteId, initialActive = "local") {
         official: { top: 0, left: 0 },
         local: { top: 0, left: 0 },
         unranked: { top: 0, left: 0 },
+        browser: { top: 0, left: 0 },
       },
     };
   }
@@ -2795,7 +2895,7 @@ function captureRankedRunGroupScroll() {
   const stack = viewport?.closest?.(".ranked-run-group-stack[data-suite-id]");
   const group = viewport?.dataset.runGroup;
   const suiteId = stack?.dataset.suiteId;
-  if (!viewport || !suiteId || !["official", "local", "unranked"].includes(group)) return;
+  if (!viewport || !suiteId || !["official", "local", "unranked", "browser"].includes(group)) return;
   const state = rankedRunGroupStateForSuite(suiteId);
   state.scroll[group] = {
     top: viewport.scrollTop,
@@ -2887,11 +2987,13 @@ function renderLeaderboard({ preserveScroll = true } = {}) {
   const visibleUnranked = filteredRows(unranked);
   const splitByOurs = suite.suite_id !== "track3" &&
     rows.some((row) => row.run.run_role === "ours");
-  const belongsToReferenceGroup = (row) => splitByOurs
+  const browserRows = visibleRows.filter((row) => row.run.local_experiment);
+  const allBrowserRows = rows.filter((row) => row.run.local_experiment);
+  const belongsToReferenceGroup = (row) => !row.run.local_experiment && (splitByOurs
     ? row.run.run_role !== "ours"
-    : referenceRunForSuite(suite, row.run);
+    : (allBrowserRows.length && suite.suite_id !== "track3") || referenceRunForSuite(suite, row.run));
   const referenceRows = visibleRows.filter(belongsToReferenceGroup);
-  const localRows = visibleRows.filter((row) => !belongsToReferenceGroup(row));
+  const localRows = visibleRows.filter((row) => !row.run.local_experiment && !belongsToReferenceGroup(row));
   const hasReferenceAndLocal =
     rows.some(belongsToReferenceGroup) &&
     rows.some((row) => !belongsToReferenceGroup(row));
@@ -2941,7 +3043,7 @@ function renderLeaderboard({ preserveScroll = true } = {}) {
     `
     : "";
 
-  if (hasReferenceAndLocal || splitByOurs) {
+  if (hasReferenceAndLocal || splitByOurs || allBrowserRows.length) {
     const referenceLabel = uiText(
       suite.suite_id === "track3" ? "runs.track3_official"
         : splitByOurs ? (suite.protocol?.source_kind === "paper_main_benchmark" ? "runs.paper" : "runs.title")
@@ -2963,7 +3065,9 @@ function renderLeaderboard({ preserveScroll = true } = {}) {
       state.scroll[state.active] = { top: 0, left: 0 };
     }
     const allReferenceRows = rows.filter(belongsToReferenceGroup);
-    const allLocalRows = rows.filter((row) => !belongsToReferenceGroup(row));
+    const allLocalRows = rows.filter((row) => !row.run.local_experiment && !belongsToReferenceGroup(row));
+    if (state.active === "browser" && !allBrowserRows.length) state.active = "official";
+    if (state.active === "local" && !allLocalRows.length) state.active = allBrowserRows.length ? "browser" : "official";
     if (state.active === "official" && !allReferenceRows.length) state.active = "local";
     byId("leaderboardContent").innerHTML = `
       ${selectionBlock}
@@ -2978,7 +3082,7 @@ function renderLeaderboard({ preserveScroll = true } = {}) {
             totalCount: allReferenceRows.length,
             active: state.active === "official",
           }) : ""}
-          ${renderRankedRunGroup({
+          ${allLocalRows.length ? renderRankedRunGroup({
             suite,
             group: "local",
             label: localLabel,
@@ -2986,7 +3090,12 @@ function renderLeaderboard({ preserveScroll = true } = {}) {
             rows: localRows,
             totalCount: allLocalRows.length,
             active: state.active === "local",
-          })}
+          }) : ""}
+          ${allBrowserRows.length ? renderRankedRunGroup({
+            suite, group: "browser", label: localText("Local experiments", "本机实验"),
+            helper: localText("Only this browser · local ranking", "仅此浏览器 · 本机比较排名"),
+            rows: browserRows, totalCount: allBrowserRows.length, active: state.active === "browser",
+          }) : ""}
           ${unranked.length
             ? renderRankedRunGroup({
                 suite,
@@ -3135,33 +3244,19 @@ function chartViewDomain() {
   return currentChartModel ? { ...currentChartModel.domain, ...chartViewport } : null;
 }
 
-function zoomChartViewport(factor, anchor = 0.5, vertical = false) {
+function zoomChartViewport(factor, anchor = 0.5) {
   const domain = chartViewDomain();
   if (!domain) return;
-  const view = { xMin: domain.xMin, xMax: domain.xMax };
-  if (vertical) {
-    const center = domain.yMin + (domain.yMax - domain.yMin) * anchor;
-    const span = Math.max(1e-7, Math.min(1e6, (domain.yMax - domain.yMin) * factor));
-    view.yMin = center - span * anchor;
-    view.yMax = view.yMin + span;
-  } else {
-    const center = domain.xMin + (domain.xMax - domain.xMin) * anchor;
-    const span = Math.max(1, (domain.xMax - domain.xMin) * factor);
-    view.xMin = center - span * anchor;
-    view.xMax = view.xMin + span;
-    if (Number.isFinite(chartViewport?.yMin)) {
-      view.yMin = chartViewport.yMin;
-      view.yMax = chartViewport.yMax;
-    }
-  }
-  scheduleChartViewport(view);
+  const center = domain.xMin + (domain.xMax - domain.xMin) * anchor;
+  const span = Math.max(1, (domain.xMax - domain.xMin) * factor);
+  const xMin = center - span * anchor;
+  scheduleChartViewport({ xMin, xMax: xMin + span });
 }
 
 function panChartViewport(fraction, domain = chartViewDomain()) {
   if (!domain) return;
   const shift = (domain.xMax - domain.xMin) * fraction;
-  scheduleChartViewport({ xMin: domain.xMin + shift, xMax: domain.xMax + shift,
-    ...(Number.isFinite(chartViewport?.yMin) ? { yMin: chartViewport.yMin, yMax: chartViewport.yMax } : {}) });
+  scheduleChartViewport({ xMin: domain.xMin + shift, xMax: domain.xMax + shift });
 }
 
 function installChartViewportController(svg) {
@@ -3176,22 +3271,21 @@ function installChartViewportController(svg) {
     point.x = event.clientX; point.y = event.clientY;
     return point.matrixTransform(matrix.inverse());
   };
-  const inPlot = (point, includeAxis = false) => {
+  const inPlot = (point) => {
     const plot = currentChartModel?.plotRect;
-    return point && plot && point.x >= (includeAxis ? 0 : plot.left) && point.x <= plot.right && point.y >= plot.top && point.y <= plot.bottom;
+    return point && plot && point.x >= plot.left && point.x <= plot.right && point.y >= plot.top && point.y <= plot.bottom;
   };
   svg.addEventListener("wheel", (event) => {
     if (event.ctrlKey || event.metaKey || !currentChartModel?.series.length) return;
     const point = localPoint(event);
-    if (!inPlot(point, true)) return;
+    if (!inPlot(point)) return;
     event.preventDefault();
     event.stopPropagation();
     const plot = currentChartModel.plotRect;
-    const vertical = point.x < plot.left;
     const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? plot.height : 1);
     const factor = Math.exp(Math.max(-0.7, Math.min(0.7, delta * 0.002)));
-    const anchor = vertical ? 1 - (point.y - plot.top) / plot.height : (point.x - plot.left) / plot.width;
-    zoomChartViewport(factor, anchor, vertical);
+    const anchor = (point.x - plot.left) / plot.width;
+    zoomChartViewport(factor, anchor);
   }, { passive: false });
   svg.addEventListener("pointerdown", (event) => {
     chartSuppressClick = false;
@@ -3583,6 +3677,7 @@ function renderChart({ viewportOnly = false } = {}) {
   byId("chartMeta").textContent = model
     ? `${model.axes.y.label} by ${model.axes.x.label}${model.target ? ` · ${model.target.label}` : ""}`
     : `${yMetric} by step`;
+  if (runs.some((run) => run.local_experiment)) byId("chartMeta").textContent += localText(" · Includes local experiments", " · 含本机实验");
 
   if (!viewportOnly) {
   byId("chartSelectionChips").innerHTML = runs.length
@@ -3590,7 +3685,7 @@ function renderChart({ viewportOnly = false } = {}) {
         .map(
           (run) => {
             const entry = seriesByRun.get(run.run_id);
-            const metricText = summaryMetricText(run.run_id, primaryMetricName(suite));
+            const metricText = comparisonMetricText(run, suite);
             const chipLabel = chartRunChipLabel(run, suite);
             const accessibleLabel = `${run.display_name} · ${metricText}`;
             return `
@@ -4056,11 +4151,12 @@ function renderRunDetail() {
 
   byId("detail-title").textContent = run.display_name;
   byId("runDetail").innerHTML = `
+    ${run.local_experiment ? `<p class="local-library-notice">${escapeHtml(localText("Browser-local, unreviewed experiment. Comparison uses the last real observation, not a completed-budget final summary.", "本机导入、未经公开审核的实验。比较采用末次真实观测，不代表已完成预算的 final summary。"))}</p>` : ""}
     <div class="detail-grid">
       ${metricLine("run_id", run.run_id)}
       ${metricLine("role", roleLabel(run))}
       ${metricLine("status", run.status)}
-      ${metricLine("primary_metric", primaryDisplay)}
+      ${metricLine("primary_metric", run.local_experiment ? comparisonMetricText(run, suite) : primaryDisplay)}
       ${meta.rank_label ? metricLine("reference_rank", meta.rank_label) : ""}
       ${meta.evidence ? metricLine("reference_evidence", meta.evidence) : ""}
       ${meta.date ? metricLine("reference_date", meta.date) : ""}
@@ -4085,7 +4181,7 @@ function renderRunDetail() {
       ${metricLine("eval_interval", displayValue(training.eval_interval))}
       ${metricLine("dtype", displayValue(training.dtype))}
       ${metricLine("hardware", `${hardware.gpu_type || "n/a"}${hardware.num_gpus ? ` · ${hardware.num_gpus} GPU` : ""}`)}
-      ${extraSummary.map((metric) => metricLine(metric.metric_name, formatMetricValue(metric.metric_name, metric.value))).join("")}
+      ${extraSummary.map((metric) => metricLine(metric.metric_name, run.local_experiment ? metricValueWithOptionalStep(metric.metric_name, metric) : formatMetricValue(metric.metric_name, metric.value))).join("")}
       ${metricLine("source_type", displayValue(source.source_type))}
       ${metricLine("source_access", wandbUrl ? uiText("detail.public_link") : uiText("detail.local_artifact"))}
       ${meta.description ? metricLine("description", meta.description) : ""}
@@ -4151,10 +4247,10 @@ function renderDataHealth() {
   const summaryMetricsCount = portalData.metrics.filter((metric) => metric.metric_scope === "summary").length;
   const totalRuns =
     numericEvidenceValue(globalEvidence, ["runs", "mapped"]) ??
-    (portalLoadMode === "aggregate" ? portalData.runs.length : summedEvidence.mapped);
+    (portalLoadMode === "aggregate" ? portalCatalog.runs.length : summedEvidence.mapped);
   const totalMetrics =
     numericEvidenceValue(globalEvidence, ["metrics"]) ??
-    (portalLoadMode === "aggregate" ? portalData.metrics.length : summedEvidence.metrics);
+    (portalLoadMode === "aggregate" ? portalCatalog.metrics.length : summedEvidence.metrics);
   const totalClaims =
     numericEvidenceValue(globalEvidence, ["claims"]) ??
     (portalLoadMode === "aggregate" ? portalData.claims.length : summedEvidence.claims);
@@ -4491,8 +4587,8 @@ function suiteNeedsShard(suite) {
 }
 
 function composePortalData(catalog, shard = null) {
-  if (portalLoadMode === "aggregate") return normalizedPortalData(catalog);
-  return normalizedPortalData({
+  if (portalLoadMode === "aggregate") return withLocalExperiments(normalizedPortalData(catalog));
+  return withLocalExperiments(normalizedPortalData({
     ...catalog,
     meta: mergePlainObjects(catalog.meta || {}, shard?.meta || {}),
     visual_style_registry: mergePlainObjects(
@@ -4504,7 +4600,7 @@ function composePortalData(catalog, shard = null) {
     claims: shard?.claims || [],
     figures: shard?.figures || [],
     sources: shard?.sources || [],
-  });
+  }));
 }
 
 async function portalDataForSuite(suite) {
@@ -4523,6 +4619,7 @@ function resetSuiteInteractionState(suite) {
   chartLabelMode = "none";
   currentChartModel = null;
   initializeChartSelection(suite);
+  restoreLocalPlot(suite);
   selectedRunId = firstChartRun(suite)?.run_id || null;
 }
 
@@ -4718,7 +4815,10 @@ async function restoreSuiteFromLocation() {
   });
   const generation = suiteLoadGeneration;
   const restored = await restoration;
-  if (restored && generation === suiteLoadGeneration) await navigateToPageView(targetPageHash, { generation });
+  if (restored && generation === suiteLoadGeneration) {
+    await navigateToPageView(targetPageHash, { generation });
+    if (generation === suiteLoadGeneration && params.has("view_y")) syncUrlState();
+  }
 }
 
 async function start() {
@@ -4737,6 +4837,7 @@ async function start() {
     let usedAggregateFallback = Boolean(loaded.fallbackReason);
     portalLoadMode = loaded.mode;
     portalCatalog = loaded.data;
+    await initializeLocalLibrary();
     portalData = composePortalData(portalCatalog, null);
     buildDataIndex(portalData);
     const defaultSuiteId =
@@ -4762,7 +4863,7 @@ async function start() {
       usedAggregateFallback = true;
       portalLoadMode = "aggregate";
       portalCatalog = aggregate;
-      portalData = aggregate;
+      portalData = withLocalExperiments(aggregate);
       activeSuiteShardId = null;
       pendingSuiteId = null;
       protocolSwitchError = "";
