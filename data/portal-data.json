@@ -5,7 +5,7 @@
     "generated_at": "2026-09-15",
     "mode": "static-multi-protocol-paper-main",
     "notes": "Static suite-local portal data with Track 3, current curated benchmarks, and audited arXiv:2509.01440v1 main-benchmark protocols.",
-    "delivery_id": "sha256:84a1267b169ad32dd9e88b58b0187a9b6485e08e64e1dfdc82fd15accb86aebb",
+    "delivery_id": "sha256:1d1f830e9e2623c6b25f4c21ce1173285803f8a6178ae1639856d127c3a52d2e",
     "local_optimizer_import": {
       "date": "2026-09-15",
       "manifest": "local-optimizer-manifest.json",
@@ -2026,6 +2026,65 @@
         },
         "unresolved_methods": []
       }
+    },
+    {
+      "suite_id": "llama-1b-fineweb30b-bs1984-8k",
+      "title": "Llama 1B",
+      "family": "benchmark",
+      "status": "planned",
+      "primary_metric": "final_val_loss",
+      "target": {
+        "metric_name": null,
+        "value": null,
+        "direction": null
+      },
+      "leaderboard_rule": {
+        "sort_by": "final_val_loss",
+        "direction": "asc",
+        "display_name": "Llama 1B · 8,000-step validation leaderboard",
+        "formal_rank_metric": "final_val_loss",
+        "tie_breakers": [
+          "best_val_loss"
+        ]
+      },
+      "leaderboard_eligibility": {
+        "allowed_status": [
+          "completed"
+        ],
+        "require_same_token_budget": true,
+        "require_same_model": true,
+        "require_same_dataset": true
+      },
+      "comparability_constraints": {
+        "model": "Llama 1,026,086,656 parameters",
+        "dataset": "FineWeb-30B training pool; 100M validation tokens; GPT-2 tokenizer",
+        "token_budget": "8,000 optimizer steps · 8,126,464,000 tokens",
+        "hardware_scope": "Compare only within this exact 1B protocol. Hardware-dependent measurements require matching hardware."
+      },
+      "card": {
+        "headline": "8,000-step protocol ready. Import experiment curves to begin comparison.",
+        "metric_label": "Validation loss",
+        "status_label": "planned",
+        "detail_state": "available"
+      },
+      "protocol": {
+        "protocol_id": "llama-1b-fineweb30b-bs1984-8k",
+        "source_kind": "current_benchmark",
+        "source_label": "Current · FineWeb-30B",
+        "model": "llama",
+        "model_params": "1026.086656M",
+        "parameter_count": 1026086656,
+        "dataset": "FineWeb-30B",
+        "batch_size_sequences": 1984,
+        "sequence_length": 512,
+        "tokens_per_step": 1015808,
+        "budget_steps": 8000,
+        "planned_tokens": 8126464000,
+        "budget_label": "8,000 steps",
+        "accepts_local_experiments": true,
+        "display_order": 0
+      },
+      "notes": "Planned 8,000-update comparison; no observed results are included. FineWeb-30B is the training pool size, not this run's token budget. The inherited optimizer recipes are not claimed to be tuned for 1B."
     }
   ],
   "runs": [
@@ -1038168,6 +1038227,27 @@
       "selection_mode": "manual",
       "selection_limit": 8,
       "suite_id": "paper-moe-520m-bs256-44b"
+    },
+    {
+      "figure_id": "llama-1b-fineweb30b-bs1984-8k-loss-curve",
+      "suite_id": "llama-1b-fineweb30b-bs1984-8k",
+      "title": "Llama 1B · 8,000 Steps Validation Loss Curves",
+      "figure_type": "loss_curve",
+      "run_ids": [],
+      "x_axis": "step",
+      "y_metric": "val_loss",
+      "full_step_max": 8000,
+      "zoom_step_max": 8000,
+      "preset": "presentation",
+      "export_formats": [
+        "png",
+        "svg",
+        "csv"
+      ],
+      "caption": "Llama 1B · FineWeb-30B · global batch 1984 × sequence 512 · planned 8,000 optimizer updates (8,126,464,000 tokens).",
+      "source_claim_ids": [],
+      "selection_mode": "manual",
+      "selection_limit": 8
     }
   ],
   "benchmark_groups": [
@@ -1038227,5 +1038307,5 @@
       "default_suite_id": "moe_520m"
     }
   ],
-  "delivery_id": "sha256:84a1267b169ad32dd9e88b58b0187a9b6485e08e64e1dfdc82fd15accb86aebb"
+  "delivery_id": "sha256:1d1f830e9e2623c6b25f4c21ce1173285803f8a6178ae1639856d127c3a52d2e"
 }

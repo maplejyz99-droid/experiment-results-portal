@@ -104,8 +104,8 @@
     const sample = data.runs.find((run) => run.suite_id === suiteId && !run.local_experiment);
     const p = suite.protocol || {};
     return {
-      suite_id: suiteId, title: suite.title, model: sample?.model?.type || "",
-      model_params: sample?.model?.params || "",
+      suite_id: suiteId, title: suite.title, model: sample?.model?.type || p.model || "",
+      model_params: sample?.model?.params || p.model_params || "",
       dataset: sample?.dataset?.name || p.dataset || "",
       batch_size_sequences: p.batch_size_sequences || (sample?.training?.global_batch_tokens / sample?.training?.sequence_length) || null,
       sequence_length: p.sequence_length || sample?.training?.sequence_length || null,

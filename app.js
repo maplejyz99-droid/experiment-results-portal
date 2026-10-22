@@ -1115,7 +1115,8 @@ function suiteDetailState(suite) {
 }
 
 function suiteHasDetail(suite) {
-  return suiteDetailState(suite) === "available" && Boolean(figureForSuite(suite)) && suiteRuns(suite.suite_id).length > 0;
+  return suiteDetailState(suite) === "available" && Boolean(figureForSuite(suite)) &&
+    (suiteRuns(suite.suite_id).length > 0 || suite.protocol?.accepts_local_experiments === true);
 }
 
 function displayValue(value) {
@@ -1439,6 +1440,7 @@ function protocolSelectable(suite) {
     ["drawable", "curves"]
   );
   if (!detailAvailable) return false;
+  if (suite.protocol.accepts_local_experiments === true) return true;
   return drawable === null ? suite.status === "active" : drawable > 0;
 }
 
@@ -3718,7 +3720,10 @@ function renderChart({ viewportOnly = false } = {}) {
   if (!model?.series?.length || !model.stats.points) {
     byId("chartToolbarMeta").textContent = `${runs.length}/${chartSelectionLimit(suite)} visible`;
     const empty = svgEl("text", { x: 24, y: 48, class: "chart-label" });
-    empty.textContent = "Select a run with an available curve.";
+    empty.textContent = suite.protocol?.accepts_local_experiments && !suiteRuns(suite.suite_id).length
+      ? localText("No experiments yet. Import a CSV to start.", "尚无实验曲线，请先导入实验。")
+      : "Select a run with an available curve.";
+    svg.setAttribute("aria-label", empty.textContent);
     svg.appendChild(empty);
     return;
   }
