@@ -1317,9 +1317,17 @@ function benchmarkNavigationEntries() {
       defaultSuite: suite,
     }));
 
-  return [...explicit, ...derivedById.values(), ...standalone].sort(
+  const entries = [...explicit, ...derivedById.values(), ...standalone].sort(
     (left, right) => left.order - right.order
   );
+  // Keep the import-ready 1B workspace beside the other Llama models.
+  const oneBIndex = entries.findIndex((entry) => entry.id === "suite:llama-1b-fineweb30b-bs1984-8k");
+  if (oneBIndex >= 0 && entries.some((entry) => entry.id === "llama-720m")) {
+    const [oneB] = entries.splice(oneBIndex, 1);
+    const after720M = entries.findIndex((entry) => entry.id === "llama-720m") + 1;
+    entries.splice(after720M, 0, oneB);
+  }
+  return entries;
 }
 
 function navigationEntryForSuite(suiteId) {
