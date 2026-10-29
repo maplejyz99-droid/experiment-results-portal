@@ -764,6 +764,49 @@
     };
   }
 
+  // Opt-in 1B pilot. Reference evidence never changes the viewport or leaderboard.
+  function lossReferenceChoices(indexes, suite, series, metric) {
+    if (suite.suite_id !== "llama-1b-fineweb30b-bs1984-8k" || metric !== "val_loss") return [];
+    return series.flatMap((entry) => {
+      const last = indexes.points.get(pointKey(entry.runId, metric))?.at(-1);
+      if (!last || !finite(last.value) || !finite(last.step)) return [];
+      return [{
+        runId: entry.runId, label: entry.displayName, color: entry.style.color,
+        basis: "last", value: last.value, step: last.step, metricId: last.metric_id || "",
+        evaluationProtocol: last.evaluation_protocol || "",
+      }];
+    });
+  }
+
+  function buildLossReference(indexes, choices, series, metric, request, domain) {
+    // Earlier pilot links used final summaries. Keep the run, but migrate every
+    // supported request to real curve evidence; final summaries only rank runs.
+    const basis = [undefined, "last", "final"].includes(request?.basis) ? "last" : null;
+    const reference = choices.find((choice) => choice.runId === request?.runId && choice.basis === basis);
+    if (!reference) return null;
+    const items = series.map((entry) => {
+      const points = indexes.points.get(pointKey(entry.runId, metric)) || [];
+      const index = points.findIndex((point) => point.value <= reference.value);
+      const point = index >= 0 ? points[index] : null;
+      const protocols = [...new Set(points.map((item) => item.evaluation_protocol || ""))];
+      const protocolMatch = Boolean(reference.evaluationProtocol) && protocols.length === 1 && protocols[0] === reference.evaluationProtocol;
+      return {
+        runId: entry.runId, label: entry.displayName, color: entry.style.color,
+        step: point?.step ?? null, value: point?.value ?? null, metricId: point?.metric_id || "",
+        previousStep: index > 0 ? points[index - 1].step : null,
+        previousValue: index > 0 ? points[index - 1].value : null,
+        evaluationProtocols: protocols, protocolMatch,
+        inView: Boolean(point && point.step >= domain.xMin && point.step <= domain.xMax && point.value >= domain.yMin && point.value <= domain.yMax),
+      };
+    }).sort((left, right) => (left.step ?? Infinity) - (right.step ?? Infinity) || left.runId.localeCompare(right.runId));
+    return {
+      ...reference, items,
+      lineInView: reference.value >= domain.yMin && reference.value <= domain.yMax,
+      protocolCaveat: items.some((item) => !item.protocolMatch),
+      semantics: "first-observed-at-or-below; no interpolation; not a leaderboard metric",
+    };
+  }
+
   function buildFigureModel(data, request) {
     const indexes = buildIndexes(data);
     const figure = resolveFigure(indexes, request || {});
@@ -887,6 +930,15 @@
 
     const layout = buildLayout(profile, profile.name === "interactive" ? 0 : series.length);
     const ranking = buildRanking(indexes, suite, series, profile, layout);
+    const referenceChoices = lossReferenceChoices(indexes, suite, series, yMetric);
+    const lossReference = buildLossReference(indexes, referenceChoices, series, yMetric, request?.lossReference, domain);
+    if (lossReference && ranking) {
+      const top = ranking.bounds.y + ranking.bounds.height + 16;
+      lossReference.bounds = {
+        x: ranking.bounds.x, y: top, width: ranking.bounds.width,
+        height: 92 + lossReference.items.length * 17,
+      };
+    }
     const geometry = {
       xScale: { domain: [domain.xMin, domain.xMax], range: [layout.plot.left, layout.plot.right] },
       yScale: { domain: [domain.yMin, domain.yMax], range: [layout.plot.bottom, layout.plot.top] },
@@ -896,7 +948,9 @@
       layout.plot,
       domain,
       layout.compact,
-      ranking ? ranking.bounds.y + ranking.bounds.height + 10 : layout.plot.top,
+      lossReference?.bounds
+        ? lossReference.bounds.y + lossReference.bounds.height + 10
+        : ranking ? ranking.bounds.y + ranking.bounds.height + 10 : layout.plot.top,
       Boolean(viewport)
     );
     const labelsByRun = new Map(directLabels.map((label) => [label.runId, label]));
@@ -981,6 +1035,7 @@
       { name: "focus_run_ids", value: selection.focusRunIds.join(",") },
       { name: "focus_run_id", value: selection.focusRunId || "" },
       { name: "label_mode", value: selection.labelMode },
+      ...(lossReference ? [{ name: "loss_reference", value: JSON.stringify(lossReference) }] : []),
       { name: "snapshot_version", value: snapshot.schemaVersion },
       { name: "snapshot_date", value: snapshot.generatedAt },
       {
@@ -1020,6 +1075,7 @@
         labelMode: selection.labelMode,
         scaleMode,
         viewport,
+        lossReference: lossReference ? { runId: lossReference.runId, basis: lossReference.basis } : null,
         profile: profile.name,
         width: profile.width,
         height: profile.height,
@@ -1049,6 +1105,8 @@
       explorationDomain,
       series,
       target,
+      referenceChoices,
+      lossReference,
       clipping,
       ranking,
       directLabels,
@@ -1160,6 +1218,7 @@
         focusRunId: model.selection.focusRunId,
         labelMode: model.selection.labelMode,
         ranking: model.ranking,
+        lossReference: model.lossReference,
         domain: model.domain,
         snapshot: model.snapshot,
         comparability: model.suite.comparability,
@@ -1181,6 +1240,7 @@
       ".ranking-label{font-size:9px;fill:#344054}",
       ".ranking-value{font-size:9px;fill:#667085;font-variant-numeric:tabular-nums}",
       ".ranking-line{stroke-linecap:round}",
+      ".loss-reference-line{stroke-width:1.4;stroke-dasharray:6 5;fill:none}",
       ".footer{font-size:9px;fill:#667085}",
       "</style>",
       `<rect width="${width}" height="${height}" fill="#FFFFFF"/>`,
@@ -1229,6 +1289,18 @@
     }
     lines.push("</g>");
 
+    const reference = model.lossReference;
+    if (reference?.lineInView) {
+      const y = linearMap(reference.value, model.geometry.yScale.domain, model.geometry.yScale.range);
+      lines.push(`<line class="loss-reference-line" x1="${plot.left}" x2="${plot.right}" y1="${y}" y2="${y}" stroke="${reference.color}"/>`);
+    }
+    for (const item of reference?.items || []) {
+      if (!item.inView) continue;
+      const x = linearMap(item.step, model.geometry.xScale.domain, model.geometry.xScale.range);
+      const y = linearMap(item.value, model.geometry.yScale.domain, model.geometry.yScale.range);
+      lines.push(`<circle class="loss-reference-observation" cx="${x}" cy="${y}" r="4" fill="#fff" stroke="${item.color}" stroke-width="2"><title>${escapeXml(`${item.label}: first observed step ${item.step}, loss ${item.value}`)}</title></circle>`);
+    }
+
     for (const label of model.directLabels.filter((candidate) => candidate.visible)) {
       lines.push(`<line x1="${label.connector.x1.toFixed(2)}" y1="${label.connector.y1.toFixed(2)}" x2="${label.connector.x2.toFixed(2)}" y2="${label.connector.y2.toFixed(2)}" stroke="${label.color}" stroke-width="1" opacity=".7"/>`);
       lines.push(`<text class="end-label" x="${label.x.toFixed(2)}" y="${label.y.toFixed(2)}" text-anchor="${label.textAnchor || "start"}" fill="${label.color}"${label.focused ? ' font-weight="750"' : ' opacity=".78"'}>${escapeXml(label.text)}</text>`);
@@ -1249,6 +1321,25 @@
         lines.push(`<text class="ranking-label" x="${box.left + 36}" y="${item.y}">${escapeXml(item.label)}</text>`);
         lines.push(`<text class="ranking-value" x="${box.right}" y="${item.y}" text-anchor="end">${escapeXml(item.valueLabel)}</text>`);
       }
+    }
+
+    if (reference?.bounds) {
+      const box = reference.bounds;
+      const right = box.x + box.width;
+      lines.push(`<text class="ranking-title" x="${box.x}" y="${box.y + 10}">FIRST OBSERVED STEP</text>`);
+      lines.push(`<text class="ranking-label" x="${box.x}" y="${box.y + 25}">${escapeXml(fitLabelText(reference.label, 28))}</text>`);
+      lines.push(`<text class="ranking-label" x="${box.x}" y="${box.y + 39}">Last curve loss ≤ ${formatNumber(reference.value, 5)}</text>`);
+      reference.items.forEach((item, index) => {
+        const y = box.y + 56 + index * 17;
+        const value = item.step === null ? "Not reached" : Math.round(item.step).toLocaleString("en-US");
+        lines.push(`<line x1="${box.x}" x2="${box.x + 14}" y1="${y - 3}" y2="${y - 3}" stroke="${item.color}" stroke-width="2"/>`);
+        lines.push(`<text class="ranking-label" x="${box.x + 20}" y="${y}">${escapeXml(fitLabelText(item.label, 22))}</text>`);
+        lines.push(`<text class="ranking-value" x="${right}" y="${y}" text-anchor="end">${value}</text>`);
+      });
+      const noteY = box.y + 56 + reference.items.length * 17;
+      lines.push(`<text class="ranking-value" x="${box.x}" y="${noteY}">Observed samples only; no interpolation.</text>`);
+      lines.push(`<text class="ranking-value" x="${box.x}" y="${noteY + 13}">${reference.protocolCaveat ? "Different / unverified evaluation:" : "Same recorded evaluation protocol."}</text>`);
+      lines.push(`<text class="ranking-value" x="${box.x}" y="${noteY + 26}">Numeric reference only; no speedup claim.</text>`);
     }
 
     const footerY = height - 22;
@@ -1299,6 +1390,7 @@
       "snapshot_date",
       "comparability",
       "source_type",
+      ...(model.lossReference ? ["reference_run_id", "reference_basis", "reference_loss", "first_observed_step_at_or_below", "reference_evaluation_protocol", "reference_protocol_match"] : []),
     ];
     const comparability = JSON.stringify(model.suite.comparability || {});
     const rows = [headers];
@@ -1343,6 +1435,12 @@
           model.snapshot.generatedAt,
           comparability,
           entry.sourceType || "",
+          ...(model.lossReference ? [
+            model.lossReference.runId, model.lossReference.basis, model.lossReference.value,
+            model.lossReference.items.find((item) => item.runId === entry.runId)?.step ?? "",
+            model.lossReference.evaluationProtocol,
+            model.lossReference.items.find((item) => item.runId === entry.runId)?.protocolMatch ?? false,
+          ] : []),
         ]);
       });
     });

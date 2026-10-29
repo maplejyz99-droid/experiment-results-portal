@@ -1,12 +1,12 @@
 {
-  "delivery_id": "sha256:6553675a918d6da0a763d5c6507c287f0639961d4c7ab436ef49db8f3daccde2",
+  "delivery_id": "sha256:22a844b3a34db5872fb023515aa1d7a853179b01f304c806ea870acc1b61464b",
   "meta": {
     "title": "LLM Optimizer Results Portal",
     "version": "0.5.0",
     "generated_at": "2026-10-29",
     "mode": "static-multi-protocol-paper-main",
     "notes": "Static suite-local portal data with Track 3, current curated benchmarks, and audited arXiv:2509.01440v1 main-benchmark protocols.",
-    "delivery_id": "sha256:6553675a918d6da0a763d5c6507c287f0639961d4c7ab436ef49db8f3daccde2",
+    "delivery_id": "sha256:22a844b3a34db5872fb023515aa1d7a853179b01f304c806ea870acc1b61464b",
     "local_optimizer_import": {
       "date": "2026-09-15",
       "manifest": "local-optimizer-manifest.json",
@@ -28,6 +28,16 @@
         "cara-llama-124m-1p5b-seed-0",
         "cara-llama-1b-8k-seed-0",
         "sophiag-llama-1b-8k-seed-0"
+      ]
+    },
+    "creno_1b_import": {
+      "date": "2026-10-29",
+      "manifest": "creno-1b-manifest.json",
+      "run_ids": [
+        "creno-llama-1b-8k-cos014-seed-0",
+        "creno-llama-1b-8k-lin020-seed-0",
+        "muon-llama-1b-8k-cos010-seed-0",
+        "per-head-creno-llama-1b-8k-lin020-seed-0"
       ]
     },
     "publication": "github-pages-public-snapshot",
@@ -118,6 +128,10 @@
       "cara": {
         "label": "CARA",
         "color": "#d04a25"
+      },
+      "creno-cosine": {
+        "label": "CRENO Full · cosine warmup",
+        "color": "#9A6700"
       }
     }
   },
@@ -2498,16 +2512,16 @@
         ],
         "require_same_token_budget": true,
         "require_same_model": true,
-        "require_same_dataset": true
+        "require_same_dataset": false
       },
       "comparability_constraints": {
         "model": "Llama 1,026,086,656 parameters",
-        "dataset": "FineWeb-30B training pool; 100M validation tokens; GPT-2 tokenizer",
+        "dataset": "Mixed FineWeb pools/validation sets: SophiaG/CARA 30B/100M; Muon/CRENO 102.8B/10.4M. Numeric comparison only, not a controlled matched-data ranking.",
         "token_budget": "8,000 optimizer steps · 8,126,464,000 tokens",
-        "hardware_scope": "Compare only within this exact 1B protocol. Hardware-dependent measurements require matching hardware."
+        "hardware_scope": "Hardware/layouts and optimizer recipes differ; no same-hardware or equivalent-quality speedup claim."
       },
       "card": {
-        "headline": "Completed SophiaG and CARA 8,000-step runs.",
+        "headline": "Six completed 8,000-step runs; mixed validation sets.",
         "metric_label": "Validation loss",
         "status_label": "active",
         "detail_state": "available"
@@ -2515,7 +2529,7 @@
       "protocol": {
         "protocol_id": "llama-1b-fineweb30b-bs1984-8k",
         "source_kind": "current_benchmark",
-        "source_label": "Current · FineWeb-30B",
+        "source_label": "Current · FineWeb",
         "model": "llama",
         "model_params": "1026.086656M",
         "parameter_count": 1026086656,
@@ -2529,27 +2543,37 @@
         "accepts_local_experiments": true,
         "display_order": 0,
         "evidence_summary": {
-          "expected": 2,
-          "mapped": 2,
-          "complete": 2,
+          "expected": 6,
+          "mapped": 6,
+          "complete": 6,
           "partial": 0,
           "nonfinite": 0,
           "unresolved": 0
         }
       },
-      "notes": "Completed 8,000-update logs. Ranking uses full6300 terminal evaluation; curves use periodic128 stdout precision. Full evaluations are not spliced into periodic curves. Optimizer recipes are not claimed to be tuned for 1B.",
+      "notes": "User-approved same-page overlay; original run datasets retained. Curves use periodic128 or periodic64. Final rankings use each run's full6300 or full636 evaluation. Full evaluations are not spliced into periodic curves. Different data/evaluation sets permit numeric reference only.",
+      "comparison_overlay": {
+        "run_ids": [
+          "creno-llama-1b-8k-cos014-seed-0",
+          "creno-llama-1b-8k-lin020-seed-0",
+          "muon-llama-1b-8k-cos010-seed-0",
+          "per-head-creno-llama-1b-8k-lin020-seed-0"
+        ],
+        "mixed_validation": true,
+        "basis": "User explicitly requested the original 1B page after disclosure of the different training pools and validation sets. Preserve original configurations; this is a numeric comparison, not a matched-data leaderboard."
+      },
       "evidence_summary": {
-        "mapped": 2,
-        "expected": 2,
-        "complete": 2,
+        "mapped": 6,
+        "expected": 6,
+        "complete": 6,
         "partial": 0,
         "failed": 0,
-        "drawable": 2,
-        "metrics": 84,
+        "drawable": 6,
+        "metrics": 301,
         "claims": 0,
         "figures": 1,
         "status_counts": {
-          "completed": 2
+          "completed": 6
         },
         "nonfinite": 0,
         "unresolved": 0
@@ -2559,8 +2583,8 @@
   "evidence_summary": {
     "suites": 24,
     "active_suites": 20,
-    "runs": 223,
-    "metrics": 85523,
+    "runs": 227,
+    "metrics": 85740,
     "claims": 4,
     "figures": 20
   }
