@@ -1663,8 +1663,7 @@ html:not(.workspace-visible) .benchmark-rail {
 .chart-reference-control summary strong { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chart-reference-control details[open] summary { border-color: var(--electric); }
 .chart-reference-control summary:focus-visible,
-.chart-reference-menu button:focus-visible,
-.chart-reference-summary button:focus-visible { outline: 2px solid var(--electric); outline-offset: 2px; }
+.chart-reference-menu button:focus-visible { outline: 2px solid var(--electric); outline-offset: 2px; }
 
 .chart-reference-menu {
   position: absolute;
@@ -1708,22 +1707,29 @@ html:not(.workspace-visible) .benchmark-rail {
 .chart-reference-menu button[aria-pressed="true"] { background: var(--blue-50); color: var(--electric); }
 .chart-reference-menu small { font-variant-numeric: tabular-nums; }
 
-.chart-reference-summary {
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--divider);
-  background: var(--blue-50);
-  font-size: var(--type-control);
+.chart-reference-note { margin: 0; padding: 0 16px 10px; }
+.chart-reference-status { color: var(--slate-600); font-size: 10px; white-space: nowrap; }
+.chart-reference-caption, .chart-reference-step {
+  font-family: var(--mono); font-size: 11px; font-weight: 650;
+  paint-order: stroke; stroke: #fff; stroke-width: 4px; stroke-linejoin: round;
 }
-.chart-reference-heading { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
-.chart-reference-heading p { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.chart-reference-heading strong { display: block; color: var(--slate-900); }
-.chart-reference-heading span { display: block; margin-top: 3px; color: var(--slate-600); font-size: var(--type-caption); }
-.chart-reference-heading button { display: grid; place-items: center; flex: 0 0 36px; height: 36px; border: 1px solid var(--slate-200); border-radius: 7px; color: var(--slate-700); background: #fff; cursor: pointer; }
-.chart-reference-results { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 8px 0; }
-.chart-reference-results button { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 36px; padding: 4px 0; border: 0; background: transparent; color: var(--slate-700); text-align: left; cursor: pointer; }
-.chart-reference-results strong { font-variant-numeric: tabular-nums; color: var(--slate-900); }
-.chart-reference-results small { color: var(--slate-600); }
-.chart-reference-note { margin: 0; }
+.chart-reference-marker, .chart-reference-tick { cursor: help; }
+.chart-reference-overlay .is-reference-muted { opacity: .25; }
+.chart-reference-overlay .is-reference-active .chart-reference-guide { opacity: 1; stroke-width: 1.6; }
+.series-path.is-reference-preview { filter: drop-shadow(0 1px 1px rgba(15, 23, 42, .2)); }
+.chart-reference-tick:focus-visible { outline: none; }
+.chart-reference-tick:focus-visible .chart-reference-step { text-decoration: underline; }
+.chart-reference-tooltip {
+  position: absolute; top: 8px; right: 8px; z-index: 3;
+  width: max-content; max-width: min(340px, calc(100% - 16px));
+  max-height: calc(100% - 16px); padding: 10px 12px;
+  background: #fff; border: 1px solid var(--slate-200); border-radius: 8px;
+  color: var(--slate-700); font-size: var(--type-caption); line-height: 1.5;
+  overflow-wrap: anywhere; pointer-events: none;
+}
+.chart-reference-tooltip div + div { margin-top: 8px; }
+.chart-reference-tooltip strong, .chart-reference-tooltip span { display: block; }
+.chart-reference-tooltip span { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .chart-reference-line { stroke-width: 1.4; stroke-dasharray: 6 5; }
 .chart-reference-guide { stroke-width: 1; stroke-dasharray: 3 4; opacity: .65; }
 .chart-reference-endpoint { cursor: pointer; }
@@ -1732,10 +1738,7 @@ html:not(.workspace-visible) .benchmark-rail {
 .chart-reference-endpoint:focus-visible circle:last-of-type,
 .chart-reference-marker:focus-visible circle:last-of-type { stroke-width: 4; }
 @media (max-width: 640px), (pointer: coarse) {
-  .chart-reference-control summary,
-  .chart-reference-summary button { min-height: 44px; }
-  .chart-reference-results { gap: 2px 14px; }
-  .chart-reference-summary { padding: 10px 12px; }
+  .chart-reference-control summary { min-height: 44px; }
   .chart-reference-menu { position: static; width: 100%; margin-top: 6px; }
   .chart-reference-control:has(details[open]) { flex: 1 1 100%; }
 }

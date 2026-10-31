@@ -560,6 +560,51 @@
     };
   }
 
+  // Reference ticks describe real samples. Only the text placement is adjusted;
+  // the projection always stays at the observed step, including grouped ticks.
+  function layoutLossReference(reference, layout, domain) {
+    const plot = layout.plot;
+    const groups = new Map();
+    for (const item of reference.items.filter((item) => item.inView)) {
+      if (!groups.has(item.step)) groups.set(item.step, { step: item.step, items: [] });
+      groups.get(item.step).items.push(item);
+    }
+    const labels = [...groups.values()].sort((a, b) => a.step - b.step).map((group) => {
+      const label = group.step >= 1000000 ? `${Number((group.step / 1000000).toFixed(1))}m`
+        : group.step >= 1000 ? `${Number((group.step / 1000).toFixed(1))}k` : String(group.step);
+      const width = Math.max(38, label.length * 7 + 12, group.items.length * 7 + 8);
+      const x = linearMap(group.step, [domain.xMin, domain.xMax], [plot.left, plot.right]);
+      return { ...group, label, width, x, labelX: Math.max(plot.left + width / 2, Math.min(plot.right - width / 2, x)), lane: 0 };
+    });
+    const ends = [-Infinity, -Infinity];
+    for (const label of labels) {
+      const left = label.labelX - label.width / 2;
+      const lane = left >= ends[0] + 8 ? 0 : left >= ends[1] + 8 ? 1 : ends[0] <= ends[1] ? 0 : 1;
+      label.lane = lane;
+      label.labelX = Math.max(label.labelX, ends[lane] + 8 + label.width / 2);
+      ends[lane] = label.labelX + label.width / 2;
+    }
+    // Pack each lane back inside the plot when several achievements cluster.
+    for (let lane = 0; lane < 2; lane += 1) {
+      const row = labels.filter((label) => label.lane === lane);
+      let edge = plot.right;
+      for (const label of row.slice().reverse()) {
+        label.labelX = Math.min(label.labelX, edge - label.width / 2);
+        edge = label.labelX - label.width / 2 - 8;
+      }
+    }
+    const extra = labels.some((label) => label.lane === 1) ? 22 : 0;
+    plot.bottom -= extra;
+    plot.height = plot.bottom - plot.top;
+    layout.referenceAxisExtra = extra;
+    reference.axisLabels = labels.map((label) => ({ ...label, y: plot.bottom + 21 + label.lane * 22 }));
+    reference.projections = reference.items.filter((item) => item.inView).map((item) => ({
+      ...item,
+      x: linearMap(item.step, [domain.xMin, domain.xMax], [plot.left, plot.right]),
+      y: linearMap(item.value, [domain.yMin, domain.yMax], [plot.bottom, plot.top]),
+    }));
+  }
+
   function linearMap(value, domain, range) {
     const span = domain[1] - domain[0];
     if (!finite(value) || !finite(span) || span === 0) return (range[0] + range[1]) / 2;
@@ -764,9 +809,10 @@
     };
   }
 
-  // Opt-in 1B pilot. Reference evidence never changes the viewport or leaderboard.
-  function lossReferenceChoices(indexes, suite, series, metric) {
-    if (suite.suite_id !== "llama-1b-fineweb30b-bs1984-8k" || metric !== "val_loss") return [];
+  // Opt-in for every validation-loss chart, using only its plotted observations.
+  // Reference evidence never changes the viewport or leaderboard.
+  function lossReferenceChoices(indexes, series, metric) {
+    if (metric !== "val_loss") return [];
     return series.flatMap((entry) => {
       const last = indexes.points.get(pointKey(entry.runId, metric))?.at(-1);
       if (!last || !finite(last.value) || !finite(last.step)) return [];
@@ -930,15 +976,9 @@
 
     const layout = buildLayout(profile, profile.name === "interactive" ? 0 : series.length);
     const ranking = buildRanking(indexes, suite, series, profile, layout);
-    const referenceChoices = lossReferenceChoices(indexes, suite, series, yMetric);
+    const referenceChoices = lossReferenceChoices(indexes, series, yMetric);
     const lossReference = buildLossReference(indexes, referenceChoices, series, yMetric, request?.lossReference, domain);
-    if (lossReference && ranking) {
-      const top = ranking.bounds.y + ranking.bounds.height + 16;
-      lossReference.bounds = {
-        x: ranking.bounds.x, y: top, width: ranking.bounds.width,
-        height: 92 + lossReference.items.length * 17,
-      };
-    }
+    if (lossReference) layoutLossReference(lossReference, layout, domain);
     const geometry = {
       xScale: { domain: [domain.xMin, domain.xMax], range: [layout.plot.left, layout.plot.right] },
       yScale: { domain: [domain.yMin, domain.yMax], range: [layout.plot.bottom, layout.plot.top] },
@@ -948,9 +988,7 @@
       layout.plot,
       domain,
       layout.compact,
-      lossReference?.bounds
-        ? lossReference.bounds.y + lossReference.bounds.height + 10
-        : ranking ? ranking.bounds.y + ranking.bounds.height + 10 : layout.plot.top,
+      ranking ? ranking.bounds.y + ranking.bounds.height + 10 : layout.plot.top,
       Boolean(viewport)
     );
     const labelsByRun = new Map(directLabels.map((label) => [label.runId, label]));
@@ -1241,6 +1279,8 @@
       ".ranking-value{font-size:9px;fill:#667085;font-variant-numeric:tabular-nums}",
       ".ranking-line{stroke-linecap:round}",
       ".loss-reference-line{stroke-width:1.4;stroke-dasharray:6 5;fill:none}",
+      ".loss-reference-guide{stroke-width:1;stroke-dasharray:3 4;opacity:.65}",
+      ".loss-reference-label{font-size:10px;font-weight:650;paint-order:stroke;stroke:white;stroke-width:4px;stroke-linejoin:round}",
       ".footer{font-size:9px;fill:#667085}",
       "</style>",
       `<rect width="${width}" height="${height}" fill="#FFFFFF"/>`,
@@ -1265,11 +1305,13 @@
         lines.push(`<line class="grid" x1="${x.toFixed(2)}" x2="${x.toFixed(2)}" y1="${plot.top}" y2="${plot.bottom}" opacity=".55"/>`);
       }
       const anchor = index === 0 ? "start" : index === ticks.length - 1 ? "end" : "middle";
-      lines.push(`<text class="tick" x="${x.toFixed(2)}" y="${plot.bottom + 22}" text-anchor="${anchor}">${escapeXml(formatStep(tick))}</text>`);
+      if (!model.lossReference?.axisLabels.some((label) => label.lane === 0 && Math.abs(x - label.labelX) < label.width / 2 + 22)) {
+        lines.push(`<text class="tick" x="${x.toFixed(2)}" y="${plot.bottom + 22}" text-anchor="${anchor}">${escapeXml(formatStep(tick))}</text>`);
+      }
     });
     lines.push(`<line class="axis" x1="${plot.left}" x2="${plot.left}" y1="${plot.top}" y2="${plot.bottom}"/>`);
     lines.push(`<line class="axis" x1="${plot.left}" x2="${plot.right}" y1="${plot.bottom}" y2="${plot.bottom}"/>`);
-    lines.push(`<text class="axis-label" x="${(plot.left + plot.right) / 2}" y="${plot.bottom + 45}" text-anchor="middle">${escapeXml(model.axes.x.label)}</text>`);
+    lines.push(`<text class="axis-label" x="${(plot.left + plot.right) / 2}" y="${plot.bottom + 45 + (model.layout.referenceAxisExtra || 0)}" text-anchor="middle">${escapeXml(model.axes.x.label)}</text>`);
     lines.push(`<text class="axis-label" transform="translate(${plot.left - 52} ${(plot.top + plot.bottom) / 2}) rotate(-90)" text-anchor="middle">${escapeXml(model.axes.y.label)}</text>`);
 
     if (model.target && model.target.value >= model.domain.yMin && model.target.value <= model.domain.yMax) {
@@ -1294,11 +1336,22 @@
       const y = linearMap(reference.value, model.geometry.yScale.domain, model.geometry.yScale.range);
       lines.push(`<line class="loss-reference-line" x1="${plot.left}" x2="${plot.right}" y1="${y}" y2="${y}" stroke="${reference.color}"/>`);
     }
-    for (const item of reference?.items || []) {
-      if (!item.inView) continue;
-      const x = linearMap(item.step, model.geometry.xScale.domain, model.geometry.xScale.range);
-      const y = linearMap(item.value, model.geometry.yScale.domain, model.geometry.yScale.range);
+    for (const item of reference?.projections || []) {
+      const { x, y } = item;
+      lines.push(`<line class="loss-reference-guide" x1="${x}" x2="${x}" y1="${y}" y2="${plot.bottom}" stroke="${item.color}"/>`);
       lines.push(`<circle class="loss-reference-observation" cx="${x}" cy="${y}" r="4" fill="#fff" stroke="${item.color}" stroke-width="2"><title>${escapeXml(`${item.label}: first observed step ${item.step}, loss ${item.value}`)}</title></circle>`);
+    }
+    for (const label of reference?.axisLabels || []) {
+      const title = label.items.map((item) => `${item.label}: first observed step ${item.step}, loss ${item.value}`).join("; ");
+      lines.push(`<path d="M${label.x} ${plot.bottom}V${plot.bottom + 4}L${label.labelX} ${label.y - 11}" fill="none" stroke="#98A2B3" stroke-width=".7"/>`);
+      lines.push(`<text class="loss-reference-label" x="${label.labelX}" y="${label.y}" text-anchor="middle" style="fill:${label.items.length === 1 ? label.items[0].color : '#344054'}"><title>${escapeXml(title)}</title>${escapeXml(label.label)}</text>`);
+      if (label.items.length > 1) label.items.forEach((item, index) => {
+        lines.push(`<circle cx="${label.labelX + (index - (label.items.length - 1) / 2) * 7}" cy="${label.y + 5}" r="2" fill="${item.color}"/>`);
+      });
+    }
+    if (reference) {
+      const y = reference.lineInView ? Math.max(plot.top + 12, linearMap(reference.value, model.geometry.yScale.domain, model.geometry.yScale.range) - 8) : plot.top + 12;
+      lines.push(`<text class="loss-reference-label" x="${plot.left + 6}" y="${y}" style="fill:${reference.color}">${escapeXml(fitLabelText(reference.label, 30))} · Last curve loss ${formatNumber(reference.value, 5)}${reference.lineInView ? '' : ' · Outside view'}</text>`);
     }
 
     for (const label of model.directLabels.filter((candidate) => candidate.visible)) {
@@ -1323,23 +1376,10 @@
       }
     }
 
-    if (reference?.bounds) {
-      const box = reference.bounds;
-      const right = box.x + box.width;
-      lines.push(`<text class="ranking-title" x="${box.x}" y="${box.y + 10}">FIRST OBSERVED STEP</text>`);
-      lines.push(`<text class="ranking-label" x="${box.x}" y="${box.y + 25}">${escapeXml(fitLabelText(reference.label, 28))}</text>`);
-      lines.push(`<text class="ranking-label" x="${box.x}" y="${box.y + 39}">Last curve loss ≤ ${formatNumber(reference.value, 5)}</text>`);
-      reference.items.forEach((item, index) => {
-        const y = box.y + 56 + index * 17;
-        const value = item.step === null ? "Not reached" : Math.round(item.step).toLocaleString("en-US");
-        lines.push(`<line x1="${box.x}" x2="${box.x + 14}" y1="${y - 3}" y2="${y - 3}" stroke="${item.color}" stroke-width="2"/>`);
-        lines.push(`<text class="ranking-label" x="${box.x + 20}" y="${y}">${escapeXml(fitLabelText(item.label, 22))}</text>`);
-        lines.push(`<text class="ranking-value" x="${right}" y="${y}" text-anchor="end">${value}</text>`);
-      });
-      const noteY = box.y + 56 + reference.items.length * 17;
-      lines.push(`<text class="ranking-value" x="${box.x}" y="${noteY}">Observed samples only; no interpolation.</text>`);
-      lines.push(`<text class="ranking-value" x="${box.x}" y="${noteY + 13}">${reference.protocolCaveat ? "Different / unverified evaluation:" : "Same recorded evaluation protocol."}</text>`);
-      lines.push(`<text class="ranking-value" x="${box.x}" y="${noteY + 26}">Numeric reference only; no speedup claim.</text>`);
+    if (reference) {
+      const missing = reference.items.filter((item) => item.step === null).map((item) => item.label);
+      const note = `${reference.protocolCaveat ? "Different / unverified evaluation; numeric reference only. " : ""}First observed samples; no interpolation.${missing.length ? ` Not reached: ${missing.join(', ')}.` : ''}`;
+      lines.push(`<text class="footer" x="${plot.left}" y="${height - 36}">${escapeXml(fitLabelText(note, Math.floor(plot.width / 4.5)))}</text>`);
     }
 
     const footerY = height - 22;

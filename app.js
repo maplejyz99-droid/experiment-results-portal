@@ -621,7 +621,8 @@ function renderLocalizedInterface() {
       renderChartModeSwitch();
       renderChartEmphasisSwitch();
       renderChartReferenceControl(currentChartModel);
-      renderChartReferenceSummary(currentChartModel);
+      renderChartReferenceFeedback(currentChartModel);
+      if (currentChartModel) renderChartReferenceOverlay(byId("lossChart"), currentChartModel);
       renderRunDetail();
       renderClaims();
       restoreRunListScroll(listScroll);
@@ -2071,7 +2072,7 @@ function applyUrlState(search = globalThis.location?.search) {
       : "none";
   const referenceRun = runById(params.get("ref_run"));
   const referenceBasis = params.get("ref_basis");
-  chartLossReference = suite.suite_id === "llama-1b-fineweb30b-bs1984-8k" &&
+  chartLossReference = Boolean(figureForSuite(suite)) && curveMetricName(suite) === "val_loss" &&
     referenceRun?.suite_id === suite.suite_id && selectedChartRunIds.has(referenceRun.run_id) &&
     [null, "final", "last"].includes(referenceBasis)
     ? { runId: referenceRun.run_id, basis: "last" } : null;
@@ -3480,70 +3481,85 @@ function renderChartReferenceControl(model) {
   });
 }
 
-function showReferenceGuide(runId) {
+function showReferenceGuide(runIds = []) {
   const svg = byId("lossChart");
-  const guide = svg?.querySelector("[data-reference-guide]");
-  if (!guide || !currentChartModel?.lossReference) return;
-  const model = currentChartModel;
-  const item = model.lossReference.items.find((candidate) => candidate.runId === runId && candidate.inView);
-  guide.setAttribute("visibility", item ? "visible" : "hidden");
-  if (!item) return;
-  const x = mapFigureValue(item.step, model.geometry.xScale);
-  guide.setAttribute("x1", x);
-  guide.setAttribute("x2", x);
-  guide.setAttribute("stroke", item.color);
-  svg.querySelector(".chart-hover")?.setAttribute("style", "display:none");
+  const ids = new Set(runIds || []);
+  const items = currentChartModel?.lossReference?.items.filter((item) => ids.has(item.runId)) || [];
+  svg?.querySelectorAll("[data-reference-runs]").forEach((element) => {
+    const matches = JSON.parse(element.dataset.referenceRuns).some((id) => ids.has(id));
+    element.classList.toggle("is-reference-muted", ids.size > 0 && !matches);
+    element.classList.toggle("is-reference-active", matches);
+  });
+  svg?.querySelectorAll(".series-path[data-chart-run-id]").forEach((element) => {
+    element.classList.toggle("is-reference-preview", ids.has(element.dataset.chartRunId));
+  });
+  const tooltip = byId("chartReferenceTooltip");
+  if (!tooltip) return;
+  tooltip.hidden = !items.length;
+  tooltip.innerHTML = items.map((item) => `<div><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(localText("First observed step", "首次观测达标步数"))} ${intFmt.format(item.step)}</span><span>loss ${escapeHtml(item.value)}</span></div>`).join("");
+  if (items.length) {
+    svg?.querySelector(".chart-hover")?.setAttribute("style", "display:none");
+    const point = currentChartModel.lossReference.projections.find((item) => ids.has(item.runId));
+    const frame = tooltip.parentElement?.getBoundingClientRect();
+    if (point && frame) {
+      const rect = svg.getBoundingClientRect();
+      const box = tooltip.getBoundingClientRect();
+      const x = point.x * rect.width / currentChartModel.profile.width + rect.left - frame.left;
+      const y = point.y * rect.height / currentChartModel.profile.height + rect.top - frame.top;
+      tooltip.style.left = `${Math.max(8, Math.min(frame.width - box.width - 8, x + 12))}px`;
+      tooltip.style.top = `${Math.max(8, Math.min(frame.height - box.height - 8, y - box.height - 12))}px`;
+      tooltip.style.right = "auto";
+    }
+  }
 }
 
-function renderChartReferenceSummary(model) {
-  const host = byId("chartReferenceSummary");
+function renderChartReferenceFeedback(model) {
+  const host = byId("chartReferenceNote");
   if (!host) return;
   const reference = model?.lossReference;
   host.hidden = !reference;
-  if (!reference) { host.innerHTML = ""; delete host.dataset.referenceSignature; return; }
-  // During gestures only rebuild this small strip when an off-screen status changes.
-  const signature = JSON.stringify([portalI18n.getLocale(), reference]);
-  if (host.dataset.referenceSignature === signature) return;
-  host.dataset.referenceSignature = signature;
-  host.setAttribute("aria-label", localText("Loss reference comparison", "达标参考线对比"));
-  host.innerHTML = `<div class="chart-reference-heading">
-    <p><strong>${escapeHtml(reference.label)} · ${escapeHtml(localText("Last curve loss", "曲线末值"))} ≤ ${escapeHtml(formatMetricValue("val_loss", reference.value))}</strong>
-      <span>${escapeHtml(localText("First observed step", "首次观测达标步数"))}${reference.lineInView ? "" : escapeHtml(localText(" · Reference line outside view", " · 参考线在当前视窗外"))}</span></p>
-    <button type="button" data-reference-close aria-label="${escapeHtml(localText("Close loss reference", "关闭达标参考线"))}"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
-    </div>
-    <div class="chart-reference-results">${reference.items.map((item) => {
-      const step = item.step === null ? localText("Not reached", "未达到") : intFmt.format(item.step);
-      const detail = item.step === null ? localText("No observed point ≤ reference", "尚无真实观测达到参考值")
-        : `loss ${formatMetricValue("val_loss", item.value)}${item.inView ? "" : localText(" · Outside view", " · 视窗外")}`;
-      const evidence = item.step === null ? detail : `${item.label} · ${step} · loss ${item.value}`;
-      return `<button type="button" data-reference-result="${escapeHtml(item.runId)}" title="${escapeHtml(evidence)}" aria-label="${escapeHtml(`${item.label} · ${step} · ${detail}`)}">
-        <svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" stroke="${item.color}" stroke-width="2"/></svg>
-        <span>${escapeHtml(item.label)}</span><strong>${escapeHtml(step)}</strong><small>${escapeHtml(detail)}</small>
-      </button>`;
-    }).join("")}</div>
-    <p class="chart-reference-note">${escapeHtml(reference.protocolCaveat
-      ? localText("Different or unverified evaluation protocols: numeric reference only, not an equivalent-quality speedup. No interpolation.", "评估口径不同或未确认一致，仅作数值参考，不代表等质量加速；步数不插值。")
-      : localText("First real observation at or below the reference; no interpolation. This does not change the leaderboard.", "取首次不高于参考值的真实观测，不插值，不改变排行榜。"))}</p>`;
-  host.querySelector("[data-reference-close]")?.addEventListener("click", () => {
-    setChartLossReference(null, null);
-    byId("chartReferenceMenu")?.querySelector("summary")?.focus({ preventScroll: true });
-  });
-  host.querySelectorAll("[data-reference-result]").forEach((button) => {
-    const show = () => showReferenceGuide(button.dataset.referenceResult);
-    button.addEventListener("pointerenter", show);
-    button.addEventListener("focus", show);
-    button.addEventListener("click", show);
-    button.addEventListener("pointerleave", () => showReferenceGuide(null));
-    button.addEventListener("blur", () => showReferenceGuide(null));
+  host.textContent = reference ? reference.protocolCaveat
+    ? localText("Numeric reference only · Evaluation protocols differ or are unverified · No interpolation", "仅作数值参考 · 评估口径不同或未确认一致 · 不插值")
+    : localText("First real observation at or below the reference · No interpolation", "取首次不高于参考值的真实观测 · 不插值") : "";
+  host.title = localText("This does not change the leaderboard or establish an equivalent-quality speedup.", "不改变排行榜，不代表等质量加速。");
+  byId("chartSelectionChips")?.querySelectorAll("button[data-run-id]").forEach((button) => {
+    const item = reference?.items.find((candidate) => candidate.runId === button.dataset.runId);
+    const status = !item ? "" : item.step === null ? localText("Not reached", "未达") : !item.inView ? localText("Outside view", "视窗外") : "";
+    let badge = button.querySelector(".chart-reference-status");
+    if (!status) { badge?.remove(); return; }
+    if (!badge) { badge = document.createElement("small"); badge.className = "chart-reference-status"; button.appendChild(badge); }
+    badge.textContent = status;
+    badge.title = item.step === null ? localText("No real observation at or below this reference", "尚无真实观测达到参考值")
+      : `${item.label} · ${intFmt.format(item.step)} · loss ${item.value}`;
   });
 }
 
 function renderChartReferenceOverlay(svg, model) {
+  showReferenceGuide();
+  svg.querySelectorAll(".chart-reference-overlay, .chart-reference-endpoint").forEach((element) => element.remove());
   if (!model.referenceChoices?.length) return;
   const plot = model.plotRect;
   const x = (value) => mapFigureValue(value, model.geometry.xScale);
   const y = (value) => mapFigureValue(value, model.geometry.yScale);
   const reference = model.lossReference;
+  const bindEvidence = (element, items) => {
+    const runIds = items.map((item) => item.runId);
+    element.dataset.referenceRuns = JSON.stringify(runIds);
+    const evidence = items.map((item) => `${item.label} · ${localText("First observed step", "首次观测达标步数")} ${intFmt.format(item.step)} · loss ${item.value}`).join("; ");
+    element.setAttribute("aria-label", evidence);
+    const title = svgEl("title"); title.textContent = evidence; element.appendChild(title);
+    const show = () => { if (!chartGesture?.dragging) showReferenceGuide(runIds); };
+    element.addEventListener("pointerenter", show);
+    element.addEventListener("focus", show);
+    element.addEventListener("pointerleave", () => showReferenceGuide());
+    element.addEventListener("blur", () => showReferenceGuide());
+    element.addEventListener("click", (event) => { event.stopPropagation(); if (!chartSuppressClick) show(); });
+    element.addEventListener("keydown", (event) => {
+      if (!["Enter", " ", "Escape"].includes(event.key)) return;
+      event.preventDefault(); event.stopPropagation();
+      if (event.key === "Escape") showReferenceGuide(); else show();
+    });
+  };
   if (reference) {
     const layer = svgEl("g", { class: "chart-reference-overlay" });
     if (reference.lineInView) {
@@ -3552,25 +3568,35 @@ function renderChartReferenceOverlay(svg, model) {
         stroke: reference.color, class: "chart-reference-line", "pointer-events": "none",
       }));
     }
-    layer.appendChild(svgEl("line", {
-      y1: plot.top, y2: plot.bottom, visibility: "hidden", "data-reference-guide": "",
-      class: "chart-reference-guide", "pointer-events": "none",
-    }));
-    for (const item of reference.items.filter((candidate) => candidate.inView)) {
+    const caption = svgEl("text", { x: plot.left + 6,
+      y: reference.lineInView ? Math.max(plot.top + 12, y(reference.value) - 8) : plot.top + 12,
+      class: "chart-reference-caption", fill: reference.color, "pointer-events": "none" });
+    const captionName = compactTooltipText(reference.label, Math.max(10, Math.floor(plot.width / 7) - 22));
+    caption.textContent = `${captionName} · ${localText("Last loss", "曲线末值")} ${formatMetricValue("val_loss", reference.value)}${reference.lineInView ? "" : localText(" · Outside view", " · 视窗外")}`;
+    layer.appendChild(caption);
+    for (const item of reference.projections) {
       // Marks sit on the actual observation, not an invented line intersection.
-      const marker = svgEl("g", { tabindex: "0", role: "img", class: "chart-reference-marker",
-        "aria-label": `${item.label}: ${localText("first observed step", "首次观测达标步数")} ${item.step}, loss ${item.value}` });
-      marker.appendChild(svgEl("circle", { cx: x(item.step), cy: y(item.value), r: 12, fill: "transparent" }));
-      marker.appendChild(svgEl("circle", { cx: x(item.step), cy: y(item.value), r: 4.5, fill: "white", stroke: item.color, "stroke-width": 2 }));
-      const title = svgEl("title");
-      title.textContent = `${item.label} · ${intFmt.format(item.step)} · loss ${item.value}`;
-      marker.appendChild(title);
-      marker.addEventListener("pointerenter", () => showReferenceGuide(item.runId));
-      marker.addEventListener("focus", () => showReferenceGuide(item.runId));
-      marker.addEventListener("pointerleave", () => showReferenceGuide(null));
-      marker.addEventListener("blur", () => showReferenceGuide(null));
-      marker.addEventListener("click", (event) => { event.stopPropagation(); showReferenceGuide(item.runId); });
+      const marker = svgEl("g", { tabindex: "0", role: "button", class: "chart-reference-marker" });
+      marker.appendChild(svgEl("line", { x1: item.x, x2: item.x, y1: item.y, y2: plot.bottom,
+        stroke: item.color, class: "chart-reference-guide", "pointer-events": "none" }));
+      marker.appendChild(svgEl("circle", { cx: item.x, cy: item.y, r: 12, fill: "transparent" }));
+      marker.appendChild(svgEl("circle", { cx: item.x, cy: item.y, r: 4.5, fill: "white", stroke: item.color, "stroke-width": 2 }));
+      bindEvidence(marker, [item]);
       layer.appendChild(marker);
+    }
+    for (const label of reference.axisLabels) {
+      const tick = svgEl("g", { tabindex: "0", role: "button", class: "chart-reference-tick" });
+      tick.appendChild(svgEl("path", { d: `M${label.x} ${plot.bottom}V${plot.bottom + 4}L${label.labelX} ${label.y - 11}`,
+        fill: "none", stroke: "#98A2B3", "stroke-width": .7, "pointer-events": "none" }));
+      tick.appendChild(svgEl("rect", { x: label.labelX - label.width / 2, y: label.y - 13,
+        width: label.width, height: 22, fill: "transparent" }));
+      const text = svgEl("text", { x: label.labelX, y: label.y, "text-anchor": "middle",
+        class: "chart-reference-step", fill: label.items.length === 1 ? label.items[0].color : "#344054" });
+      text.textContent = label.label; tick.appendChild(text);
+      if (label.items.length > 1) label.items.forEach((item, index) => tick.appendChild(svgEl("circle", {
+        cx: label.labelX + (index - (label.items.length - 1) / 2) * 7, cy: label.y + 5, r: 2, fill: item.color,
+      })));
+      bindEvidence(tick, label.items); layer.appendChild(tick);
     }
     svg.appendChild(layer);
   }
@@ -3585,6 +3611,13 @@ function renderChartReferenceOverlay(svg, model) {
     const title = svgEl("title");
     title.textContent = `${choice.label} · ${localText("Click to toggle last-loss reference", "点击切换曲线末值参考线")}`;
     endpoint.appendChild(title);
+    const achieved = reference?.items.find((item) => item.runId === choice.runId && item.step === choice.step && item.inView);
+    if (achieved) {
+      endpoint.addEventListener("pointerenter", () => showReferenceGuide([choice.runId]));
+      endpoint.addEventListener("focus", () => showReferenceGuide([choice.runId]));
+      endpoint.addEventListener("pointerleave", () => showReferenceGuide());
+      endpoint.addEventListener("blur", () => showReferenceGuide());
+    }
     const toggle = () => {
       const selected = currentChartModel?.lossReference?.runId === choice.runId;
       setChartLossReference(selected ? null : choice.runId, selected ? null : "last");
@@ -3859,7 +3892,6 @@ function renderChart({ viewportOnly = false } = {}) {
   chartViewport = model?.request.viewport || null;
   chartLossReference = model?.request.lossReference || null;
   if (!viewportOnly) renderChartReferenceControl(model);
-  renderChartReferenceSummary(model);
   const tailButton = byId("chartModeSwitch").querySelector('[data-scale-mode="tail"]');
   if (tailButton) {
     const isTailPreset = !chartViewport && chartScaleMode === "tail";
@@ -3911,6 +3943,8 @@ function renderChart({ viewportOnly = false } = {}) {
     });
   });
   }
+
+  renderChartReferenceFeedback(model);
 
   if (!model?.series?.length || !model.stats.points) {
     byId("chartToolbarMeta").textContent = `${runs.length}/${chartSelectionLimit(suite)} visible`;
@@ -4000,7 +4034,7 @@ function renderChart({ viewportOnly = false } = {}) {
         "text-anchor": index === 0 ? "start" : index === xTicks.length - 1 ? "end" : "middle",
       });
       label.textContent = intFmt.format(tick);
-      svg.appendChild(label);
+      if (!model.lossReference?.axisLabels.some((item) => item.lane === 0 && Math.abs(tickX - item.labelX) < item.width / 2 + 22)) svg.appendChild(label);
   });
 
   svg.appendChild(svgEl("line", {
@@ -4019,7 +4053,7 @@ function renderChart({ viewportOnly = false } = {}) {
   }));
   const xTitle = svgEl("text", {
     x: (plot.left + plot.right) / 2,
-    y: plot.bottom + 43,
+    y: plot.bottom + 43 + (model.layout.referenceAxisExtra || 0),
     class: "chart-axis-title",
     "text-anchor": "middle",
   });

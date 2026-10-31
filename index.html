@@ -12,7 +12,7 @@
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" sizes="180x180" />
-    <link rel="stylesheet" href="styles.css?v=20261029-loss-reference" />
+    <link rel="stylesheet" href="styles.css?v=20261031-reference-projections" />
   </head>
   <body>
     <a class="skip-link" href="#workspace-start" data-i18n="a11y.skip_workspace">Skip to benchmark workspace</a>
@@ -241,7 +241,6 @@
               aria-label="Selected chart runs"
               data-i18n-aria-label="a11y.selected_runs"
             ></div>
-            <section class="chart-reference-summary" id="chartReferenceSummary" aria-label="Loss reference comparison" hidden></section>
             <p class="chart-gesture-hint" id="chartGestureHint" data-i18n="chart.gesture_hint">Scroll to zoom X · Drag to pan · Y axis auto-fits</p>
             <div class="chart-frame figure-canvas">
               <svg
@@ -250,7 +249,9 @@
                 aria-label="Track 3 validation loss curves"
                 tabindex="0"
               ></svg>
+              <div class="chart-reference-tooltip" id="chartReferenceTooltip" role="tooltip" hidden></div>
             </div>
+            <p class="chart-reference-note" id="chartReferenceNote" hidden></p>
           </section>
         </div>
 
@@ -329,11 +330,11 @@
     <noscript>
       <p class="noscript-message" data-i18n="noscript">JavaScript is required to inspect the experiment evidence.</p>
     </noscript>
-    <script src="figure-runtime.js?v=20261029-curve-reference-v2"></script>
+    <script src="figure-runtime.js?v=20261031-reference-projections"></script>
     <script src="portal-i18n.js"></script>
     <script src="hero-mesh-text.js"></script>
     <script src="local-library.js"></script>
     <script src="local-library-ui.js"></script>
-    <script src="app.js?v=20261029-curve-reference-v2"></script>
+    <script src="app.js?v=20261031-reference-projections"></script>
   </body>
 </html>
