@@ -1,12 +1,12 @@
 {
-  "delivery_id": "sha256:22a844b3a34db5872fb023515aa1d7a853179b01f304c806ea870acc1b61464b",
+  "delivery_id": "sha256:0418b6bae3e22988c138c314cf237bbc8f0bf67a419b74b2080cada27f128514",
   "meta": {
     "title": "LLM Optimizer Results Portal",
     "version": "0.5.0",
-    "generated_at": "2026-10-29",
+    "generated_at": "2026-11-09",
     "mode": "static-multi-protocol-paper-main",
     "notes": "Static suite-local portal data with Track 3, current curated benchmarks, and audited arXiv:2509.01440v1 main-benchmark protocols.",
-    "delivery_id": "sha256:22a844b3a34db5872fb023515aa1d7a853179b01f304c806ea870acc1b61464b",
+    "delivery_id": "sha256:0418b6bae3e22988c138c314cf237bbc8f0bf67a419b74b2080cada27f128514",
     "local_optimizer_import": {
       "date": "2026-09-15",
       "manifest": "local-optimizer-manifest.json",
@@ -39,6 +39,11 @@
         "muon-llama-1b-8k-cos010-seed-0",
         "per-head-creno-llama-1b-8k-lin020-seed-0"
       ]
+    },
+    "remote_muon_import": {
+      "date": "2026-11-09",
+      "manifest": "muon-remote-manifest.json",
+      "run_id": "benchmark-124m-muon"
     },
     "publication": "github-pages-public-snapshot",
     "source_path_policy": "Remote absolute paths are replaced with public source labels in this published snapshot."
@@ -309,12 +314,12 @@
         "display_order": 0,
         "paper": null,
         "evidence_summary": {
-          "expected": 15,
-          "mapped": 15,
-          "complete": 15,
+          "expected": 16,
+          "mapped": 16,
+          "unresolved": 0,
+          "complete": 16,
           "partial": 0,
-          "nonfinite": 0,
-          "unresolved": 0
+          "nonfinite": 0
         },
         "unresolved_methods": []
       },
@@ -328,20 +333,20 @@
         "basis": "User-requested shared chart by model, dataset family, batch and nominal token budget. Original run configuration and measurements are retained; identical validation splits are not established."
       },
       "evidence_summary": {
-        "mapped": 15,
-        "expected": 15,
-        "complete": 15,
+        "mapped": 16,
+        "expected": 16,
+        "complete": 16,
         "partial": 0,
         "failed": 0,
-        "drawable": 15,
-        "metrics": 8779,
+        "drawable": 16,
+        "metrics": 9241,
         "claims": 1,
         "figures": 1,
         "status_counts": {
-          "completed": 15
+          "completed": 16
         },
-        "nonfinite": 0,
-        "unresolved": 0
+        "unresolved": 0,
+        "nonfinite": 0
       }
     },
     {
@@ -504,6 +509,99 @@
         "claims": 0,
         "figures": 0,
         "status_counts": {}
+      }
+    },
+    {
+      "suite_id": "llama-1b-fineweb30b-bs1984-8k",
+      "title": "Llama 1B",
+      "family": "benchmark",
+      "status": "active",
+      "primary_metric": "final_val_loss",
+      "target": {
+        "metric_name": null,
+        "value": null,
+        "direction": null
+      },
+      "leaderboard_rule": {
+        "sort_by": "final_val_loss",
+        "direction": "asc",
+        "display_name": "Llama 1B · 8,000-step validation leaderboard",
+        "formal_rank_metric": "final_val_loss",
+        "tie_breakers": [
+          "best_val_loss"
+        ]
+      },
+      "leaderboard_eligibility": {
+        "allowed_status": [
+          "completed"
+        ],
+        "require_same_token_budget": true,
+        "require_same_model": true,
+        "require_same_dataset": false
+      },
+      "comparability_constraints": {
+        "model": "Llama 1,026,086,656 parameters",
+        "dataset": "Mixed FineWeb pools/validation sets: SophiaG/CARA 30B/100M; Muon/CRENO 102.8B/10.4M. Numeric comparison only, not a controlled matched-data ranking.",
+        "token_budget": "8,000 optimizer steps · 8,126,464,000 tokens",
+        "hardware_scope": "Hardware/layouts and optimizer recipes differ; no same-hardware or equivalent-quality speedup claim."
+      },
+      "card": {
+        "headline": "Six completed 8,000-step runs; mixed validation sets.",
+        "metric_label": "Validation loss",
+        "status_label": "active",
+        "detail_state": "available"
+      },
+      "protocol": {
+        "protocol_id": "llama-1b-fineweb30b-bs1984-8k",
+        "source_kind": "current_benchmark",
+        "source_label": "Current · FineWeb",
+        "model": "llama",
+        "model_params": "1026.086656M",
+        "parameter_count": 1026086656,
+        "dataset": "FineWeb-30B",
+        "batch_size_sequences": 1984,
+        "sequence_length": 512,
+        "tokens_per_step": 1015808,
+        "budget_steps": 8000,
+        "planned_tokens": 8126464000,
+        "budget_label": "8,000 steps",
+        "accepts_local_experiments": true,
+        "display_order": 0,
+        "evidence_summary": {
+          "expected": 6,
+          "mapped": 6,
+          "complete": 6,
+          "partial": 0,
+          "nonfinite": 0,
+          "unresolved": 0
+        }
+      },
+      "notes": "User-approved same-page overlay; original run datasets retained. Curves use periodic128 or periodic64. Final rankings use each run's full6300 or full636 evaluation. Full evaluations are not spliced into periodic curves. Different data/evaluation sets permit numeric reference only.",
+      "comparison_overlay": {
+        "run_ids": [
+          "creno-llama-1b-8k-cos014-seed-0",
+          "creno-llama-1b-8k-lin020-seed-0",
+          "muon-llama-1b-8k-cos010-seed-0",
+          "per-head-creno-llama-1b-8k-lin020-seed-0"
+        ],
+        "mixed_validation": true,
+        "basis": "User explicitly requested the original 1B page after disclosure of the different training pools and validation sets. Preserve original configurations; this is a numeric comparison, not a matched-data leaderboard."
+      },
+      "evidence_summary": {
+        "mapped": 6,
+        "expected": 6,
+        "complete": 6,
+        "partial": 0,
+        "failed": 0,
+        "drawable": 6,
+        "metrics": 301,
+        "claims": 0,
+        "figures": 1,
+        "status_counts": {
+          "completed": 6
+        },
+        "nonfinite": 0,
+        "unresolved": 0
       }
     },
     {
@@ -843,12 +941,12 @@
         "hardware_scope": "Compare only within this exact paper protocol."
       },
       "card": {
-        "headline": "4/11 formal methods mapped from the paper archive.",
+        "headline": "5/11 formal methods mapped from the paper archive.",
         "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred. Muon-family supplements retain their source names and actual configurations; they are archive representatives, not asserted paper-best settings.",
       "benchmark_group_id": "llama-124m",
       "protocol": {
         "protocol_id": "paper-llama-124m-bs256-1b",
@@ -869,11 +967,11 @@
         },
         "evidence_summary": {
           "expected": 11,
-          "mapped": 4,
-          "complete": 4,
+          "mapped": 5,
+          "complete": 5,
           "partial": 0,
           "nonfinite": 0,
-          "unresolved": 7
+          "unresolved": 6
         },
         "unresolved_methods": [
           {
@@ -887,10 +985,6 @@
           {
             "paper_label": "Signum",
             "reason": "No unique archived candidate matches the paper appendix best configuration and main-figure identity."
-          },
-          {
-            "paper_label": "D-Muon",
-            "reason": "No archived run is explicitly labeled D-Muon with the paper appendix best configuration."
           },
           {
             "paper_label": "SOAP",
@@ -907,20 +1001,20 @@
         ]
       },
       "evidence_summary": {
-        "mapped": 4,
+        "mapped": 5,
         "expected": 11,
-        "complete": 4,
+        "complete": 5,
         "partial": 0,
         "failed": 0,
-        "drawable": 4,
-        "metrics": 300,
+        "drawable": 5,
+        "metrics": 375,
         "claims": 0,
         "figures": 1,
         "status_counts": {
-          "completed": 4
+          "completed": 5
         },
         "nonfinite": 0,
-        "unresolved": 7
+        "unresolved": 6
       }
     },
     {
@@ -964,12 +1058,12 @@
         "hardware_scope": "Compare only within this exact paper protocol."
       },
       "card": {
-        "headline": "5/11 formal methods mapped from the paper archive.",
+        "headline": "6/11 formal methods mapped from the paper archive.",
         "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred. Muon-family supplements retain their source names and actual configurations; they are archive representatives, not asserted paper-best settings.",
       "benchmark_group_id": "llama-124m",
       "protocol": {
         "protocol_id": "paper-llama-124m-bs256-2p1b",
@@ -990,11 +1084,11 @@
         },
         "evidence_summary": {
           "expected": 11,
-          "mapped": 5,
-          "complete": 5,
+          "mapped": 6,
+          "complete": 6,
           "partial": 0,
           "nonfinite": 0,
-          "unresolved": 6
+          "unresolved": 5
         },
         "unresolved_methods": [
           {
@@ -1004,10 +1098,6 @@
           {
             "paper_label": "Signum",
             "reason": "No unique archived candidate matches the paper appendix best configuration and main-figure identity."
-          },
-          {
-            "paper_label": "D-Muon",
-            "reason": "No archived run is explicitly labeled D-Muon with the paper appendix best configuration."
           },
           {
             "paper_label": "SOAP",
@@ -1024,20 +1114,20 @@
         ]
       },
       "evidence_summary": {
-        "mapped": 5,
+        "mapped": 6,
         "expected": 11,
-        "complete": 5,
+        "complete": 6,
         "partial": 0,
         "failed": 0,
-        "drawable": 5,
-        "metrics": 725,
+        "drawable": 6,
+        "metrics": 870,
         "claims": 0,
         "figures": 1,
         "status_counts": {
-          "completed": 5
+          "completed": 6
         },
         "nonfinite": 0,
-        "unresolved": 6
+        "unresolved": 5
       }
     },
     {
@@ -1081,12 +1171,12 @@
         "hardware_scope": "Compare only within this exact paper protocol."
       },
       "card": {
-        "headline": "4/11 formal methods mapped from the paper archive.",
+        "headline": "5/11 formal methods mapped from the paper archive.",
         "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred. Muon-family supplements retain their source names and actual configurations; they are archive representatives, not asserted paper-best settings.",
       "benchmark_group_id": "llama-124m",
       "protocol": {
         "protocol_id": "paper-llama-124m-bs256-4p2b",
@@ -1107,11 +1197,11 @@
         },
         "evidence_summary": {
           "expected": 11,
-          "mapped": 4,
-          "complete": 4,
+          "mapped": 5,
+          "complete": 5,
           "partial": 0,
           "nonfinite": 0,
-          "unresolved": 7
+          "unresolved": 6
         },
         "unresolved_methods": [
           {
@@ -1125,10 +1215,6 @@
           {
             "paper_label": "Signum",
             "reason": "No unique archived candidate matches the paper appendix best configuration and main-figure identity."
-          },
-          {
-            "paper_label": "D-Muon",
-            "reason": "No archived run is explicitly labeled D-Muon with the paper appendix best configuration."
           },
           {
             "paper_label": "SOAP",
@@ -1145,20 +1231,20 @@
         ]
       },
       "evidence_summary": {
-        "mapped": 4,
+        "mapped": 5,
         "expected": 11,
-        "complete": 4,
+        "complete": 5,
         "partial": 0,
         "failed": 0,
-        "drawable": 4,
-        "metrics": 1136,
+        "drawable": 5,
+        "metrics": 1420,
         "claims": 0,
         "figures": 1,
         "status_counts": {
-          "completed": 4
+          "completed": 5
         },
         "nonfinite": 0,
-        "unresolved": 7
+        "unresolved": 6
       }
     },
     {
@@ -1202,12 +1288,12 @@
         "hardware_scope": "Compare only within this exact paper protocol."
       },
       "card": {
-        "headline": "4/11 formal methods mapped from the paper archive.",
+        "headline": "5/11 formal methods mapped from the paper archive.",
         "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred. Muon-family supplements retain their source names and actual configurations; they are archive representatives, not asserted paper-best settings.",
       "benchmark_group_id": "llama-124m",
       "protocol": {
         "protocol_id": "paper-llama-124m-bs256-6p3b",
@@ -1228,11 +1314,11 @@
         },
         "evidence_summary": {
           "expected": 11,
-          "mapped": 4,
-          "complete": 1,
+          "mapped": 5,
+          "complete": 2,
           "partial": 2,
           "nonfinite": 1,
-          "unresolved": 7
+          "unresolved": 6
         },
         "unresolved_methods": [
           {
@@ -1246,10 +1332,6 @@
           {
             "paper_label": "Signum",
             "reason": "No unique archived candidate matches the paper appendix best configuration and main-figure identity."
-          },
-          {
-            "paper_label": "D-Muon",
-            "reason": "No archived run is explicitly labeled D-Muon with the paper appendix best configuration."
           },
           {
             "paper_label": "SOAP",
@@ -1266,22 +1348,22 @@
         ]
       },
       "evidence_summary": {
-        "mapped": 4,
+        "mapped": 5,
         "expected": 11,
-        "complete": 1,
+        "complete": 2,
         "partial": 2,
         "failed": 1,
-        "drawable": 4,
-        "metrics": 1683,
+        "drawable": 5,
+        "metrics": 2106,
         "claims": 0,
         "figures": 1,
         "status_counts": {
           "partial": 2,
           "diverged": 1,
-          "completed": 1
+          "completed": 2
         },
         "nonfinite": 1,
-        "unresolved": 7
+        "unresolved": 6
       }
     },
     {
@@ -1325,12 +1407,12 @@
         "hardware_scope": "Compare only within this exact paper protocol."
       },
       "card": {
-        "headline": "8/11 formal methods mapped from the paper archive.",
+        "headline": "9/11 formal methods mapped from the paper archive.",
         "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred. Muon-family supplements retain their source names and actual configurations; they are archive representatives, not asserted paper-best settings.",
       "benchmark_group_id": "llama-210m",
       "protocol": {
         "protocol_id": "paper-llama-210m-bs256-1b",
@@ -1351,20 +1433,16 @@
         },
         "evidence_summary": {
           "expected": 11,
-          "mapped": 8,
-          "complete": 8,
+          "mapped": 9,
+          "complete": 9,
           "partial": 0,
           "nonfinite": 0,
-          "unresolved": 3
+          "unresolved": 2
         },
         "unresolved_methods": [
           {
             "paper_label": "AdamW",
             "reason": "The archived horizon series uses beta1=0.8, while the paper appendix selects beta1=0.9."
-          },
-          {
-            "paper_label": "D-Muon",
-            "reason": "The archive exposes only basic-Muon candidates for this protocol; basic Muon cannot be relabeled as D-Muon."
           },
           {
             "paper_label": "SF-AdamW",
@@ -1373,20 +1451,20 @@
         ]
       },
       "evidence_summary": {
-        "mapped": 8,
+        "mapped": 9,
         "expected": 11,
-        "complete": 8,
+        "complete": 9,
         "partial": 0,
         "failed": 0,
-        "drawable": 8,
-        "metrics": 600,
+        "drawable": 9,
+        "metrics": 675,
         "claims": 0,
         "figures": 1,
         "status_counts": {
-          "completed": 8
+          "completed": 9
         },
         "nonfinite": 0,
-        "unresolved": 3
+        "unresolved": 2
       }
     },
     {
@@ -1430,12 +1508,12 @@
         "hardware_scope": "Compare only within this exact paper protocol."
       },
       "card": {
-        "headline": "8/11 formal methods mapped from the paper archive.",
+        "headline": "9/11 formal methods mapped from the paper archive.",
         "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred. Muon-family supplements retain their source names and actual configurations; they are archive representatives, not asserted paper-best settings.",
       "benchmark_group_id": "llama-210m",
       "protocol": {
         "protocol_id": "paper-llama-210m-bs256-2p1b",
@@ -1456,20 +1534,16 @@
         },
         "evidence_summary": {
           "expected": 13,
-          "mapped": 10,
-          "complete": 10,
+          "mapped": 11,
+          "complete": 11,
           "partial": 0,
           "nonfinite": 0,
-          "unresolved": 3
+          "unresolved": 2
         },
         "unresolved_methods": [
           {
             "paper_label": "AdamW",
             "reason": "The archived horizon series uses beta1=0.8, while the paper appendix selects beta1=0.9."
-          },
-          {
-            "paper_label": "D-Muon",
-            "reason": "The archive exposes only basic-Muon candidates for this protocol; basic Muon cannot be relabeled as D-Muon."
           },
           {
             "paper_label": "SF-AdamW",
@@ -1486,20 +1560,20 @@
         "basis": "User-requested shared chart by model, dataset family, batch and nominal token budget. Original run configuration and measurements are retained; identical validation splits are not established."
       },
       "evidence_summary": {
-        "mapped": 10,
+        "mapped": 11,
         "expected": 13,
-        "complete": 10,
+        "complete": 11,
         "partial": 0,
         "failed": 0,
-        "drawable": 10,
-        "metrics": 2004,
+        "drawable": 11,
+        "metrics": 2149,
         "claims": 0,
         "figures": 1,
         "status_counts": {
-          "completed": 10
+          "completed": 11
         },
         "nonfinite": 0,
-        "unresolved": 3
+        "unresolved": 2
       }
     },
     {
@@ -1543,12 +1617,12 @@
         "hardware_scope": "Compare only within this exact paper protocol."
       },
       "card": {
-        "headline": "8/11 formal methods mapped from the paper archive.",
+        "headline": "9/11 formal methods mapped from the paper archive.",
         "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred. Muon-family supplements retain their source names and actual configurations; they are archive representatives, not asserted paper-best settings.",
       "benchmark_group_id": "llama-210m",
       "protocol": {
         "protocol_id": "paper-llama-210m-bs256-4p2b",
@@ -1569,20 +1643,16 @@
         },
         "evidence_summary": {
           "expected": 13,
-          "mapped": 10,
+          "mapped": 11,
           "complete": 6,
           "partial": 3,
-          "nonfinite": 1,
-          "unresolved": 3
+          "nonfinite": 2,
+          "unresolved": 2
         },
         "unresolved_methods": [
           {
             "paper_label": "AdamW",
             "reason": "The archived horizon series uses beta1=0.8, while the paper appendix selects beta1=0.9."
-          },
-          {
-            "paper_label": "D-Muon",
-            "reason": "The archive exposes only basic-Muon candidates for this protocol; basic Muon cannot be relabeled as D-Muon."
           },
           {
             "paper_label": "SF-AdamW",
@@ -1599,22 +1669,22 @@
         "basis": "User-requested shared chart by model, dataset family, batch and nominal token budget. Original run configuration and measurements are retained; identical validation splits are not established."
       },
       "evidence_summary": {
-        "mapped": 10,
+        "mapped": 11,
         "expected": 13,
         "complete": 6,
         "partial": 3,
-        "failed": 1,
-        "drawable": 10,
-        "metrics": 3938,
+        "failed": 2,
+        "drawable": 11,
+        "metrics": 4219,
         "claims": 0,
         "figures": 1,
         "status_counts": {
           "partial": 3,
           "completed": 6,
-          "diverged": 1
+          "diverged": 2
         },
-        "nonfinite": 1,
-        "unresolved": 3
+        "nonfinite": 2,
+        "unresolved": 2
       }
     },
     {
@@ -1658,12 +1728,12 @@
         "hardware_scope": "Compare only within this exact paper protocol."
       },
       "card": {
-        "headline": "8/11 formal methods mapped from the paper archive.",
+        "headline": "9/11 formal methods mapped from the paper archive.",
         "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred. Muon-family supplements retain their source names and actual configurations; they are archive representatives, not asserted paper-best settings.",
       "benchmark_group_id": "llama-210m",
       "protocol": {
         "protocol_id": "paper-llama-210m-bs256-6p3b",
@@ -1684,20 +1754,16 @@
         },
         "evidence_summary": {
           "expected": 13,
-          "mapped": 10,
+          "mapped": 11,
           "complete": 4,
-          "partial": 4,
+          "partial": 5,
           "nonfinite": 2,
-          "unresolved": 3
+          "unresolved": 2
         },
         "unresolved_methods": [
           {
             "paper_label": "AdamW",
             "reason": "The archived horizon series uses beta1=0.8, while the paper appendix selects beta1=0.9."
-          },
-          {
-            "paper_label": "D-Muon",
-            "reason": "The archive exposes only basic-Muon candidates for this protocol; basic Muon cannot be relabeled as D-Muon."
           },
           {
             "paper_label": "SF-AdamW",
@@ -1714,22 +1780,22 @@
         "basis": "User-requested shared chart by model, dataset family, batch and nominal token budget. Original run configuration and measurements are retained; identical validation splits are not established."
       },
       "evidence_summary": {
-        "mapped": 10,
+        "mapped": 11,
         "expected": 13,
         "complete": 4,
-        "partial": 4,
+        "partial": 5,
         "failed": 2,
-        "drawable": 10,
-        "metrics": 5878,
+        "drawable": 11,
+        "metrics": 6298,
         "claims": 0,
         "figures": 1,
         "status_counts": {
           "completed": 4,
-          "partial": 4,
+          "partial": 5,
           "diverged": 2
         },
         "nonfinite": 2,
-        "unresolved": 3
+        "unresolved": 2
       }
     },
     {
@@ -1773,12 +1839,12 @@
         "hardware_scope": "Compare only within this exact paper protocol."
       },
       "card": {
-        "headline": "8/11 formal methods mapped from the paper archive.",
+        "headline": "9/11 formal methods mapped from the paper archive.",
         "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred. Muon-family supplements retain their source names and actual configurations; they are archive representatives, not asserted paper-best settings.",
       "benchmark_group_id": "llama-210m",
       "protocol": {
         "protocol_id": "paper-llama-210m-bs256-8p4b",
@@ -1799,20 +1865,16 @@
         },
         "evidence_summary": {
           "expected": 13,
-          "mapped": 10,
+          "mapped": 11,
           "complete": 3,
-          "partial": 7,
+          "partial": 8,
           "nonfinite": 0,
-          "unresolved": 3
+          "unresolved": 2
         },
         "unresolved_methods": [
           {
             "paper_label": "AdamW",
             "reason": "The archived horizon series uses beta1=0.8, while the paper appendix selects beta1=0.9."
-          },
-          {
-            "paper_label": "D-Muon",
-            "reason": "The archive exposes only basic-Muon candidates for this protocol; basic Muon cannot be relabeled as D-Muon."
           },
           {
             "paper_label": "SF-AdamW",
@@ -1829,21 +1891,21 @@
         "basis": "User-requested shared chart by model, dataset family, batch and nominal token budget. Original run configuration and measurements are retained; identical validation splits are not established."
       },
       "evidence_summary": {
-        "mapped": 10,
+        "mapped": 11,
         "expected": 13,
         "complete": 3,
-        "partial": 7,
+        "partial": 8,
         "failed": 0,
-        "drawable": 10,
-        "metrics": 7821,
+        "drawable": 11,
+        "metrics": 8380,
         "claims": 0,
         "figures": 1,
         "status_counts": {
-          "partial": 7,
+          "partial": 8,
           "completed": 3
         },
         "nonfinite": 0,
-        "unresolved": 3
+        "unresolved": 2
       }
     },
     {
@@ -1887,12 +1949,12 @@
         "hardware_scope": "Compare only within this exact paper protocol."
       },
       "card": {
-        "headline": "9/11 formal methods mapped from the paper archive.",
+        "headline": "10/11 formal methods mapped from the paper archive.",
         "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred. Muon-family supplements retain their source names and actual configurations; they are archive representatives, not asserted paper-best settings.",
       "benchmark_group_id": "llama-210m",
       "protocol": {
         "protocol_id": "paper-llama-210m-bs256-16p8b",
@@ -1913,39 +1975,35 @@
         },
         "evidence_summary": {
           "expected": 11,
-          "mapped": 9,
-          "complete": 4,
+          "mapped": 10,
+          "complete": 5,
           "partial": 5,
           "nonfinite": 0,
-          "unresolved": 2
+          "unresolved": 1
         },
         "unresolved_methods": [
           {
             "paper_label": "AdamW",
             "reason": "The archived horizon series uses beta1=0.8, while the paper appendix selects beta1=0.9."
-          },
-          {
-            "paper_label": "D-Muon",
-            "reason": "The archive exposes only basic-Muon candidates for this protocol; basic Muon cannot be relabeled as D-Muon."
           }
         ]
       },
       "evidence_summary": {
-        "mapped": 9,
+        "mapped": 10,
         "expected": 11,
-        "complete": 4,
+        "complete": 5,
         "partial": 5,
         "failed": 0,
-        "drawable": 8,
-        "metrics": 4910,
+        "drawable": 9,
+        "metrics": 5411,
         "claims": 0,
         "figures": 1,
         "status_counts": {
           "partial": 5,
-          "completed": 4
+          "completed": 5
         },
         "nonfinite": 0,
-        "unresolved": 2
+        "unresolved": 1
       }
     },
     {
@@ -2032,7 +2090,7 @@
           },
           {
             "paper_label": "D-Muon",
-            "reason": "The explicit archived D-Muon candidate uses different 1D betas from the paper appendix best configuration."
+            "reason": "Rechecked 2026-11-09: archived Muon/D-Muon candidates have empty output logs and no recoverable validation trajectory. Summary metadata alone is not a drawable curve; no points are fabricated."
           },
           {
             "paper_label": "SOAP",
@@ -2120,12 +2178,12 @@
         "hardware_scope": "Compare only within this exact paper protocol."
       },
       "card": {
-        "headline": "8/11 formal methods mapped from the paper archive.",
+        "headline": "9/11 formal methods mapped from the paper archive.",
         "metric_label": "Last observed validation loss",
         "status_label": "active",
         "detail_state": "available"
       },
-      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred.",
+      "notes": "Paper main-benchmark evidence only. Every mapped run is listed; ranking uses the latest available finite validation result, while unresolved methods are not inferred. Muon-family supplements retain their source names and actual configurations; they are archive representatives, not asserted paper-best settings.",
       "benchmark_group_id": "llama-720m",
       "protocol": {
         "protocol_id": "paper-llama-720m-bs1984-16b",
@@ -2146,17 +2204,13 @@
         },
         "evidence_summary": {
           "expected": 11,
-          "mapped": 8,
-          "complete": 8,
+          "mapped": 9,
+          "complete": 9,
           "partial": 0,
           "nonfinite": 0,
-          "unresolved": 3
+          "unresolved": 2
         },
         "unresolved_methods": [
-          {
-            "paper_label": "D-Muon",
-            "reason": "The explicit archived D-Muon candidate uses different 1D betas from the paper appendix best configuration; a basic-Muon alias is not accepted."
-          },
           {
             "paper_label": "Sophia",
             "reason": "No unique archived candidate matches the paper appendix best configuration and main-figure identity."
@@ -2168,20 +2222,20 @@
         ]
       },
       "evidence_summary": {
-        "mapped": 8,
+        "mapped": 9,
         "expected": 11,
-        "complete": 8,
+        "complete": 9,
         "partial": 0,
         "failed": 0,
-        "drawable": 8,
-        "metrics": 588,
+        "drawable": 9,
+        "metrics": 673,
         "claims": 0,
         "figures": 1,
         "status_counts": {
-          "completed": 8
+          "completed": 9
         },
         "nonfinite": 0,
-        "unresolved": 3
+        "unresolved": 2
       }
     },
     {
@@ -2260,7 +2314,7 @@
         "unresolved_methods": [
           {
             "paper_label": "D-Muon",
-            "reason": "No archived run is explicitly labeled D-Muon with the paper appendix best configuration."
+            "reason": "Rechecked 2026-11-09: archived Muon/D-Muon candidates have empty output logs and no recoverable validation trajectory. Summary metadata alone is not a drawable curve; no points are fabricated."
           },
           {
             "paper_label": "Sophia",
@@ -2485,106 +2539,13 @@
         "nonfinite": 2,
         "unresolved": 0
       }
-    },
-    {
-      "suite_id": "llama-1b-fineweb30b-bs1984-8k",
-      "title": "Llama 1B",
-      "family": "benchmark",
-      "status": "active",
-      "primary_metric": "final_val_loss",
-      "target": {
-        "metric_name": null,
-        "value": null,
-        "direction": null
-      },
-      "leaderboard_rule": {
-        "sort_by": "final_val_loss",
-        "direction": "asc",
-        "display_name": "Llama 1B · 8,000-step validation leaderboard",
-        "formal_rank_metric": "final_val_loss",
-        "tie_breakers": [
-          "best_val_loss"
-        ]
-      },
-      "leaderboard_eligibility": {
-        "allowed_status": [
-          "completed"
-        ],
-        "require_same_token_budget": true,
-        "require_same_model": true,
-        "require_same_dataset": false
-      },
-      "comparability_constraints": {
-        "model": "Llama 1,026,086,656 parameters",
-        "dataset": "Mixed FineWeb pools/validation sets: SophiaG/CARA 30B/100M; Muon/CRENO 102.8B/10.4M. Numeric comparison only, not a controlled matched-data ranking.",
-        "token_budget": "8,000 optimizer steps · 8,126,464,000 tokens",
-        "hardware_scope": "Hardware/layouts and optimizer recipes differ; no same-hardware or equivalent-quality speedup claim."
-      },
-      "card": {
-        "headline": "Six completed 8,000-step runs; mixed validation sets.",
-        "metric_label": "Validation loss",
-        "status_label": "active",
-        "detail_state": "available"
-      },
-      "protocol": {
-        "protocol_id": "llama-1b-fineweb30b-bs1984-8k",
-        "source_kind": "current_benchmark",
-        "source_label": "Current · FineWeb",
-        "model": "llama",
-        "model_params": "1026.086656M",
-        "parameter_count": 1026086656,
-        "dataset": "FineWeb-30B",
-        "batch_size_sequences": 1984,
-        "sequence_length": 512,
-        "tokens_per_step": 1015808,
-        "budget_steps": 8000,
-        "planned_tokens": 8126464000,
-        "budget_label": "8,000 steps",
-        "accepts_local_experiments": true,
-        "display_order": 0,
-        "evidence_summary": {
-          "expected": 6,
-          "mapped": 6,
-          "complete": 6,
-          "partial": 0,
-          "nonfinite": 0,
-          "unresolved": 0
-        }
-      },
-      "notes": "User-approved same-page overlay; original run datasets retained. Curves use periodic128 or periodic64. Final rankings use each run's full6300 or full636 evaluation. Full evaluations are not spliced into periodic curves. Different data/evaluation sets permit numeric reference only.",
-      "comparison_overlay": {
-        "run_ids": [
-          "creno-llama-1b-8k-cos014-seed-0",
-          "creno-llama-1b-8k-lin020-seed-0",
-          "muon-llama-1b-8k-cos010-seed-0",
-          "per-head-creno-llama-1b-8k-lin020-seed-0"
-        ],
-        "mixed_validation": true,
-        "basis": "User explicitly requested the original 1B page after disclosure of the different training pools and validation sets. Preserve original configurations; this is a numeric comparison, not a matched-data leaderboard."
-      },
-      "evidence_summary": {
-        "mapped": 6,
-        "expected": 6,
-        "complete": 6,
-        "partial": 0,
-        "failed": 0,
-        "drawable": 6,
-        "metrics": 301,
-        "claims": 0,
-        "figures": 1,
-        "status_counts": {
-          "completed": 6
-        },
-        "nonfinite": 0,
-        "unresolved": 0
-      }
     }
   ],
   "evidence_summary": {
     "suites": 24,
     "active_suites": 20,
-    "runs": 227,
-    "metrics": 85740,
+    "runs": 239,
+    "metrics": 89195,
     "claims": 4,
     "figures": 20
   }
